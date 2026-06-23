@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, StatusBar } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StatusBar, BackHandler } from 'react-native';
 import { useAuth } from '../store/AuthContext';
 import { useNav } from './NavContext';
 import { colors } from '../theme';
@@ -46,7 +46,16 @@ function StackScreen({ name, params }) {
 
 export default function RootNavigator() {
   const { isAuthed } = useAuth();
-  const { tab, top, navigateTab } = useNav();
+  const { tab, top, navigateTab, goBack } = useNav();
+
+  // Android hardware/system back → one step back inside the app instead of
+  // closing it. When goBack() can't go further (Home, nothing pushed) we
+  // return false so the OS performs its default (exit).
+  useEffect(() => {
+    const onBack = () => (isAuthed ? goBack() : false);
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+    return () => sub.remove();
+  }, [isAuthed, goBack]);
 
   const onHeader = isAuthed && (tab === 'home' || tab === 'profile') ? colors.brand : colors.surface;
 

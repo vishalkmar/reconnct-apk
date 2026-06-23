@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space } from '../theme';
 import { useAuth } from '../store/AuthContext';
 import { useNav } from '../navigation/NavContext';
 import { initials } from '../utils/format';
+import { ICONS } from '../icons';
 
 const MENU = [
   { label: 'My Bookings', icon: '🎟️', screen: 'bookings' },
@@ -24,7 +25,7 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingBottom: 110 }}>
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <Text style={styles.logo}>reconnct</Text>
+        <Image source={ICONS.logoWhite} style={styles.logoImg} resizeMode="contain" />
         <View style={styles.avatar}><Text style={styles.avatarInit}>{initials(name)}</Text></View>
         <Text style={styles.name}>{name}</Text>
         {!!(user && user.email) && <Text style={styles.email}>{user.email}</Text>}
@@ -51,6 +52,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   header: { backgroundColor: colors.brand, alignItems: 'center', paddingBottom: 28, borderBottomLeftRadius: 26, borderBottomRightRadius: 26 },
   logo: { fontSize: 24, fontWeight: '800', color: '#fff', marginBottom: 14 },
+  logoImg: { width: 132, height: 26, marginBottom: 14 },
   avatar: { width: 78, height: 78, borderRadius: 39, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   avatarInit: { fontSize: 28, fontWeight: '800', color: colors.brand },
   name: { fontSize: font.h2, fontWeight: '800', color: '#fff', marginTop: 12 },

@@ -26,10 +26,19 @@ export function NavProvider({ children }) {
     setTab(next);
   }, []);
 
+  // One logical "step back" for the hardware/system back button:
+  //   pushed screen → pop it; on a non-home tab → go Home; else let the OS exit.
+  // Returns true when handled (so the OS doesn't close the app).
+  const goBack = useCallback(() => {
+    if (stack.length > 0) { setStack((s) => s.slice(0, -1)); return true; }
+    if (tab !== 'home') { setTab('home'); return true; }
+    return false;
+  }, [stack.length, tab]);
+
   const value = useMemo(() => ({
-    tab, stack, push, pop, navigateTab,
+    tab, stack, push, pop, navigateTab, goBack,
     top: stack.length ? stack[stack.length - 1] : null,
-  }), [tab, stack, push, pop, navigateTab]);
+  }), [tab, stack, push, pop, navigateTab, goBack]);
 
   return <NavContext.Provider value={value}>{children}</NavContext.Provider>;
 }

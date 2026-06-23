@@ -7,4 +7,5 @@ export const ICONS = {
   searchMuted: require('./assets/search-muted.png'),
   filter: require('./assets/filter.png'),
   cardGradient: require('./assets/card-gradient.png'),
+  logoWhite: require('./assets/logo-white.png'),
 };

@@ -134,7 +134,7 @@ export default function HomeScreen() {
         {/* Golden header — scrolls; the hero cards overlap up into its base */}
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <View style={styles.headerTop}>
-            <Text style={styles.logo}>reconnct</Text>
+            <Image source={ICONS.logoWhite} style={styles.logoImg} resizeMode="contain" />
             <View style={styles.headerRight}>
               <TouchableOpacity style={styles.locPill} onPress={() => push('cityPicker')}>
                 <Image source={ICONS.locWhite} style={styles.locPinIcon} />
@@ -307,6 +307,7 @@ const styles = StyleSheet.create({
   },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   logo: { fontSize: 24, fontWeight: '800', color: '#fff' },
+  logoImg: { width: 132, height: 26 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   locPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.25)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill },
   locPinIcon: { width: 13, height: 13 },

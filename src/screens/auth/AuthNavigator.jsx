@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BackHandler } from 'react-native';
 import LoginScreen from './LoginScreen';
 import OtpScreen from './OtpScreen';
 import { api } from '../../api/client';
@@ -16,6 +17,13 @@ export default function AuthNavigator() {
     api.appScreen('login').then((d) => { if (alive) setContent(d.content); }).catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  // System back on the OTP step returns to the email step (instead of exiting).
+  useEffect(() => {
+    const onBack = () => { if (step === 'otp') { setStep('login'); return true; } return false; };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+    return () => sub.remove();
+  }, [step]);
 
   if (step === 'otp') {
     return <OtpScreen email={email} content={content} onBack={() => setStep('login')} />;
