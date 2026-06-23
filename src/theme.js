@@ -20,7 +20,7 @@ export const colors = {
 
   star: '#F5A623',
   price: '#E08A00',
-  heart: '#EF4444',
+  heart: '#F5A623',
   success: '#16A34A',
   chipBg: '#F1F2F4',
 

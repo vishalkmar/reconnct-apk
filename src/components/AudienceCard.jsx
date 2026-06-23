@@ -1,20 +1,19 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { colors, radius, font, shadow } from '../theme';
+import { ICONS } from '../icons';
 
 /**
  * Overlay-style "Reconnect" card (full-bleed image + text overlay) — the second
  * card pattern in the Explore grid. Tapping opens the Experiences page filtered
- * by that audience. Content is anchored over a dark gradient so it is always
- * legible regardless of the photo.
+ * by that audience. A smooth bottom gradient (PNG) keeps text legible without a
+ * hard band; the chip + title are centred, Explore sits bottom-left.
  */
 export default function AudienceCard({ data, onPress, style }) {
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={[styles.card, style]}>
       <Image source={{ uri: data.image }} style={styles.bg} resizeMode="cover" />
-      {/* Layered scrims for legibility (top pill + bottom text). */}
-      <View style={styles.scrim} />
-      <View style={styles.bottomScrim} />
+      <Image source={ICONS.cardGradient} style={styles.gradient} resizeMode="stretch" />
 
       <View style={styles.top}>
         <View style={styles.pill}><Text style={styles.pillText}>💛 Reconnect</Text></View>
@@ -43,17 +42,16 @@ export const AUDIENCE_CARDS = [
 const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, overflow: 'hidden', height: 250, backgroundColor: '#2b3040', ...shadow.card },
   bg: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(20,24,40,0.28)' },
-  bottomScrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 160, backgroundColor: 'rgba(15,18,32,0.55)' },
+  gradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '78%' },
   top: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', padding: 10, zIndex: 2 },
   pill: { backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
   pillText: { color: '#fff', fontSize: font.tiny, fontWeight: '700' },
   heart: { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
   heartIcon: { color: colors.ink, fontSize: 14 },
-  content: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 12, zIndex: 2 },
-  chip: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, marginBottom: 8 },
-  chipText: { color: colors.ink, fontSize: font.tiny, fontWeight: '700' },
-  title: { color: '#fff', fontSize: 24, fontWeight: '800', fontStyle: 'italic' },
-  subtitle: { color: 'rgba(255,255,255,0.92)', fontSize: font.small, marginTop: 2 },
-  explore: { color: '#fff', fontWeight: '800', fontSize: font.small, marginTop: 8 },
+  content: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 12, paddingBottom: 12, alignItems: 'center', zIndex: 2 },
+  chip: { backgroundColor: 'rgba(255,255,255,0.94)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.pill, marginBottom: 8 },
+  chipText: { color: colors.heart, fontSize: font.tiny, fontWeight: '800' },
+  title: { color: '#fff', fontSize: 24, fontWeight: '800', fontStyle: 'italic', textAlign: 'center' },
+  subtitle: { color: 'rgba(255,255,255,0.92)', fontSize: font.small, marginTop: 2, textAlign: 'center' },
+  explore: { color: '#fff', fontWeight: '800', fontSize: font.small, marginTop: 10, alignSelf: 'flex-start' },
 });

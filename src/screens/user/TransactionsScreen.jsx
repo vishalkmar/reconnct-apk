@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
 import { colors, radius, font, space, shadow } from '../../theme';
 import { api } from '../../api/client';
 import { formatMoney } from '../../utils/format';
@@ -15,10 +15,15 @@ const isCredit = (t) => {
   return v >= 0;
 };
 
+const isRefund = (t) => /refund/i.test(String(t.type || '') + ' ' + String(t.description || t.note || ''));
+const TABS = [{ key: 'all', label: 'All' }, { key: 'payments', label: 'Payments' }, { key: 'refunds', label: 'Refunds' }];
+const matchTab = (t, key) => key === 'all' || (key === 'refunds' ? isRefund(t) : !isRefund(t));
+
 export default function TransactionsScreen() {
   const { token } = useAuth();
   const [data, setData] = useState({ balance: 0, transactions: [] });
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('all');
 
   useEffect(() => {
     let alive = true;
@@ -29,6 +34,10 @@ export default function TransactionsScreen() {
     return () => { alive = false; };
   }, [token]);
 
+  const txns = data.transactions || [];
+  const counts = TABS.reduce((acc, t) => { acc[t.key] = txns.filter((x) => matchTab(x, t.key)).length; return acc; }, {});
+  const shown = txns.filter((x) => matchTab(x, tab));
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScreenHeader title="Transactions" />
@@ -36,13 +45,26 @@ export default function TransactionsScreen() {
         <ActivityIndicator color={colors.brand} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
-          data={data.transactions || []}
+          data={shown}
           keyExtractor={(t, i) => String(t.id || i)}
           contentContainerStyle={{ padding: space.lg }}
           ListHeaderComponent={
-            <View style={styles.balanceCard}>
-              <Text style={styles.balanceLabel}>Wallet balance</Text>
-              <Text style={styles.balance}>{formatMoney(data.balance || 0, 'INR')}</Text>
+            <View>
+              <View style={styles.balanceCard}>
+                <Text style={styles.balanceLabel}>Wallet balance</Text>
+                <Text style={styles.balance}>{formatMoney(data.balance || 0, 'INR')}</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+                {TABS.map((t) => {
+                  const active = tab === t.key;
+                  return (
+                    <TouchableOpacity key={t.key} onPress={() => setTab(t.key)} style={[styles.tab, active && styles.tabActive]} activeOpacity={0.8}>
+                      <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
+                      <View style={[styles.badge, active && styles.badgeActive]}><Text style={[styles.badgeText, active && styles.badgeTextActive]}>{counts[t.key] || 0}</Text></View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
             </View>
           }
           renderItem={({ item }) => {
@@ -74,7 +96,16 @@ export default function TransactionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  balanceCard: { backgroundColor: colors.brand, borderRadius: radius.lg, padding: 20, marginBottom: 16 },
+  tabs: { paddingVertical: 12, gap: 8 },
+  tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 38, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  tabActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  tabText: { color: colors.ink, fontWeight: '700', fontSize: font.small },
+  tabTextActive: { color: '#fff' },
+  badge: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
+  badgeActive: { backgroundColor: 'rgba(255,255,255,0.3)' },
+  badgeText: { fontSize: font.tiny, fontWeight: '800', color: colors.inkMuted },
+  badgeTextActive: { color: '#fff' },
+  balanceCard: { backgroundColor: colors.brand, borderRadius: radius.lg, padding: 20, marginBottom: 4 },
   balanceLabel: { color: 'rgba(255,255,255,0.85)', fontSize: font.small },
   balance: { color: '#fff', fontSize: 30, fontWeight: '900', marginTop: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: radius.md, padding: 14, marginBottom: 10, ...shadow.card },

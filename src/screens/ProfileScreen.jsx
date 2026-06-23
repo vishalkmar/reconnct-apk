@@ -22,7 +22,7 @@ export default function ProfileScreen() {
   const name = (user && user.name) || 'Guest';
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingBottom: 40 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingBottom: 110 }}>
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Text style={styles.logo}>reconnct</Text>
         <View style={styles.avatar}><Text style={styles.avatarInit}>{initials(name)}</Text></View>

@@ -4,6 +4,7 @@ import { colors, radius, font, shadow } from '../theme';
 import { resolveImage, DUMMY_IMAGE } from '../api/client';
 import { formatMoney } from '../utils/format';
 import { useWishlist } from '../store/WishlistContext';
+import { ICONS } from '../icons';
 
 /**
  * Experience card (image-top, details-below). Used in the Explore grid,
@@ -34,7 +35,10 @@ export default function ExperienceCard({ item, onPress, variant = 'grid', style 
           <Text style={[styles.heartIcon, wished && styles.heartOn]}>{wished ? '♥' : '♡'}</Text>
         </TouchableOpacity>
         {item.distanceKm != null && (
-          <View style={styles.distance}><Text style={styles.distanceText}>📍 {item.distanceKm} km</Text></View>
+          <View style={styles.distance}>
+            <Image source={ICONS.locMuted} style={styles.distIcon} />
+            <Text style={styles.distanceText}>{item.distanceKm} km</Text>
+          </View>
         )}
       </View>
 
@@ -42,7 +46,10 @@ export default function ExperienceCard({ item, onPress, variant = 'grid', style 
         <Text style={styles.title} numberOfLines={2}>{item.name}</Text>
 
         {!!item.city && (
-          <Text style={styles.location} numberOfLines={1}>📍 {item.city}</Text>
+          <View style={styles.locRow}>
+            <Image source={ICONS.locGray} style={styles.locIcon} />
+            <Text style={styles.location} numberOfLines={1}>{item.city}</Text>
+          </View>
         )}
 
         <View style={styles.rowBetween}>
@@ -95,13 +102,16 @@ const styles = StyleSheet.create({
   heartIcon: { color: colors.inkMuted, fontSize: 18, marginTop: -1 },
   heartOn: { color: colors.heart },
   distance: {
-    position: 'absolute', bottom: 8, left: 8,
+    position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.sm,
   },
+  distIcon: { width: 11, height: 11, tintColor: colors.inkMuted },
   distanceText: { fontSize: font.tiny, color: colors.ink, fontWeight: '700' },
   body: { padding: 10 },
   title: { fontSize: font.body, fontWeight: '700', color: colors.ink, lineHeight: 18 },
-  location: { fontSize: font.small, color: colors.inkMuted, marginTop: 4 },
+  locRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 },
+  locIcon: { width: 12, height: 12 },
+  location: { fontSize: font.small, color: colors.inkMuted, flex: 1 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 5 },
   rating: { fontSize: font.small, color: colors.ink, fontWeight: '600' },
   star: { color: colors.star },

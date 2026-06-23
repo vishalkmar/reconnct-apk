@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList, Dimensions,
-  ActivityIndicator, ScrollView, TextInput,
+  ActivityIndicator, ScrollView, TextInput, Image,
 } from 'react-native';
+import { ICONS } from '../icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space } from '../theme';
 import { api } from '../api/client';
@@ -82,10 +83,10 @@ export default function ExperiencesScreen({ initialFilters, tagMode = 'category'
           )}
           <View style={styles.headerRight}>
             <TouchableOpacity onPress={() => (searching ? submitSearch() : setSearching(true))} style={styles.iconBtn}>
-              <Text style={styles.hIcon}>🔍</Text>
+              <Image source={ICONS.search} style={styles.hIconImg} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowFilter(true)} style={styles.iconBtn}>
-              <Text style={styles.hIcon}>⚗</Text>
+              <Image source={ICONS.filter} style={styles.hIconImg} />
               {activeCount > 0 && <View style={styles.dot}><Text style={styles.dotText}>{activeCount}</Text></View>}
             </TouchableOpacity>
           </View>
@@ -124,7 +125,7 @@ export default function ExperiencesScreen({ initialFilters, tagMode = 'category'
           keyExtractor={(it) => String(it.id)}
           numColumns={2}
           columnWrapperStyle={{ paddingHorizontal: H_PAD, justifyContent: 'space-between' }}
-          contentContainerStyle={{ paddingTop: 12, paddingBottom: 24 }}
+          contentContainerStyle={{ paddingTop: 12, paddingBottom: 110 }}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <ExperienceCard item={item} variant="grid" style={{ width: COL_W, marginBottom: GAP }} onPress={() => openDetail(item)} />
@@ -169,6 +170,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: font.h3, color: colors.ink, marginLeft: 4, height: 40 },
   headerRight: { flexDirection: 'row', alignItems: 'center' },
   hIcon: { fontSize: 18 },
+  hIconImg: { width: 22, height: 22 },
   dot: { position: 'absolute', top: 4, right: 4, backgroundColor: colors.brand, minWidth: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   dotText: { color: '#fff', fontSize: 10, fontWeight: '800' },
   tabs: { paddingHorizontal: H_PAD, gap: 8, paddingTop: 4 },

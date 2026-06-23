@@ -9,6 +9,7 @@ import { api, resolveImage, DUMMY_IMAGE } from '../api/client';
 import { formatMoney, initials } from '../utils/format';
 import { useNav } from '../navigation/NavContext';
 import { useWishlist } from '../store/WishlistContext';
+import { ICONS } from '../icons';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -138,7 +139,12 @@ export default function DetailScreen({ idOrSlug }) {
         <View style={styles.body}>
           {!!(item.category && item.category.name) && <Text style={styles.cat}>{item.category.name}</Text>}
           <Text style={styles.title}>{item.name}</Text>
-          {!!(item.city || item.location) && <Text style={styles.loc}>📍 {[item.location, item.city].filter(Boolean).join(', ')}</Text>}
+          {!!(item.city || item.location) && (
+            <View style={styles.locRow}>
+              <Image source={ICONS.locGray} style={styles.locIcon} />
+              <Text style={styles.loc}>{[item.location, item.city].filter(Boolean).join(', ')}</Text>
+            </View>
+          )}
           <View style={styles.metaRow}>
             <Text style={styles.metaItem}><Text style={styles.star}>★ </Text>{Number(item.rating).toFixed(1)}{item.reviewsCount ? ` (${item.reviewsCount})` : ''}</Text>
             {!!item.durationLabel && <Text style={styles.metaDot}>·</Text>}
@@ -315,7 +321,9 @@ const styles = StyleSheet.create({
   body: { padding: space.xl, marginTop: -18, backgroundColor: colors.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22 },
   cat: { color: colors.brand, fontWeight: '800', fontSize: font.small, textTransform: 'uppercase' },
   title: { fontSize: font.h1, fontWeight: '800', color: colors.ink, marginTop: 6 },
-  loc: { color: colors.inkMuted, marginTop: 6, fontSize: font.body },
+  locRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  locIcon: { width: 15, height: 15 },
+  loc: { color: colors.inkMuted, fontSize: font.body },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' },
   metaItem: { fontSize: font.small, color: colors.ink, fontWeight: '600' },
   metaDot: { color: colors.inkFaint }, star: { color: colors.star },

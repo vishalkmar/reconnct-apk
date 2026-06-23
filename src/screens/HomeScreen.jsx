@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions,
-  ActivityIndicator, RefreshControl, FlatList, TextInput,
+  ActivityIndicator, RefreshControl, FlatList, TextInput, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../theme';
@@ -13,6 +13,7 @@ import ExperienceCard from '../components/ExperienceCard';
 import AudienceCard, { AUDIENCE_CARDS } from '../components/AudienceCard';
 import OfferBannerCarousel from '../components/OfferBannerCarousel';
 import FilterSheet, { draftToParams } from './FilterSheet';
+import { ICONS } from '../icons';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const H_PAD = 16;
@@ -127,7 +128,7 @@ export default function HomeScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 110 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />}
       >
         {/* Golden header — scrolls; the hero cards overlap up into its base */}
@@ -136,7 +137,8 @@ export default function HomeScreen() {
             <Text style={styles.logo}>reconnct</Text>
             <View style={styles.headerRight}>
               <TouchableOpacity style={styles.locPill} onPress={() => push('cityPicker')}>
-                <Text style={styles.locText}>📍 {city || 'Delhi'} ▾</Text>
+                <Image source={ICONS.locWhite} style={styles.locPinIcon} />
+                <Text style={styles.locText}>{city || 'Delhi'} ▾</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => push('notifications')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={styles.bell}>🔔</Text>
@@ -216,7 +218,7 @@ export default function HomeScreen() {
           {/* You're here — dismissible tooltip */}
           {!!detectedCity && !geoDismissed && (
             <View style={styles.geoBanner}>
-              <View style={styles.geoIconWrap}><Text style={styles.geoEmoji}>📍</Text></View>
+              <View style={styles.geoIconWrap}><Image source={ICONS.locMuted} style={styles.geoPin} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.geoTitle}>You’re in {detectedCity}</Text>
                 <Text style={styles.geoText}>Showing experiences nearby you first.</Text>
@@ -306,7 +308,8 @@ const styles = StyleSheet.create({
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   logo: { fontSize: 24, fontWeight: '800', color: '#fff' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  locPill: { backgroundColor: 'rgba(255,255,255,0.25)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill },
+  locPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.25)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill },
+  locPinIcon: { width: 13, height: 13 },
   locText: { color: '#fff', fontSize: font.small, fontWeight: '700' },
   bell: { fontSize: 18 },
   bellDot: { position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' },
@@ -323,7 +326,7 @@ const styles = StyleSheet.create({
 
   geoBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, marginHorizontal: H_PAD, marginTop: 16, paddingVertical: 12, paddingHorizontal: 14, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.brandSoft, ...shadow.card },
   geoIconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
-  geoEmoji: { fontSize: 16 },
+  geoPin: { width: 18, height: 18 },
   geoTitle: { color: colors.ink, fontSize: font.body, fontWeight: '800' },
   geoText: { color: colors.inkMuted, fontSize: font.small, marginTop: 1 },
   geoClose: { color: colors.inkFaint, fontSize: 16, fontWeight: '700', paddingHorizontal: 4 },
