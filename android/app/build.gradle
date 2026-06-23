@@ -103,6 +103,10 @@ android {
             signingConfig signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            // Allow cleartext (http) so the release APK can reach the local
+            // backend over LAN http://192.168.1.8:5001. Remove once the backend
+            // is served over https.
+            manifestPlaceholders = [usesCleartextTraffic: "true"]
         }
     }
 }
