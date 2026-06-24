@@ -45,9 +45,28 @@ export default function FilterSheet({ visible, taxonomy, initial, onApply, onClo
   }, [draft, visible]);
 
   const audiences = (taxonomy && taxonomy.audiences) || [];
-  const categories = (taxonomy && taxonomy.categories) || [];
+  const allCategories = (taxonomy && taxonomy.categories) || [];
 
-  const toggle = (key, val) => setDraft((d) => ({ ...d, [key]: d[key] === val ? null : val }));
+  // When an audience is picked, show only the categories tagged with it (like
+  // the admin form). Lenient: if the taxonomy hasn't shipped category→audience
+  // tags yet, show everything so the filter never goes blank.
+  const selAud = audiences.find((a) => a.id === draft.audienceId);
+  const anyTagged = allCategories.some((c) => Array.isArray(c.audiences) && c.audiences.length);
+  const categories = (draft.audienceId && selAud && anyTagged)
+    ? allCategories.filter((c) => Array.isArray(c.audiences) && c.audiences.includes(selAud.slug))
+    : allCategories;
+
+  const toggle = (key, val) => setDraft((d) => {
+    const next = { ...d, [key]: d[key] === val ? null : val };
+    // Changing audience invalidates a category that no longer fits it.
+    if (key === 'audienceId' && next.categoryId) {
+      const aud = audiences.find((a) => a.id === next.audienceId);
+      const cat = allCategories.find((c) => c.id === next.categoryId);
+      const ok = !next.audienceId || !aud || !cat || !Array.isArray(cat.audiences) || cat.audiences.length === 0 || cat.audiences.includes(aud.slug);
+      if (!ok) next.categoryId = null;
+    }
+    return next;
+  });
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -98,7 +117,7 @@ export default function FilterSheet({ visible, taxonomy, initial, onApply, onClo
                         onPress={() => toggle('categoryId', c.id)}
                         activeOpacity={0.85}
                       >
-                        <Text style={[styles.chipText, sel && styles.chipTextSel]}>{c.name}</Text>
+                        <Text style={[styles.chipText, sel && styles.chipTextSel]}>{c.icon ? `${c.icon}  ` : ''}{c.name}</Text>
                       </TouchableOpacity>
                     );
                   })}

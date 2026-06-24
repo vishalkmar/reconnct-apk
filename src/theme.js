@@ -6,8 +6,10 @@ export const colors = {
   brandText: '#7A4E00',
 
   navy: '#15233F',         // dark headings ("Almost there!")
-  reconnectCard: '#2C2C2E',// dark "Reconnect" hero card
-  experiencesCard: '#2F5E8C', // blue "Experiences" hero card
+  reconnectCard: '#1B5E47',// deep-green "Reconnect" hero card (Figma)
+  reconnectIcon: '#A7E84C',// lime icon square
+  experiencesCard: '#2E2A6B', // deep-indigo "Experiences" hero card (Figma)
+  experiencesIcon: '#CDBEFB', // light-lavender icon square
 
   ink: '#1F2937',          // primary text
   inkMuted: '#6B7280',     // secondary text

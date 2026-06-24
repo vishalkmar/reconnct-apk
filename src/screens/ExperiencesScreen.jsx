@@ -95,17 +95,17 @@ export default function ExperiencesScreen({ initialFilters, tagMode = 'category'
         {/* Quick tabs — audiences (All/Family/Friends/Kids…) or broad categories */}
         {audienceMode ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-            <Tab label="All" active={!filters.audienceId} onPress={() => setFilters((f) => ({ ...f, audienceId: null }))} />
+            <Tab label="All" icon="✨" active={!filters.audienceId} onPress={() => setFilters((f) => ({ ...f, audienceId: null }))} />
             {auds.map((a) => (
-              <Tab key={a.id} label={a.name} active={filters.audienceId === a.id}
+              <Tab key={a.id} label={a.name} icon={a.icon} active={filters.audienceId === a.id}
                 onPress={() => setFilters((f) => ({ ...f, audienceId: f.audienceId === a.id ? null : a.id }))} />
             ))}
           </ScrollView>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-            <Tab label="All" active={!filters.categoryId} onPress={() => setFilters((f) => ({ ...f, categoryId: null }))} />
+            <Tab label="All" icon="🌐" active={!filters.categoryId} onPress={() => setFilters((f) => ({ ...f, categoryId: null }))} />
             {cats.map((c) => (
-              <Tab key={c.id} label={c.name} active={filters.categoryId === c.id}
+              <Tab key={c.id} label={c.name} icon={c.icon} active={filters.categoryId === c.id}
                 onPress={() => setFilters((f) => ({ ...f, categoryId: f.categoryId === c.id ? null : c.id }))} />
             ))}
           </ScrollView>
@@ -150,10 +150,10 @@ export default function ExperiencesScreen({ initialFilters, tagMode = 'category'
   );
 }
 
-function Tab({ label, active, onPress }) {
+function Tab({ label, icon, active, onPress }) {
   return (
     <TouchableOpacity onPress={onPress} style={[styles.tab, active && styles.tabActive]} activeOpacity={0.8}>
-      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
+      <Text style={[styles.tabText, active && styles.tabTextActive]}>{icon ? `${icon}  ` : ''}{label}</Text>
     </TouchableOpacity>
   );
 }

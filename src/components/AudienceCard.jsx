@@ -21,7 +21,6 @@ export default function AudienceCard({ data, onPress, style }) {
       </View>
 
       <View style={styles.content}>
-        <View style={styles.chip}><Text style={styles.chipText}>{data.chip}</Text></View>
         <Text style={styles.title}>{data.title}</Text>
         <Text style={styles.subtitle}>{data.subtitle}</Text>
         <Text style={styles.explore}>Explore  →</Text>
@@ -38,6 +37,29 @@ export const AUDIENCE_CARDS = [
   { slug: 'friends', title: 'Friends', chip: '🧑‍🤝‍🧑 With your crew', subtitle: 'Adventures, laughs', image: U('1529156069898-49953e39b3ac') },
   { slug: 'kids-and-teens', title: 'With Kids', chip: '☀ Fun for little ones', subtitle: 'Safe, joyful', image: U('1476234251651-f353703a034d') },
 ];
+
+// Theme (image + subtitle) for every taxonomy audience, used on the Reconnect
+// screen. Falls back to the audience's own name + a default image.
+const AUDIENCE_THEME = {
+  self: { subtitle: 'Me-time & growth', image: U('1517836357463-d25dfeac3438') },
+  yourself: { subtitle: 'Me-time & growth', image: U('1517836357463-d25dfeac3438') },
+  partner: { subtitle: 'Romantic escapes', image: U('1503104834685-7205e8607eb9') },
+  family: { subtitle: 'Memories that last', image: U('1542359649-31e03cd4d909') },
+  friends: { subtitle: 'Adventures, laughs', image: U('1529156069898-49953e39b3ac') },
+  'kids-and-teens': { subtitle: 'Safe, joyful fun', image: U('1476234251651-f353703a034d') },
+  'community-and-new-connections': { subtitle: 'Meet new people', image: U('1528659882437-b89a74bc157f') },
+  'elders-and-active-seniors': { subtitle: 'Cherished moments', image: U('1530789253388-582c481c54b0') },
+  'corporate-and-teams': { subtitle: 'Build together', image: U('1488646953014-85cb44e25828') },
+};
+export const themeForAudience = (a) => {
+  const t = AUDIENCE_THEME[a.slug] || {};
+  return {
+    slug: a.slug,
+    title: a.name,
+    subtitle: t.subtitle || 'Curated experiences',
+    image: t.image || U('1469854523086-cc02fe5d8800'),
+  };
+};
 
 const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, overflow: 'hidden', height: 250, backgroundColor: '#2b3040', ...shadow.card },

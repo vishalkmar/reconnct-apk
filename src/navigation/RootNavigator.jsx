@@ -7,6 +7,9 @@ import { colors } from '../theme';
 import AuthNavigator from '../screens/auth/AuthNavigator';
 import HomeScreen from '../screens/HomeScreen';
 import ExperiencesScreen from '../screens/ExperiencesScreen';
+import SearchScreen from '../screens/SearchScreen';
+import ReconnectScreen from '../screens/ReconnectScreen';
+import BookingScreen from '../screens/BookingScreen';
 import InboxScreen from '../screens/InboxScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import DetailScreen from '../screens/DetailScreen';
@@ -22,7 +25,7 @@ import BottomNav from '../components/BottomNav';
 function TabScreen({ tab }) {
   switch (tab) {
     case 'home': return <HomeScreen />;
-    case 'search': return <ExperiencesScreen />;
+    case 'search': return <SearchScreen />;
     case 'experiences': return <ExperiencesScreen />;
     case 'inbox': return <InboxScreen />;
     case 'profile': return <ProfileScreen />;
@@ -34,6 +37,8 @@ function TabScreen({ tab }) {
 function StackScreen({ name, params }) {
   switch (name) {
     case 'detail': return <DetailScreen idOrSlug={params.idOrSlug} />;
+    case 'reconnect': return <ReconnectScreen />;
+    case 'booking': return <BookingScreen item={params.item} />;
     case 'experiences': return <ExperiencesScreen initialFilters={params.initialFilters} tagMode={params.tagMode} />;
     case 'bookings': return <MyBookingsScreen />;
     case 'wishlist': return <WishlistScreen />;

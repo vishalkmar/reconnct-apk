@@ -123,6 +123,15 @@ export default function HomeScreen() {
     push('experiences', { tagMode: 'audience', initialFilters: match ? { audienceId: match.id } : {} });
   };
 
+  // One Explore card (audience overlay OR experience).
+  const renderMixed = (m) => (m.__aud
+    ? <AudienceCard key={'a' + m.__aud.slug} data={m.__aud} style={{ marginBottom: GRID_GAP }} onPress={() => goAudience(m.__aud.slug)} />
+    : <ExperienceCard key={'e' + m.__exp.id} item={m.__exp} style={{ marginBottom: GRID_GAP }} onPress={() => openDetail(m.__exp)} />);
+  const renderExp = (it) => <ExperienceCard key={it.id} item={it} style={{ marginBottom: GRID_GAP }} onPress={() => openDetail(it)} />;
+  // Split a list into two independent columns → masonry (no row-height gaps).
+  const evens = (arr) => arr.filter((_, i) => i % 2 === 0);
+  const odds = (arr) => arr.filter((_, i) => i % 2 === 1);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView
@@ -140,8 +149,8 @@ export default function HomeScreen() {
                 <Image source={ICONS.locWhite} style={styles.locPinIcon} />
                 <Text style={styles.locText}>{city || 'Delhi'} ▾</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => push('notifications')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={styles.bell}>🔔</Text>
+              <TouchableOpacity onPress={() => push('notifications')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.bellWrap}>
+                <Image source={ICONS.bell} style={styles.bellIcon} />
                 <View style={styles.bellDot} />
               </TouchableOpacity>
             </View>
@@ -150,7 +159,7 @@ export default function HomeScreen() {
           <Text style={styles.whatsNext}>What’s next?</Text>
 
           <View style={styles.search}>
-            <Text style={styles.searchIcon}>🔍</Text>
+            <Image source={ICONS.searchMuted} style={styles.searchIconImg} />
             <TextInput
               style={styles.searchInput}
               placeholder="Experiences, destinations…"
@@ -163,7 +172,7 @@ export default function HomeScreen() {
               <TouchableOpacity onPress={() => setQuery('')}><Text style={styles.clearX}>✕</Text></TouchableOpacity>
             )}
             <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilter(true)}>
-              <Text style={styles.filterIcon}>≡</Text>
+              <Image source={ICONS.filter} style={styles.filterIconImg} />
               <Text style={styles.filterLabel}>Filter</Text>
               {hasActiveFilters && <View style={styles.filterDot} />}
             </TouchableOpacity>
@@ -179,24 +188,25 @@ export default function HomeScreen() {
             {searchingBusy && !results ? (
               <ActivityIndicator color={colors.brand} style={{ marginTop: 24 }} />
             ) : (
-              <View style={styles.grid}>
-                {(results || []).map((it) => (
-                  <ExperienceCard key={it.id} item={it} style={{ width: COL_W, marginBottom: GRID_GAP }} onPress={() => openDetail(it)} />
-                ))}
+              <>
+                <View style={styles.masonry}>
+                  <View style={styles.col}>{evens(results || []).map(renderExp)}</View>
+                  <View style={styles.col}>{odds(results || []).map(renderExp)}</View>
+                </View>
                 {(results || []).length === 0 && (
                   <Text style={styles.emptyFeat}>No experiences match. Try a different search or filter.</Text>
                 )}
-              </View>
+              </>
             )}
           </>
         ) : (
           <>
           {/* Two hero cards — pulled up so they overlap the yellow header */}
           <View style={styles.heroRow}>
-            <TouchableOpacity activeOpacity={0.9} style={[styles.heroCard, { backgroundColor: colors.reconnectCard }]} onPress={() => push('experiences', { tagMode: 'audience' })}>
-              <View style={styles.heroIcon}><Text style={{ fontSize: 18 }}>💛</Text></View>
-              <Text style={styles.heroTitle}>Reconnect</Text>
-              <Text style={styles.heroSub}>For people who matter most</Text>
+            <TouchableOpacity activeOpacity={0.9} style={[styles.heroCard, { backgroundColor: colors.reconnectCard }]} onPress={() => push('reconnect')}>
+              <View style={[styles.heroIcon, { backgroundColor: colors.reconnectIcon }]}><Image source={ICONS.groups} style={[styles.heroGlyph, { tintColor: '#13402F' }]} /></View>
+              <Text style={styles.heroTitle}>Who do you want to reconnect with?</Text>
+              <Text style={styles.heroSub}>Find experiences for the people who matter most.</Text>
               <View style={styles.heroChips}>
                 {['Partner', 'Family', 'Friends', 'Kids'].map((c) => (
                   <View key={c} style={styles.heroChip}><Text style={styles.heroChipText}>{c}</Text></View>
@@ -204,9 +214,9 @@ export default function HomeScreen() {
               </View>
             </TouchableOpacity>
             <TouchableOpacity activeOpacity={0.9} style={[styles.heroCard, { backgroundColor: colors.experiencesCard }]} onPress={() => navigateTab('experiences')}>
-              <View style={styles.heroIcon}><Text style={{ fontSize: 18 }}>🧭</Text></View>
-              <Text style={styles.heroTitle}>Experiences</Text>
-              <Text style={styles.heroSub}>Explore activities worldwide</Text>
+              <View style={[styles.heroIcon, { backgroundColor: colors.experiencesIcon }]}><Image source={ICONS.compass} style={[styles.heroGlyph, { tintColor: '#2A2A6B' }]} /></View>
+              <Text style={styles.heroTitle}>What do you want to experience?</Text>
+              <Text style={styles.heroSub}>Explore unforgettable activities worldwide.</Text>
               <View style={styles.heroChips}>
                 {['Adventure', 'Cultural', 'Food', 'Nature'].map((c) => (
                   <View key={c} style={styles.heroChip}><Text style={styles.heroChipText}>{c}</Text></View>
@@ -243,12 +253,9 @@ export default function HomeScreen() {
             </View>
           ) : (
             <>
-              <View style={styles.grid}>
-                {gridMixed.map((m) => (
-                  m.__aud
-                    ? <AudienceCard key={'a' + m.__aud.slug} data={m.__aud} style={{ width: COL_W, marginBottom: GRID_GAP }} onPress={() => goAudience(m.__aud.slug)} />
-                    : <ExperienceCard key={'e' + m.__exp.id} item={m.__exp} style={{ width: COL_W, marginBottom: GRID_GAP }} onPress={() => openDetail(m.__exp)} />
-                ))}
+              <View style={styles.masonry}>
+                <View style={styles.col}>{evens(gridMixed).map(renderMixed)}</View>
+                <View style={styles.col}>{odds(gridMixed).map(renderMixed)}</View>
               </View>
 
               <TouchableOpacity style={styles.exploreMore} onPress={() => navigateTab('experiences')} activeOpacity={0.9}>
@@ -264,8 +271,8 @@ export default function HomeScreen() {
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catTabs}>
-            <CatTab label="All" active={!activeCat} onPress={() => setActiveCat(null)} />
-            {cats.map((c) => <CatTab key={c.id} label={c.name} active={activeCat === c.id} onPress={() => setActiveCat(c.id)} />)}
+            <CatTab label="All" icon="🌐" active={!activeCat} onPress={() => setActiveCat(null)} />
+            {cats.map((c) => <CatTab key={c.id} label={c.name} icon={c.icon} active={activeCat === c.id} onPress={() => setActiveCat(c.id)} />)}
           </ScrollView>
 
           <FlatList
@@ -292,10 +299,10 @@ export default function HomeScreen() {
   );
 }
 
-function CatTab({ label, active, onPress }) {
+function CatTab({ label, icon, active, onPress }) {
   return (
     <TouchableOpacity onPress={onPress} style={[styles.catTab, active && styles.catTabActive]} activeOpacity={0.8}>
-      <Text style={[styles.catTabText, active && styles.catTabTextActive]}>{label}</Text>
+      <Text style={[styles.catTabText, active && styles.catTabTextActive]}>{icon ? `${icon}  ` : ''}{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -312,16 +319,17 @@ const styles = StyleSheet.create({
   locPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.25)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill },
   locPinIcon: { width: 13, height: 13 },
   locText: { color: '#fff', fontSize: font.small, fontWeight: '700' },
-  bell: { fontSize: 18 },
-  bellDot: { position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' },
-  hello: { color: '#fff', fontSize: font.body, marginTop: 10, opacity: 0.95 },
-  whatsNext: { color: '#fff', fontSize: 24, fontWeight: '800', marginTop: 2 },
-  search: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: radius.pill, paddingLeft: 16, paddingRight: 6, height: 48, marginTop: 14 },
-  searchIcon: { fontSize: 15, marginRight: 8 },
+  bellWrap: { padding: 2 },
+  bellIcon: { width: 22, height: 22, tintColor: '#fff' },
+  bellDot: { position: 'absolute', top: 0, right: 0, width: 9, height: 9, borderRadius: 5, backgroundColor: '#EF4444', borderWidth: 1.5, borderColor: colors.brand },
+  hello: { color: '#fff', fontSize: 15, marginTop: 18, opacity: 0.95, fontWeight: '500' },
+  whatsNext: { color: '#fff', fontSize: 34, fontWeight: '900', marginTop: 6, letterSpacing: 0.2 },
+  search: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: radius.pill, paddingLeft: 16, paddingRight: 6, height: 52, marginTop: 20 },
+  searchIconImg: { width: 16, height: 16, marginRight: 8, tintColor: colors.inkFaint },
   searchInput: { flex: 1, color: colors.ink, fontSize: font.body, paddingVertical: 0 },
   clearX: { color: colors.inkFaint, fontSize: 14, paddingHorizontal: 6 },
-  filterBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.brandSoft, paddingHorizontal: 12, height: 36, borderRadius: radius.pill },
-  filterIcon: { color: colors.brandText, fontSize: 16, fontWeight: '900' },
+  filterBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.brandSoft, paddingHorizontal: 12, height: 36, borderRadius: radius.pill },
+  filterIconImg: { width: 15, height: 15, tintColor: colors.brandText },
   filterLabel: { color: colors.brandText, fontWeight: '800', fontSize: font.small },
   filterDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.brand, marginLeft: 2 },
 
@@ -336,10 +344,11 @@ const styles = StyleSheet.create({
   clearAll: { color: colors.brand, fontWeight: '700' },
 
   heroRow: { flexDirection: 'row', gap: GRID_GAP, paddingHorizontal: H_PAD, marginTop: -38 },
-  heroCard: { flex: 1, borderRadius: radius.lg, padding: 14, minHeight: 148 },
-  heroIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  heroTitle: { color: '#fff', fontSize: font.h2, fontWeight: '800' },
-  heroSub: { color: 'rgba(255,255,255,0.8)', fontSize: font.small, marginTop: 3 },
+  heroCard: { flex: 1, borderRadius: radius.lg, padding: 16, minHeight: 215 },
+  heroIcon: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  heroGlyph: { width: 24, height: 24 },
+  heroTitle: { color: '#fff', fontSize: 18, fontWeight: '800', lineHeight: 23 },
+  heroSub: { color: 'rgba(255,255,255,0.82)', fontSize: 12.5, marginTop: 6, lineHeight: 17 },
   heroChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
   heroChip: { backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 9, paddingVertical: 4, borderRadius: radius.sm },
   heroChipText: { color: '#fff', fontSize: font.tiny, fontWeight: '600' },
@@ -357,6 +366,8 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: font.h2, fontWeight: '800', color: colors.ink },
   seeAll: { color: colors.brand, fontWeight: '700' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: H_PAD },
+  masonry: { flexDirection: 'row', paddingHorizontal: H_PAD, gap: GRID_GAP },
+  col: { flex: 1 },
 
   exploreMore: { marginHorizontal: H_PAD, marginTop: 12, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.brand, borderRadius: radius.pill, paddingVertical: 13, alignItems: 'center', ...shadow.card },
   exploreMoreText: { color: colors.brand, fontWeight: '800', fontSize: font.h3 },

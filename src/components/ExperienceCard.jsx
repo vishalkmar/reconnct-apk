@@ -14,7 +14,6 @@ export default function ExperienceCard({ item, onPress, variant = 'grid', style 
   const { isWished, toggle } = useWishlist();
   const img = resolveImage(item.mainImage) || DUMMY_IMAGE;
   const wished = isWished('experience', item.id);
-  const showMeta = variant !== 'carousel';
 
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={[styles.card, style]}>
@@ -52,25 +51,16 @@ export default function ExperienceCard({ item, onPress, variant = 'grid', style 
           </View>
         )}
 
-        <View style={styles.rowBetween}>
+        <View style={styles.footRow}>
           <Text style={styles.rating}>
             <Text style={styles.star}>★ </Text>
             {Number(item.rating).toFixed(1)}
             {item.reviewsCount ? <Text style={styles.muted}>  ({item.reviewsCount})</Text> : null}
           </Text>
+          <Text style={styles.price}>
+            {item.fromPrice ? formatMoney(item.fromPrice, item.currency) : 'Contact'}
+          </Text>
         </View>
-
-        {showMeta && (item.durationLabel || item.capacity) ? (
-          <View style={styles.metaRow}>
-            {!!item.durationLabel && <Text style={styles.meta}>⏱ {item.durationLabel}</Text>}
-            {!!item.capacity && <Text style={styles.meta}>👥 Up to {item.capacity}</Text>}
-          </View>
-        ) : null}
-
-        <Text style={styles.price}>
-          {item.fromPrice ? formatMoney(item.fromPrice, item.currency) : 'Contact'}
-          {item.fromPrice ? <Text style={styles.priceUnit}>/{item.priceUnit}</Text> : null}
-        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -112,12 +102,9 @@ const styles = StyleSheet.create({
   locRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 },
   locIcon: { width: 12, height: 12 },
   location: { fontSize: font.small, color: colors.inkMuted, flex: 1 },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 5 },
-  rating: { fontSize: font.small, color: colors.ink, fontWeight: '600' },
+  footRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
+  rating: { fontSize: font.small, color: colors.ink, fontWeight: '700' },
   star: { color: colors.star },
   muted: { color: colors.inkMuted, fontWeight: '400' },
-  metaRow: { flexDirection: 'row', gap: 12, marginTop: 6 },
-  meta: { fontSize: font.tiny, color: colors.inkMuted },
-  price: { marginTop: 8, fontSize: font.h3, fontWeight: '800', color: colors.price },
-  priceUnit: { fontSize: font.tiny, fontWeight: '600', color: colors.inkMuted },
+  price: { fontSize: font.h3, fontWeight: '800', color: colors.price },
 });

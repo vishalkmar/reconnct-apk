@@ -1,0 +1,529 @@
+import React, { useState, useMemo } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, Alert, Modal, Pressable,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, radius, font, space, shadow } from '../theme';
+import { resolveImage, DUMMY_IMAGE } from '../api/client';
+import { formatMoney, initials } from '../utils/format';
+import { bookableDateSet, priceBreakdown, DOW, MONTHS_FULL } from '../utils/booking';
+import { useAuth } from '../store/AuthContext';
+import { useNav } from '../navigation/NavContext';
+import { shareExperience } from '../utils/share';
+import { ICONS } from '../icons';
+
+const pad = (n) => String(n).padStart(2, '0');
+const fmtDate = (key) => {
+  if (!key) return '';
+  const [y, m, d] = key.split('-').map(Number);
+  return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]} ${d}, ${y}`;
+};
+
+export default function BookingScreen({ item }) {
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const { pop, navigateTab, push } = useNav();
+
+  const [step, setStep] = useState(1); // 1 plan · 2 review · 3 pay · 4 done
+  const today = new Date();
+  const schedule = item.schedule || {};
+  const slots = schedule.timeSlots || [];
+  const bookable = useMemo(() => bookableDateSet(schedule), [item.id]);
+  // Open the calendar on the first month that actually has availability.
+  const firstAvail = useMemo(() => {
+    const keys = [...bookable].sort();
+    return keys.length ? keys[0] : null;
+  }, [bookable]);
+  const initMonth = firstAvail ? new Date(firstAvail) : today;
+
+  const [view, setView] = useState({ y: initMonth.getFullYear(), m: initMonth.getMonth() });
+  const [dateKey, setDateKey] = useState(null);
+  const [slot, setSlot] = useState(null);
+  const [adults, setAdults] = useState(2);
+  const [children, setChildren] = useState(0);
+  const [showGuest, setShowGuest] = useState(false);
+  const [guest, setGuest] = useState({ name: '', phone: '', email: '' });
+  const [pay, setPay] = useState('card');
+  const [card, setCard] = useState({ number: '', name: '', exp: '', cvv: '' });
+  const [upi, setUpi] = useState('');
+  const [bookingCode] = useState('RC-' + Math.floor(10000 + Math.random() * 89999));
+  const b = priceBreakdown(item, adults, children);
+  const guests = adults + children;
+  const primaryName = guest.name.trim() || (user && user.name) || 'You';
+
+  // ── Calendar grid ─────────────────────────────────────────────────────
+  const monthStart = new Date(view.y, view.m, 1);
+  const firstDow = monthStart.getDay();
+  const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
+  const cells = [...Array(firstDow).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  const todayKey = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  const stepMonth = (delta) => {
+    const d = new Date(view.y, view.m + delta, 1);
+    setView({ y: d.getFullYear(), m: d.getMonth() });
+  };
+
+  const next1 = () => {
+    if (!dateKey) return Alert.alert('Pick a date', 'Choose an available date to continue.');
+    if (slots.length && !slot) return Alert.alert('Pick a time', 'Choose a time slot for your date.');
+    setStep(2);
+  };
+
+  const headerTitle = ['', 'Plan your trip', 'Review booking', 'Confirm & pay', 'Done'][step];
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      {step < 4 && (
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.back} onPress={() => (step > 1 ? setStep(step - 1) : pop())}><Text style={styles.backIcon}>‹</Text></TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.hTitle}>{headerTitle}</Text>
+              <Text style={styles.hStep}>Step {step} of 3</Text>
+            </View>
+            <Text style={styles.hTotal}>{formatMoney(b.total, item.currency)}</Text>
+          </View>
+          <View style={styles.progress}>
+            {[1, 2, 3].map((s) => <View key={s} style={[styles.progressSeg, s <= step && styles.progressOn]} />)}
+          </View>
+        </View>
+      )}
+
+      {/* ───────── STEP 1: plan ───────── */}
+      {step === 1 && (
+        <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: 120 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <Text style={styles.bigQ}>When are you going?</Text>
+          <Text style={styles.sub}>Select a date for your experience.</Text>
+
+          {/* Calendar */}
+          <View style={styles.calendar}>
+            <View style={styles.calHead}>
+              <TouchableOpacity onPress={() => stepMonth(-1)} style={styles.calNav}><Text style={styles.calNavTxt}>‹</Text></TouchableOpacity>
+              <Text style={styles.calMonth}>{MONTHS_FULL[view.m]} {view.y}</Text>
+              <TouchableOpacity onPress={() => stepMonth(1)} style={styles.calNav}><Text style={styles.calNavTxt}>›</Text></TouchableOpacity>
+            </View>
+            <View style={styles.calDows}>{['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <Text key={i} style={styles.calDow}>{d}</Text>)}</View>
+            <View style={styles.calGrid}>
+              {cells.map((day, i) => {
+                if (!day) return <View key={i} style={styles.calCell} />;
+                const key = `${view.y}-${pad(view.m + 1)}-${pad(day)}`;
+                const avail = bookable.has(key) && key >= todayKey;
+                const sel = dateKey === key;
+                return (
+                  <TouchableOpacity key={i} style={styles.calCell} disabled={!avail} onPress={() => { setDateKey(key); setSlot(null); }}>
+                    <View style={[styles.calDay, sel && styles.calDaySel, avail && !sel && styles.calDayAvail]}>
+                      <Text style={[styles.calDayTxt, sel && styles.calDayTxtSel, !avail && styles.calDayTxtOff]}>{day}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {!!dateKey && (
+            <View style={styles.selDate}>
+              <Image source={ICONS.calendar} style={styles.selDateIcon} />
+              <Text style={styles.selDateTxt}>{fmtDate(dateKey)}{item.durationLabel ? `  ·  ${item.durationLabel}` : ''}</Text>
+            </View>
+          )}
+
+          {/* Time slots — single slidable row */}
+          {!!dateKey && slots.length > 0 && (
+            <>
+              <Text style={styles.label}>Available time slots</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.slotRow}>
+                {slots.map((t) => (
+                  <TouchableOpacity key={t} onPress={() => setSlot(t)} style={[styles.slotChip, slot === t && styles.slotChipOn]}>
+                    <Image source={ICONS.clock} style={[styles.slotIcon, slot === t && { tintColor: colors.brandText }]} />
+                    <Text style={[styles.slotTxt, slot === t && styles.slotTxtOn]}>{t}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>
+          )}
+
+          {/* Guests */}
+          {!!dateKey && (
+            <>
+              <Text style={styles.label}>Guests</Text>
+              <View style={styles.guestCard}>
+                <Stepper label="Adults" sub={`${formatMoney(b.adultPrice, item.currency)} each${item.capacity ? ` · up to ${item.capacity}` : ''}`} value={adults} setValue={setAdults} min={1} max={item.capacity || 30} />
+                {b.childBand && (
+                  <Stepper label={`Children (${b.childBand.startAge}–${b.childBand.endAge} yrs)`} sub={`${formatMoney(b.childPrice, item.currency)} each`} value={children} setValue={setChildren} min={0} max={item.capacity || 30} />
+                )}
+                <View style={styles.guestPrice}>
+                  <Text style={styles.guestPriceTxt}>{formatMoney(b.adultPrice, item.currency)} × {guests} guest{guests > 1 ? 's' : ''}</Text>
+                  <Text style={styles.guestPriceVal}>{formatMoney(b.subtotal, item.currency)}</Text>
+                </View>
+              </View>
+
+              {/* Primary guest (optional) — opens a center popup */}
+              <TouchableOpacity style={styles.guestToggle} onPress={() => setShowGuest(true)}>
+                <Image source={ICONS.people} style={styles.guestToggleIcon} />
+                <Text style={styles.guestToggleTxt}>{guest.name.trim() ? `Primary guest: ${guest.name.trim()}` : 'Add primary guest details (optional)'}</Text>
+                <Text style={styles.guestToggleChev}>›</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </ScrollView>
+      )}
+
+      {/* ───────── STEP 2: review ───────── */}
+      {step === 2 && (
+        <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+          <Text style={styles.bigQ}>Review your booking</Text>
+
+          <View style={styles.expCard}>
+            <Image source={{ uri: resolveImage(item.mainImage) || DUMMY_IMAGE }} style={styles.expImg} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.expName} numberOfLines={2}>{item.name}</Text>
+              <View style={styles.expLoc}><Image source={ICONS.locGray} style={styles.tinyLoc} /><Text style={styles.expLocTxt}>{item.city || item.location}</Text></View>
+              <Text style={styles.expRating}><Text style={{ color: colors.star }}>★ </Text>{Number(item.rating).toFixed(1)}{item.reviewsCount ? ` (${item.reviewsCount})` : ''}</Text>
+            </View>
+          </View>
+
+          <Section title="Your trip">
+            <KV k="Date" v={fmtDate(dateKey)} />
+            {!!slot && <KV k="Time" v={slot} />}
+            <KV k="Guests" v={`${guests} guest${guests > 1 ? 's' : ''}`} />
+            {!!item.durationLabel && <KV k="Duration" v={item.durationLabel} />}
+            <KV k="Language" v="English" />
+            <KV k="Primary guest" v={primaryName} last />
+          </Section>
+
+          <Section title="Price details">
+            <KV k={`${formatMoney(b.adultPrice, item.currency)} × ${guests} guest${guests > 1 ? 's' : ''}`} v={formatMoney(b.subtotal, item.currency)} />
+            {b.discountAmt > 0 && <KV k="Discount" v={`− ${formatMoney(b.discountAmt, item.currency)}`} green />}
+            {b.gstAmt > 0 && <KV k={`GST (${item.gstRate}%)`} v={formatMoney(b.gstAmt, item.currency)} />}
+            {b.convAmt > 0 && <KV k="reconnct service fee" v={formatMoney(b.convAmt, item.currency)} />}
+            <View style={styles.kvDivider} />
+            <KV k="Total (INR)" v={formatMoney(b.total, item.currency)} bold last />
+          </Section>
+
+          <View style={styles.cancelNote}>
+            <Image source={ICONS.shield} style={styles.cancelIcon} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cancelTitle}>Free cancellation — up to 24 hrs before</Text>
+              <Text style={styles.cancelSub}>Cancel up to 24 hours before your experience starts for a full refund.</Text>
+            </View>
+          </View>
+        </ScrollView>
+      )}
+
+      {/* ───────── STEP 3: pay ───────── */}
+      {step === 3 && (
+        <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: 120 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <Text style={styles.bigQ}>How would you like to pay?</Text>
+          <View style={styles.dueBox}><Text style={styles.dueTxt}>{formatMoney(b.total, item.currency)} due today</Text></View>
+
+          <View style={styles.payTabs}>
+            <TouchableOpacity style={[styles.payTab, pay === 'card' && styles.payTabOn]} onPress={() => setPay('card')}>
+              <Image source={ICONS.card} style={[styles.payTabIcon, pay === 'card' && { tintColor: colors.ink }]} />
+              <Text style={[styles.payTabTxt, pay === 'card' && styles.payTabTxtOn]}>Card</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.payTab, pay === 'upi' && styles.payTabOn]} onPress={() => setPay('upi')}>
+              <Image source={ICONS.globe} style={[styles.payTabIcon, pay === 'upi' && { tintColor: colors.ink }]} />
+              <Text style={[styles.payTabTxt, pay === 'upi' && styles.payTabTxtOn]}>UPI</Text>
+            </TouchableOpacity>
+          </View>
+
+          {pay === 'card' ? (
+            <View>
+              <Label>Card number</Label>
+              <View style={styles.fieldIconWrap}>
+                <Image source={ICONS.card} style={styles.fieldIcon} />
+                <TextInput style={styles.fieldIconInput} value={card.number} onChangeText={(t) => setCard({ ...card, number: t })}
+                  placeholder="1234 5678 9012 3456" placeholderTextColor={colors.inkFaint} keyboardType="number-pad" />
+              </View>
+              <Label>Name on card</Label>
+              <Field value={card.name} onChangeText={(t) => setCard({ ...card, name: t })} placeholder="Priya Sharma" />
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flex: 1 }}><Label>Expiry</Label><Field value={card.exp} onChangeText={(t) => setCard({ ...card, exp: t })} placeholder="MM / YY" /></View>
+                <View style={{ flex: 1 }}><Label>CVV</Label><Field value={card.cvv} onChangeText={(t) => setCard({ ...card, cvv: t })} keyboardType="number-pad" secureTextEntry placeholder="•••" /></View>
+              </View>
+            </View>
+          ) : (
+            <View>
+              <Label>UPI ID</Label>
+              <Field value={upi} onChangeText={setUpi} placeholder="yourname@upi" autoCapitalize="none" />
+              <Text style={styles.upiHint}>e.g. priya@okaxis, priya@ybl</Text>
+            </View>
+          )}
+
+          <View style={styles.secure}>
+            <Image source={ICONS.shield} style={styles.secureIcon} />
+            <Text style={styles.secureTxt}>Your payment is secure · 256-bit SSL · PCI DSS compliant</Text>
+          </View>
+
+          <View style={styles.payTotals}>
+            <KV k="Subtotal" v={formatMoney(b.subtotal - b.discountAmt + b.gstAmt, item.currency)} />
+            {b.convAmt > 0 && <KV k="Service fee" v={formatMoney(b.convAmt, item.currency)} />}
+            <KV k="Total" v={formatMoney(b.total, item.currency)} bold last />
+          </View>
+        </ScrollView>
+      )}
+
+      {/* ───────── STEP 4: confirmation ───────── */}
+      {step === 4 && (
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+          <View style={[styles.doneHero, { paddingTop: insets.top + 30 }]}>
+            <View style={styles.doneCheck}><Image source={ICONS.check} style={styles.doneCheckIcon} /></View>
+            <Text style={styles.doneTitle}>You’re all set!</Text>
+            <Text style={styles.doneSub}>Your booking is confirmed.</Text>
+          </View>
+
+          <View style={styles.doneCard}>
+            <View style={styles.doneImgWrap}>
+              <Image source={{ uri: resolveImage(item.mainImage) || DUMMY_IMAGE }} style={styles.doneImg} />
+              <Image source={ICONS.cardGradient} style={styles.doneImgGrad} resizeMode="stretch" />
+              <View style={styles.doneImgText}>
+                <Text style={styles.doneImgName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.doneImgLoc} numberOfLines={1}>{item.city || item.location}</Text>
+              </View>
+            </View>
+            <View style={styles.doneRows}>
+              <KV k="Booking ID" v={bookingCode} />
+              <KV k="Date" v={fmtDate(dateKey)} />
+              <KV k="Guests" v={`${guests} guest${guests > 1 ? 's' : ''}`} />
+              <KV k="Total paid" v={formatMoney(b.total, item.currency)} bold last />
+            </View>
+          </View>
+
+          {!!item.supplier && (
+            <View style={styles.hostNote}>
+              <View style={styles.hostAvatar}><Text style={styles.hostAvatarTxt}>{initials(item.supplier.name)}</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.hostNoteTitle}>{item.supplier.name} will be in touch</Text>
+                <Text style={styles.hostNoteSub}>Your host typically responds within 24 hours with meeting point details.</Text>
+              </View>
+            </View>
+          )}
+
+          <View style={styles.doneBtns}>
+            <TouchableOpacity style={styles.doneBtnPrimary} onPress={() => { navigateTab('profile'); push('bookings'); }}>
+              <Text style={styles.doneBtnPrimaryTxt}>View trips</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.doneBtnGhost} onPress={() => shareExperience(item)}>
+              <Image source={ICONS.share} style={{ width: 16, height: 16, tintColor: colors.ink }} />
+              <Text style={styles.doneBtnGhostTxt}>Share</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity onPress={() => navigateTab('home')}><Text style={styles.backExplore}>Back to explore</Text></TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {/* Sticky action bar (steps 1–3) */}
+      {step < 4 && (
+        <View style={[styles.actionBar, { paddingBottom: insets.bottom + 12 }]}>
+          {step === 1 && <Action label="Choose guests & continue" onPress={next1} enabled={!!dateKey && (!slots.length || !!slot)} />}
+          {step === 2 && <Action label="Continue to payment  ›" onPress={() => setStep(3)} enabled />}
+          {step === 3 && <Action label={`Confirm & pay  ${formatMoney(b.total, item.currency)}`} onPress={() => setStep(4)} enabled />}
+          {step === 3 && <Text style={styles.terms}>By confirming, you agree to our Terms of Service</Text>}
+        </View>
+      )}
+
+      {/* Primary guest popup */}
+      <Modal visible={showGuest} transparent animationType="fade" onRequestClose={() => setShowGuest(false)}>
+        <View style={styles.modalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowGuest(false)} />
+          <View style={styles.modalCard}>
+            <View style={styles.modalHead}>
+              <Text style={styles.modalTitle}>Primary guest details</Text>
+              <TouchableOpacity onPress={() => setShowGuest(false)}><Text style={styles.modalClose}>✕</Text></TouchableOpacity>
+            </View>
+            <Text style={styles.modalSub}>Who should we put on the booking? Leave blank to use your account.</Text>
+            <Field placeholder="Full name" value={guest.name} onChangeText={(t) => setGuest({ ...guest, name: t })} />
+            <View style={{ height: 10 }} />
+            <Field placeholder="Phone" value={guest.phone} onChangeText={(t) => setGuest({ ...guest, phone: t })} keyboardType="phone-pad" />
+            <View style={{ height: 10 }} />
+            <Field placeholder="Email" value={guest.email} onChangeText={(t) => setGuest({ ...guest, email: t })} keyboardType="email-address" autoCapitalize="none" />
+            <TouchableOpacity style={styles.modalSave} onPress={() => setShowGuest(false)} activeOpacity={0.9}>
+              <Text style={styles.modalSaveTxt}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+// ── small pieces ──────────────────────────────────────────────────────────
+function Stepper({ label, sub, value, setValue, min = 0, max = 30 }) {
+  return (
+    <View style={styles.stepperRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.stepperLabel}>{label}</Text>
+        {!!sub && <Text style={styles.stepperSub}>{sub}</Text>}
+      </View>
+      <View style={styles.stepper}>
+        <TouchableOpacity style={styles.stepBtn} onPress={() => setValue(Math.max(min, value - 1))}><Text style={styles.stepSign}>−</Text></TouchableOpacity>
+        <Text style={styles.stepVal}>{value}</Text>
+        <TouchableOpacity style={[styles.stepBtn, styles.stepBtnPlus]} onPress={() => setValue(Math.min(max, value + 1))}><Text style={[styles.stepSign, { color: '#fff' }]}>＋</Text></TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+function Field(props) { return <TextInput {...props} placeholderTextColor={colors.inkFaint} style={styles.field} />; }
+function Label({ children }) { return <Text style={styles.fieldLabel}>{children}</Text>; }
+function Section({ title, children }) { return (<View style={styles.sectionBox}><Text style={styles.sectionTitle}>{title}</Text>{children}</View>); }
+function KV({ k, v, bold, green, last }) {
+  return (
+    <View style={[styles.kv, !last && styles.kvBorder]}>
+      <Text style={[styles.kvK, bold && styles.kvBold]}>{k}</Text>
+      <Text style={[styles.kvV, bold && styles.kvBold, green && { color: colors.success }]}>{v}</Text>
+    </View>
+  );
+}
+function Action({ label, onPress, enabled }) {
+  return (
+    <TouchableOpacity style={[styles.action, !enabled && styles.actionOff]} onPress={onPress} disabled={!enabled} activeOpacity={0.9}>
+      <Text style={styles.actionTxt}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+const CELL = `${100 / 7}%`;
+const styles = StyleSheet.create({
+  header: { backgroundColor: colors.surface, paddingHorizontal: space.lg, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+  headerRow: { flexDirection: 'row', alignItems: 'center' },
+  back: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', marginRight: 6 },
+  backIcon: { fontSize: 24, color: colors.ink, marginTop: -2 },
+  hTitle: { fontSize: font.h3, fontWeight: '800', color: colors.ink },
+  hStep: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 1 },
+  hTotal: { fontSize: font.body, fontWeight: '900', color: colors.price },
+  progress: { flexDirection: 'row', gap: 6, marginTop: 10 },
+  progressSeg: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.border },
+  progressOn: { backgroundColor: colors.brand },
+
+  bigQ: { fontSize: font.h1, fontWeight: '800', color: colors.ink },
+  sub: { fontSize: font.body, color: colors.inkMuted, marginTop: 4 },
+  label: { fontSize: font.body, fontWeight: '800', color: colors.ink, marginTop: 20, marginBottom: 10 },
+
+  calendar: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: 12, marginTop: 16, ...shadow.card },
+  calHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, marginBottom: 8 },
+  calNav: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  calNavTxt: { fontSize: 20, color: colors.ink, marginTop: -2 },
+  calMonth: { fontSize: font.body, fontWeight: '800', color: colors.ink },
+  calDows: { flexDirection: 'row' },
+  calDow: { width: CELL, textAlign: 'center', fontSize: font.tiny, color: colors.inkFaint, fontWeight: '700', marginBottom: 4 },
+  calGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calCell: { width: CELL, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  calDay: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  calDayAvail: { backgroundColor: colors.brandSoft },
+  calDaySel: { backgroundColor: colors.brand },
+  calDayTxt: { fontSize: font.body, color: colors.ink, fontWeight: '600' },
+  calDayTxtSel: { color: '#fff', fontWeight: '800' },
+  calDayTxtOff: { color: colors.inkFaint, fontWeight: '400' },
+
+  selDate: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.brandSoft, borderRadius: radius.md, padding: 12, marginTop: 14 },
+  selDateIcon: { width: 18, height: 18, tintColor: colors.brandText },
+  selDateTxt: { color: colors.brandText, fontWeight: '700', fontSize: font.body },
+
+  slotRow: { flexDirection: 'row', gap: 8, paddingVertical: 2, paddingRight: 8 },
+  slotChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.pill },
+  slotChipOn: { backgroundColor: colors.brandSoft, borderColor: colors.brand },
+  slotIcon: { width: 14, height: 14, tintColor: colors.inkMuted },
+  slotTxt: { color: colors.ink, fontWeight: '600', fontSize: font.small },
+  slotTxtOn: { color: colors.brandText },
+
+  guestCard: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: 6, ...shadow.card },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', padding: 10 },
+  stepperLabel: { fontSize: font.body, fontWeight: '700', color: colors.ink },
+  stepperSub: { fontSize: font.small, color: colors.inkMuted, marginTop: 2 },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  stepBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, borderColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  stepBtnPlus: { backgroundColor: colors.brand },
+  stepSign: { fontSize: 18, color: colors.brand, fontWeight: '800' },
+  stepVal: { fontSize: font.h3, fontWeight: '800', color: colors.ink, minWidth: 22, textAlign: 'center' },
+  guestPrice: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  guestPriceTxt: { fontSize: font.small, color: colors.inkMuted },
+  guestPriceVal: { fontSize: font.body, fontWeight: '800', color: colors.ink },
+
+  guestToggle: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderRadius: radius.md, padding: 14, marginTop: 12, borderWidth: 1, borderColor: colors.border },
+  guestToggleIcon: { width: 18, height: 18, tintColor: colors.brand },
+  guestToggleTxt: { flex: 1, fontSize: font.body, fontWeight: '600', color: colors.ink },
+  guestToggleChev: { fontSize: 18, color: colors.inkMuted },
+  guestForm: { backgroundColor: colors.surface, borderRadius: radius.md, padding: 12, marginTop: 8, gap: 10, borderWidth: 1, borderColor: colors.border },
+  guestNote: { fontSize: font.tiny, color: colors.inkMuted },
+
+  field: { backgroundColor: colors.surfaceAlt, borderRadius: radius.md, paddingHorizontal: 14, height: 48, fontSize: font.body, color: colors.ink, borderWidth: 1, borderColor: colors.border },
+  fieldLabel: { fontSize: font.small, fontWeight: '700', color: colors.inkMuted, marginTop: 14, marginBottom: 6 },
+  fieldIconWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceAlt, borderRadius: radius.md, paddingHorizontal: 12, height: 48, borderWidth: 1, borderColor: colors.border },
+  fieldIcon: { width: 18, height: 18, tintColor: colors.inkFaint, marginRight: 8 },
+  fieldIconInput: { flex: 1, fontSize: font.body, color: colors.ink, paddingVertical: 0 },
+
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  modalCard: { width: '100%', backgroundColor: colors.surface, borderRadius: radius.lg, padding: 20 },
+  modalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  modalTitle: { fontSize: font.h3, fontWeight: '800', color: colors.ink },
+  modalClose: { fontSize: 18, color: colors.inkMuted, padding: 4 },
+  modalSub: { fontSize: font.small, color: colors.inkMuted, marginTop: 4, marginBottom: 14, lineHeight: 18 },
+  modalSave: { backgroundColor: colors.brand, height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
+  modalSaveTxt: { color: '#fff', fontWeight: '800', fontSize: font.h3 },
+
+  expCard: { flexDirection: 'row', gap: 12, backgroundColor: colors.surface, borderRadius: radius.lg, padding: 10, marginTop: 16, ...shadow.card },
+  expImg: { width: 70, height: 70, borderRadius: radius.md, backgroundColor: '#DCE0E6' },
+  expName: { fontSize: font.body, fontWeight: '700', color: colors.ink },
+  expLoc: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  tinyLoc: { width: 12, height: 12 },
+  expLocTxt: { fontSize: font.small, color: colors.inkMuted },
+  expRating: { fontSize: font.small, color: colors.ink, fontWeight: '700', marginTop: 4 },
+
+  sectionBox: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: 14, marginTop: 14, ...shadow.card },
+  sectionTitle: { fontSize: font.tiny, fontWeight: '800', color: colors.inkMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  kv: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 9 },
+  kvBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  kvK: { fontSize: font.body, color: colors.inkMuted },
+  kvV: { fontSize: font.body, color: colors.ink, fontWeight: '700' },
+  kvBold: { fontWeight: '900', color: colors.ink, fontSize: font.h3 },
+  kvDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
+
+  cancelNote: { flexDirection: 'row', gap: 10, backgroundColor: '#F0FDF4', borderRadius: radius.md, padding: 12, marginTop: 14, borderWidth: 1, borderColor: '#BBF7D0' },
+  cancelIcon: { width: 20, height: 20, tintColor: colors.success },
+  cancelTitle: { fontSize: font.small, fontWeight: '800', color: colors.ink },
+  cancelSub: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 2, lineHeight: 16 },
+
+  dueBox: { alignSelf: 'flex-start', backgroundColor: colors.brandSoft, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, marginTop: 10 },
+  dueTxt: { color: colors.brandText, fontWeight: '800', fontSize: font.small },
+  payTabs: { flexDirection: 'row', gap: 10, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 4, marginTop: 16 },
+  payTab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, borderRadius: radius.sm },
+  payTabOn: { backgroundColor: colors.surface, ...shadow.card },
+  payTabIcon: { width: 18, height: 18, tintColor: colors.inkMuted },
+  payTabTxt: { fontSize: font.body, fontWeight: '700', color: colors.inkMuted },
+  payTabTxtOn: { color: colors.ink },
+  upiHint: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 6 },
+  secure: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 12, marginTop: 16 },
+  secureIcon: { width: 16, height: 16, tintColor: colors.success },
+  secureTxt: { fontSize: font.small, color: colors.inkMuted, flex: 1 },
+  payTotals: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: 14, marginTop: 16, ...shadow.card },
+
+  doneHero: { backgroundColor: colors.brand, alignItems: 'center', paddingBottom: 40, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  doneCheck: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadow.card },
+  doneCheckIcon: { width: 40, height: 40, tintColor: colors.brand },
+  doneTitle: { fontSize: 26, fontWeight: '900', color: '#fff', marginTop: 16 },
+  doneSub: { fontSize: font.body, color: 'rgba(255,255,255,0.92)', marginTop: 4 },
+  doneCard: { backgroundColor: colors.surface, borderRadius: radius.lg, marginHorizontal: space.lg, marginTop: 18, overflow: 'hidden', ...shadow.card },
+  doneImgWrap: { height: 140, position: 'relative', backgroundColor: '#DCE0E6' },
+  doneImg: { width: '100%', height: '100%' },
+  doneImgGrad: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '75%' },
+  doneImgText: { position: 'absolute', left: 14, right: 14, bottom: 12 },
+  doneImgName: { color: '#fff', fontSize: font.h3, fontWeight: '800' },
+  doneImgLoc: { color: 'rgba(255,255,255,0.92)', fontSize: font.small, marginTop: 1 },
+  doneRows: { padding: 14 },
+  hostNote: { flexDirection: 'row', gap: 12, alignItems: 'center', backgroundColor: colors.surfaceAlt, borderRadius: radius.lg, marginHorizontal: space.lg, marginTop: 14, padding: 14 },
+  hostAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  hostAvatarTxt: { color: '#fff', fontWeight: '800' },
+  hostNoteTitle: { fontSize: font.body, fontWeight: '800', color: colors.ink },
+  hostNoteSub: { fontSize: font.small, color: colors.inkMuted, marginTop: 2, lineHeight: 17 },
+  doneBtns: { flexDirection: 'row', gap: 12, marginHorizontal: space.lg, marginTop: 18 },
+  doneBtnPrimary: { flex: 1, backgroundColor: colors.brand, height: 52, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  doneBtnPrimaryTxt: { color: '#fff', fontWeight: '800', fontSize: font.h3 },
+  doneBtnGhost: { flex: 1, flexDirection: 'row', gap: 8, borderWidth: 1.5, borderColor: colors.border, height: 52, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  doneBtnGhostTxt: { color: colors.ink, fontWeight: '800', fontSize: font.h3 },
+  backExplore: { textAlign: 'center', color: colors.inkMuted, fontWeight: '700', marginTop: 18 },
+
+  actionBar: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.surface, paddingHorizontal: space.lg, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border },
+  action: { backgroundColor: colors.brand, height: 54, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  actionOff: { opacity: 0.45 },
+  actionTxt: { color: '#fff', fontWeight: '800', fontSize: font.h3 },
+  terms: { textAlign: 'center', fontSize: font.tiny, color: colors.inkMuted, marginTop: 8 },
+});

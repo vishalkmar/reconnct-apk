@@ -1,19 +1,20 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radius, font } from '../theme';
+import { colors, font } from '../theme';
+import { ICONS } from '../icons';
 
 const ITEMS = [
-  { key: 'home', label: 'Home', icon: '🏠' },
-  { key: 'search', label: 'Search', icon: '🔍' },
-  { key: 'experiences', label: 'Experiences', icon: '✈️' },
-  { key: 'inbox', label: 'Inbox', icon: '💬', dot: true },
-  { key: 'profile', label: 'Profile', icon: '👤' },
+  { key: 'home', label: 'Home', icon: ICONS.navHome },
+  { key: 'search', label: 'Search', icon: ICONS.navSearch },
+  { key: 'experiences', label: 'Experiences', icon: ICONS.navExp },
+  { key: 'inbox', label: 'Inbox', icon: ICONS.navInbox, dot: true },
+  { key: 'profile', label: 'Profile', icon: ICONS.navProfile },
 ];
 
 /**
- * Floating, frosted bottom navigation. It sits above the content (absolute) so
- * screens scroll underneath it; the active tab gets a soft rounded pill.
+ * Floating, frosted bottom navigation with standard (SVG-style) icons. The
+ * active tab gets a soft rounded pill and a darker icon/label.
  */
 export default function BottomNav({ current, onChange }) {
   const insets = useSafeAreaInsets();
@@ -25,7 +26,7 @@ export default function BottomNav({ current, onChange }) {
           return (
             <TouchableOpacity key={it.key} style={[styles.item, active && styles.itemActive]} onPress={() => onChange(it.key)} activeOpacity={0.7}>
               <View>
-                <Text style={styles.icon}>{it.icon}</Text>
+                <Image source={it.icon} style={[styles.icon, { tintColor: active ? colors.ink : colors.inkFaint }]} />
                 {it.dot && <View style={styles.dot} />}
               </View>
               <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>{it.label}</Text>
@@ -41,15 +42,15 @@ const styles = StyleSheet.create({
   host: { position: 'absolute', left: 12, right: 12 },
   bar: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: 'rgba(255,255,255,0.96)',
     borderRadius: 32, paddingVertical: 8, paddingHorizontal: 6,
     borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.14, shadowRadius: 18, elevation: 12,
   },
   item: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: 22 },
   itemActive: { backgroundColor: colors.brandSoft },
-  icon: { fontSize: 18, textAlign: 'center' },
+  icon: { width: 22, height: 22 },
   dot: { position: 'absolute', top: -2, right: -4, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brand },
-  label: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 3 },
+  label: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 4 },
   labelActive: { color: colors.ink, fontWeight: '700' },
 });
