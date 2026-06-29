@@ -4,6 +4,7 @@ import { colors, radius, font, space, shadow } from '../../theme';
 import { api, resolveImage } from '../../api/client';
 import { formatMoney } from '../../utils/format';
 import { useAuth } from '../../store/AuthContext';
+import { useBookings } from '../../store/BookingsContext';
 import { useNav } from '../../navigation/NavContext';
 import ScreenHeader from '../../components/ScreenHeader';
 import EmptyState from '../../components/EmptyState';
@@ -30,20 +31,23 @@ const inGroup = (status, key) => key === 'all' || (GROUPS[key] || []).includes(s
 
 export default function MyBookingsScreen() {
   const { token } = useAuth();
+  const { bookings: localBookings } = useBookings();
   const { navigateTab } = useNav();
-  const [items, setItems] = useState([]);
+  const [fetched, setFetched] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all');
 
   useEffect(() => {
     let alive = true;
     api.myBookings(token)
-      .then((d) => { if (alive) setItems(d.bookings || []); })
+      .then((d) => { if (alive) setFetched(d.bookings || []); })
       .catch(() => {})
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [token]);
 
+  // In-app confirmed bookings first, then any server bookings.
+  const items = [...localBookings, ...fetched];
   const counts = TABS.reduce((acc, t) => { acc[t.key] = items.filter((b) => inGroup(b.status, t.key)).length; return acc; }, {});
   const shown = items.filter((b) => inGroup(b.status, tab));
 

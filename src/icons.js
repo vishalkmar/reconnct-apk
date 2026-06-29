@@ -27,4 +27,9 @@ export const ICONS = {
   globe: require('./assets/ic-globe.png'),
   shield: require('./assets/ic-shield.png'),
   arrowRight: require('./assets/ic-arrowright.png'),
+  settings: require('./assets/ic-settings.png'),
+  ticket: require('./assets/ic-ticket.png'),
+  tag: require('./assets/ic-tag.png'),
+  layers: require('./assets/ic-layers.png'),
+  rupee: require('./assets/ic-rupee.png'),
 };

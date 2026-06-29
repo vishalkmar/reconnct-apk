@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../theme';
 import { api } from '../api/client';
@@ -7,14 +7,15 @@ import { useAuth } from '../store/AuthContext';
 import { useWishlist } from '../store/WishlistContext';
 import { useNav } from '../navigation/NavContext';
 import { initials } from '../utils/format';
+import { ICONS } from '../icons';
 
 const MENU = [
-  { label: 'My Bookings', icon: '🎟️', screen: 'bookings' },
-  { label: 'Transactions', icon: '💳', screen: 'transactions' },
-  { label: 'Wishlist', icon: '🤍', screen: 'wishlist' },
-  { label: 'Notifications', icon: '🔔', screen: 'notifications' },
-  { label: 'Language & Region', icon: '🌐', screen: null },
-  { label: 'Settings', icon: '⚙️', screen: null },
+  { label: 'My Bookings', icon: ICONS.ticket, screen: 'bookings' },
+  { label: 'Transactions', icon: ICONS.card, screen: 'transactions' },
+  { label: 'Wishlist', icon: ICONS.heart, screen: 'wishlist' },
+  { label: 'Notifications', icon: ICONS.bell, screen: 'notifications' },
+  { label: 'Language & Region', icon: ICONS.globe, screen: null },
+  { label: 'Settings', icon: ICONS.settings, screen: null },
 ];
 
 export default function ProfileScreen() {
@@ -73,7 +74,7 @@ export default function ProfileScreen() {
             activeOpacity={0.7}
             onPress={() => (m.screen ? push(m.screen) : soon(m.label))}
           >
-            <Text style={styles.rowIcon}>{m.icon}</Text>
+            <Image source={m.icon} style={styles.rowIconImg} />
             <Text style={styles.rowText}>{m.label}</Text>
             <Text style={styles.chev}>›</Text>
           </TouchableOpacity>
@@ -121,6 +122,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
   rowLast: { borderBottomWidth: 0 },
   rowIcon: { fontSize: 17, width: 24, textAlign: 'center' },
+  rowIconImg: { width: 20, height: 20, tintColor: colors.brand },
   rowText: { flex: 1, fontSize: font.body, color: colors.ink, fontWeight: '600' },
   chev: { fontSize: 20, color: colors.inkFaint },
 

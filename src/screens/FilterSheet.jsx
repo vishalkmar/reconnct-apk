@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Pressable,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Pressable, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space } from '../theme';
 import { api } from '../api/client';
+import { categoryAudiences } from '../data/categoryAudiences';
+import { ICONS } from '../icons';
 
 export const PRICE_BANDS = [
   { key: 'under', label: 'Under ₹1,500', sub: 'Budget-friendly', priceMax: 1500 },
@@ -51,19 +53,19 @@ export default function FilterSheet({ visible, taxonomy, initial, onApply, onClo
   // the admin form). Lenient: if the taxonomy hasn't shipped category→audience
   // tags yet, show everything so the filter never goes blank.
   const selAud = audiences.find((a) => a.id === draft.audienceId);
-  const anyTagged = allCategories.some((c) => Array.isArray(c.audiences) && c.audiences.length);
-  const categories = (draft.audienceId && selAud && anyTagged)
-    ? allCategories.filter((c) => Array.isArray(c.audiences) && c.audiences.includes(selAud.slug))
+  // "All" → every category. A specific audience → only its categories (taxonomy
+  // value or the embedded fallback map — same logic as the admin form).
+  const categories = (draft.audienceId && selAud)
+    ? allCategories.filter((c) => categoryAudiences(c).includes(selAud.slug))
     : allCategories;
 
   const toggle = (key, val) => setDraft((d) => {
     const next = { ...d, [key]: d[key] === val ? null : val };
-    // Changing audience invalidates a category that no longer fits it.
+    // Changing audience drops a category that no longer fits it.
     if (key === 'audienceId' && next.categoryId) {
       const aud = audiences.find((a) => a.id === next.audienceId);
       const cat = allCategories.find((c) => c.id === next.categoryId);
-      const ok = !next.audienceId || !aud || !cat || !Array.isArray(cat.audiences) || cat.audiences.length === 0 || cat.audiences.includes(aud.slug);
-      if (!ok) next.categoryId = null;
+      if (next.audienceId && aud && cat && !categoryAudiences(cat).includes(aud.slug)) next.categoryId = null;
     }
     return next;
   });
@@ -83,8 +85,12 @@ export default function FilterSheet({ visible, taxonomy, initial, onApply, onClo
             {/* Reconnect with (audiences) */}
             {audiences.length > 0 && (
               <>
-                <Text style={styles.label}>💛 Reconnect with</Text>
+                <View style={styles.labelRow}><Image source={ICONS.heartFill} style={[styles.labelIcon, { tintColor: colors.brand }]} /><Text style={styles.label}>Reconnect with</Text></View>
                 <View style={styles.audGrid}>
+                  <TouchableOpacity style={[styles.audCard, !draft.audienceId && styles.audCardSel]} onPress={() => setDraft((d) => ({ ...d, audienceId: null }))} activeOpacity={0.85}>
+                    <Text style={styles.audIcon}>✨</Text>
+                    <Text style={styles.audName}>All</Text>
+                  </TouchableOpacity>
                   {audiences.map((a) => {
                     const sel = draft.audienceId === a.id;
                     return (
@@ -106,7 +112,7 @@ export default function FilterSheet({ visible, taxonomy, initial, onApply, onClo
             {/* Category */}
             {categories.length > 0 && (
               <>
-                <Text style={styles.label}>◎ Category</Text>
+                <View style={styles.labelRow}><Image source={ICONS.layers} style={styles.labelIcon} /><Text style={styles.label}>Category</Text></View>
                 <View style={styles.chipWrap}>
                   {categories.map((c) => {
                     const sel = draft.categoryId === c.id;
@@ -126,7 +132,7 @@ export default function FilterSheet({ visible, taxonomy, initial, onApply, onClo
             )}
 
             {/* Price */}
-            <Text style={styles.label}>$ Price per person</Text>
+            <View style={styles.labelRow}><Image source={ICONS.rupee} style={styles.labelIcon} /><Text style={styles.label}>Price per person</Text></View>
             {PRICE_BANDS.map((b) => {
               const sel = draft.priceBand === b.key;
               return (
@@ -177,7 +183,9 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   headTitle: { fontSize: font.h2, fontWeight: '800', color: colors.ink },
   close: { fontSize: 18, color: colors.inkMuted, padding: 4 },
-  label: { fontSize: font.h3, fontWeight: '800', color: colors.ink, marginTop: 18, marginBottom: 10 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 18, marginBottom: 10 },
+  labelIcon: { width: 18, height: 18, tintColor: colors.ink },
+  label: { fontSize: font.h3, fontWeight: '800', color: colors.ink },
 
   audGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   audCard: {

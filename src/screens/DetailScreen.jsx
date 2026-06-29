@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   dots: { position: 'absolute', bottom: 12, alignSelf: 'center', flexDirection: 'row', gap: 6 },
   dotSm: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.6)' },
   dotSmActive: { backgroundColor: '#fff', width: 18 },
-  body: { padding: space.xl, marginTop: -18, backgroundColor: colors.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22 },
+  body: { padding: space.xl, backgroundColor: colors.surface },
   cat: { color: colors.brand, fontWeight: '800', fontSize: font.small, textTransform: 'uppercase' },
   title: { fontSize: font.h1, fontWeight: '800', color: colors.ink, marginTop: 6 },
   locRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },

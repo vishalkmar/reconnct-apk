@@ -11,6 +11,7 @@ import { useLocation } from '../store/LocationContext';
 import { useNav } from '../navigation/NavContext';
 import ExperienceCard from '../components/ExperienceCard';
 import AudienceCard, { AUDIENCE_CARDS } from '../components/AudienceCard';
+import DealCard from '../components/DealCard';
 import OfferBannerCarousel from '../components/OfferBannerCarousel';
 import FilterSheet, { draftToParams } from './FilterSheet';
 import { ICONS } from '../icons';
@@ -49,6 +50,7 @@ export default function HomeScreen() {
   const [results, setResults] = useState(null);
   const [searchingBusy, setSearchingBusy] = useState(false);
   const [geoDismissed, setGeoDismissed] = useState(false);
+  const [compact, setCompact] = useState(false); // sticky mini-header on scroll
 
   const geoParams = coords ? { lat: coords.lat, lon: coords.lon } : {};
 
@@ -116,6 +118,11 @@ export default function HomeScreen() {
   while (ei < items.length) mixed.push({ __exp: items[ei++] });
   const gridMixed = mixed.slice(0, 12);
   const featShown = activeCat ? featured.filter((e) => e.category && e.category.id === activeCat) : featured;
+  // Partner-audience experiences for the "Connect With Your Partner" rail.
+  const partnerItems = (() => {
+    const p = items.filter((e) => (e.audiences || []).some((a) => a.slug === 'partner'));
+    return p.length ? p : items.slice(0, 8);
+  })();
 
   // Tapping a Reconnect card opens the Experiences page filtered by that audience.
   const goAudience = (slug) => {
@@ -138,6 +145,8 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: 110 }}
+        scrollEventThrottle={16}
+        onScroll={(e) => setCompact(e.nativeEvent.contentOffset.y > 150)}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />}
       >
         {/* Golden header — scrolls; the hero cards overlap up into its base */}
@@ -284,9 +293,67 @@ export default function HomeScreen() {
             renderItem={({ item }) => <ExperienceCard item={item} variant="grid" style={{ width: COL_W }} onPress={() => openDetail(item)} />}
             ListEmptyComponent={<Text style={styles.emptyFeat}>No featured experiences yet.</Text>}
           />
+
+          {/* Last Minute Deals */}
+          {items.length > 0 && (
+            <>
+              <View style={styles.sectionHead}>
+                <Text style={styles.sectionTitle}>✨ Last Minute Deals</Text>
+                <TouchableOpacity onPress={() => navigateTab('experiences')}><Text style={styles.seeAll}>See all ›</Text></TouchableOpacity>
+              </View>
+              <FlatList
+                data={items.slice(0, 10)}
+                horizontal
+                keyExtractor={(it) => 'd' + it.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: H_PAD, gap: GRID_GAP, paddingTop: 4 }}
+                renderItem={({ item }) => <DealCard item={item} onPress={() => openDetail(item)} />}
+              />
+            </>
+          )}
+
+          {/* Connect With Your Partner */}
+          {partnerItems.length > 0 && (
+            <>
+              <View style={styles.partnerHead}>
+                <Text style={styles.partnerTitle}>Connect With{'\n'}Your Partner</Text>
+                <View style={styles.polaroids}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=300&q=80' }} style={[styles.polaroid, { transform: [{ rotate: '-8deg' }] }]} />
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1503104834685-7205e8607eb9?w=300&q=80' }} style={[styles.polaroid, styles.polaroid2, { transform: [{ rotate: '7deg' }] }]} />
+                </View>
+              </View>
+              <FlatList
+                data={partnerItems.slice(0, 10)}
+                horizontal
+                keyExtractor={(it) => 'p' + it.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: H_PAD, gap: GRID_GAP, paddingTop: 4 }}
+                renderItem={({ item }) => <DealCard item={item} onPress={() => openDetail(item)} />}
+              />
+            </>
+          )}
           </>
         )}
       </ScrollView>
+
+      {/* Sticky compact header — appears once you scroll past the hero */}
+      {compact && !isSearching && (
+        <View style={[styles.sticky, { paddingTop: insets.top + 6 }]}>
+          <Image source={ICONS.logoWhite} style={styles.stickyLogo} resizeMode="contain" />
+          <View style={{ flex: 1 }} />
+          <TouchableOpacity style={styles.stickyPill} onPress={() => push('cityPicker')}>
+            <Image source={ICONS.locGray} style={styles.stickyPin} />
+            <Text style={styles.stickyPillText}>{city || 'Delhi'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.stickyCircle} onPress={() => navigateTab('search')}>
+            <Image source={ICONS.searchMuted} style={styles.stickyCircleIcon} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.stickyCircle} onPress={() => push('notifications')}>
+            <Image source={ICONS.bell} style={styles.stickyCircleIcon} />
+            <View style={styles.stickyDot} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       <FilterSheet
         visible={showFilter}
@@ -312,6 +379,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.brand, paddingHorizontal: H_PAD, paddingBottom: 100,
     borderBottomLeftRadius: 26, borderBottomRightRadius: 26,
   },
+  sticky: {
+    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: H_PAD, paddingBottom: 10,
+    backgroundColor: 'rgba(255,255,255,0.98)',
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  stickyLogo: { width: 110, height: 22, tintColor: colors.brand },
+  stickyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.brandSoft, paddingHorizontal: 10, height: 34, borderRadius: radius.pill },
+  stickyPin: { width: 13, height: 13, tintColor: colors.brandDark },
+  stickyPillText: { color: colors.brandText, fontSize: font.small, fontWeight: '700' },
+  stickyCircle: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
+  stickyCircleIcon: { width: 18, height: 18, tintColor: colors.brandDark },
+  stickyDot: { position: 'absolute', top: 7, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   logo: { fontSize: 24, fontWeight: '800', color: '#fff' },
   logoImg: { width: 132, height: 26 },
@@ -363,6 +444,11 @@ const styles = StyleSheet.create({
   bannerEmoji: { fontSize: 56, marginLeft: 8 },
 
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: H_PAD, marginTop: 22, marginBottom: 12 },
+  partnerHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: H_PAD, marginTop: 26, marginBottom: 14 },
+  partnerTitle: { fontSize: 22, fontWeight: '800', color: colors.ink, fontFamily: 'serif', lineHeight: 28 },
+  polaroids: { flexDirection: 'row', alignItems: 'center' },
+  polaroid: { width: 52, height: 52, borderRadius: 8, borderWidth: 3, borderColor: '#fff', ...shadow.card },
+  polaroid2: { marginLeft: -14 },
   sectionTitle: { fontSize: font.h2, fontWeight: '800', color: colors.ink },
   seeAll: { color: colors.brand, fontWeight: '700' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: H_PAD },
