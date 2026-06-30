@@ -14,6 +14,7 @@ import AudienceCard, { AUDIENCE_CARDS } from '../components/AudienceCard';
 import FramedDealCard from '../components/deals/FramedDealCard';
 import CleanDealCard from '../components/deals/CleanDealCard';
 import OverlayDealCard from '../components/deals/OverlayDealCard';
+import TrendingNearbyCard from '../components/deals/TrendingNearbyCard';
 import OfferBannerCarousel from '../components/OfferBannerCarousel';
 import FilterSheet, { draftToParams } from './FilterSheet';
 import { ICONS } from '../icons';
@@ -358,6 +359,11 @@ export default function HomeScreen() {
                 onSeeAll={() => navigateTab('experiences')}
                 onPressItem={openDetail}
               />
+              <TrendingNearbySection
+                data={items.slice(0, 12)}
+                onSeeAll={() => navigateTab('experiences')}
+                onPressItem={openDetail}
+              />
             </>
           )}
           </>
@@ -515,6 +521,30 @@ function FocusDealSection({ data, onSeeAll, onPressItem }) {
         }}
       />
     </>
+  );
+}
+
+// "Trending Nearby" — horizontal carousel of white container cards; each card
+// holds 3 stacked row-items. The next card peeks on the side (Figma spec).
+const TREND_CARD_W = 330;
+function TrendingNearbySection({ data, onSeeAll, onPressItem }) {
+  if (!data.length) return null;
+  const groups = [];
+  for (let i = 0; i < data.length; i += 3) groups.push(data.slice(i, i + 3));
+  return (
+    <FlatList
+      data={groups}
+      horizontal
+      keyExtractor={(g, i) => `trend-${i}`}
+      showsHorizontalScrollIndicator={false}
+      decelerationRate="fast"
+      snapToInterval={TREND_CARD_W + 14}
+      snapToAlignment="start"
+      contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 14, paddingTop: 8, paddingBottom: 4 }}
+      renderItem={({ item: group }) => (
+        <TrendingNearbyCard group={group} count={data.length} onSeeAll={onSeeAll} onPressItem={onPressItem} />
+      )}
+    />
   );
 }
 
