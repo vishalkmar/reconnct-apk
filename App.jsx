@@ -10,6 +10,7 @@ import { AuthProvider } from './src/store/AuthContext';
 import { WishlistProvider } from './src/store/WishlistContext';
 import { LocationProvider } from './src/store/LocationContext';
 import { BookingsProvider } from './src/store/BookingsContext';
+import { HostProvider } from './src/store/HostContext';
 import { NavProvider } from './src/navigation/NavContext';
 import RootNavigator from './src/navigation/RootNavigator';
 
@@ -39,9 +40,11 @@ export default function App() {
           <WishlistProvider>
             <LocationProvider>
               <BookingsProvider>
-                <NavProvider>
-                  <RootNavigator />
-                </NavProvider>
+                <HostProvider>
+                  <NavProvider>
+                    <RootNavigator />
+                  </NavProvider>
+                </HostProvider>
               </BookingsProvider>
             </LocationProvider>
           </WishlistProvider>

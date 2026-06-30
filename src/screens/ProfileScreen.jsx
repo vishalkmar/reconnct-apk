@@ -22,7 +22,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, token, signOut } = useAuth();
   const { count: wishCount } = useWishlist();
-  const { push } = useNav();
+  const { push, switchMode } = useNav();
   const [trips, setTrips] = useState(0);
 
   const name = (user && user.name) || 'Guest';
@@ -56,8 +56,8 @@ export default function ProfileScreen() {
       </View>
 
       {/* Switch to Hosting */}
-      <TouchableOpacity style={styles.hosting} activeOpacity={0.9} onPress={() => soon('Switch to Hosting')}>
-        <View style={styles.hostIcon}><Text style={{ fontSize: 18 }}>🔁</Text></View>
+      <TouchableOpacity style={styles.hosting} activeOpacity={0.9} onPress={() => switchMode('host')}>
+        <View style={styles.hostIcon}><Image source={ICONS.swap} style={{ width: 20, height: 20, tintColor: '#101010' }} /></View>
         <View style={{ flex: 1 }}>
           <Text style={styles.hostTitle}>Switch to Hosting</Text>
           <Text style={styles.hostSub}>Manage your experiences &amp; earnings</Text>

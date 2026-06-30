@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions,
-  ActivityIndicator, RefreshControl, FlatList, TextInput, Image,
+  ActivityIndicator, RefreshControl, FlatList, TextInput, Image, ImageBackground, Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../theme';
@@ -11,7 +11,9 @@ import { useLocation } from '../store/LocationContext';
 import { useNav } from '../navigation/NavContext';
 import ExperienceCard from '../components/ExperienceCard';
 import AudienceCard, { AUDIENCE_CARDS } from '../components/AudienceCard';
-import DealCard from '../components/DealCard';
+import FramedDealCard from '../components/deals/FramedDealCard';
+import CleanDealCard from '../components/deals/CleanDealCard';
+import OverlayDealCard from '../components/deals/OverlayDealCard';
 import OfferBannerCarousel from '../components/OfferBannerCarousel';
 import FilterSheet, { draftToParams } from './FilterSheet';
 import { ICONS } from '../icons';
@@ -164,7 +166,10 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           </View>
-          <Text style={styles.hello}>☀️  {greeting()}, {firstName}</Text>
+          <View style={styles.helloRow}>
+            <Image source={ICONS.sparkle} style={styles.helloIcon} />
+            <Text style={styles.hello}>{greeting()}, {firstName}</Text>
+          </View>
           <Text style={styles.whatsNext}>What’s next?</Text>
 
           <View style={styles.search}>
@@ -251,7 +256,9 @@ export default function HomeScreen() {
           {/* Offer banners — auto-sliding carousel (admin-managed) */}
           <View style={{ marginTop: 6 }}><OfferBannerCarousel /></View>
 
-          <View style={styles.sectionHead}><Text style={styles.sectionTitle}>🌐 Explore</Text></View>
+          <View style={styles.sectionHead}>
+            <SectionTitle icon={ICONS.globe} title="Explore" />
+          </View>
 
           {loading ? (
             <ActivityIndicator color={colors.brand} style={{ marginTop: 24 }} />
@@ -275,13 +282,13 @@ export default function HomeScreen() {
 
           {/* Featured */}
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>✨ Featured Experiences</Text>
+            <SectionTitle icon={ICONS.sparkle} title="Featured Experiences" />
             <TouchableOpacity onPress={() => navigateTab('experiences')}><Text style={styles.seeAll}>See all ›</Text></TouchableOpacity>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catTabs}>
-            <CatTab label="All" icon="🌐" active={!activeCat} onPress={() => setActiveCat(null)} />
-            {cats.map((c) => <CatTab key={c.id} label={c.name} icon={c.icon} active={activeCat === c.id} onPress={() => setActiveCat(c.id)} />)}
+            <CatTab label="All" icon={ICONS.globe} active={!activeCat} onPress={() => setActiveCat(null)} />
+            {cats.map((c) => <CatTab key={c.id} label={c.name} icon={ICONS.tag} active={activeCat === c.id} onPress={() => setActiveCat(c.id)} />)}
           </ScrollView>
 
           <FlatList
@@ -297,38 +304,59 @@ export default function HomeScreen() {
           {/* Last Minute Deals */}
           {items.length > 0 && (
             <>
-              <View style={styles.sectionHead}>
-                <Text style={styles.sectionTitle}>✨ Last Minute Deals</Text>
-                <TouchableOpacity onPress={() => navigateTab('experiences')}><Text style={styles.seeAll}>See all ›</Text></TouchableOpacity>
-              </View>
-              <FlatList
+              <DealRail
+                title="Last Minute Deals 1"
                 data={items.slice(0, 10)}
-                horizontal
-                keyExtractor={(it) => 'd' + it.id}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: H_PAD, gap: GRID_GAP, paddingTop: 4 }}
-                renderItem={({ item }) => <DealCard item={item} onPress={() => openDetail(item)} />}
+                kind="framed"
+                cardGap={12}
+                onSeeAll={() => navigateTab('experiences')}
+                onPressItem={openDetail}
+              />
+              <FocusDealSection
+                data={items.slice(1, 11)}
+                onSeeAll={() => navigateTab('experiences')}
+                onPressItem={openDetail}
               />
             </>
           )}
 
           {/* Connect With Your Partner */}
           {partnerItems.length > 0 && (
+            <PartnerDealSection
+              data={partnerItems.slice(0, 10)}
+              onPressItem={openDetail}
+            />
+          )}
+
+          {items.length > 0 && (
             <>
-              <View style={styles.partnerHead}>
-                <Text style={styles.partnerTitle}>Connect With{'\n'}Your Partner</Text>
-                <View style={styles.polaroids}>
-                  <Image source={{ uri: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=300&q=80' }} style={[styles.polaroid, { transform: [{ rotate: '-8deg' }] }]} />
-                  <Image source={{ uri: 'https://images.unsplash.com/photo-1503104834685-7205e8607eb9?w=300&q=80' }} style={[styles.polaroid, styles.polaroid2, { transform: [{ rotate: '7deg' }] }]} />
-                </View>
-              </View>
-              <FlatList
-                data={partnerItems.slice(0, 10)}
-                horizontal
-                keyExtractor={(it) => 'p' + it.id}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: H_PAD, gap: GRID_GAP, paddingTop: 4 }}
-                renderItem={({ item }) => <DealCard item={item} onPress={() => openDetail(item)} />}
+              <DealRail
+                title="Last Minute Deals 3"
+                data={items.slice(2, 12)}
+                kind="clean"
+                cardGap={14}
+                onSeeAll={() => navigateTab('experiences')}
+                onPressItem={openDetail}
+              />
+              <DealRail
+                title="Last Minute Deals 4"
+                data={items.slice(1, 11)}
+                kind="overlay"
+                cardW={270}
+                cardH={290}
+                cardGap={14}
+                onSeeAll={() => navigateTab('experiences')}
+                onPressItem={openDetail}
+              />
+              <DealRail
+                title="Last Minute Deals 5"
+                data={items.slice(3, 13)}
+                kind="framed"
+                cardW={270}
+                cardImageH={186}
+                cardGap={14}
+                onSeeAll={() => navigateTab('experiences')}
+                onPressItem={openDetail}
               />
             </>
           )}
@@ -366,10 +394,135 @@ export default function HomeScreen() {
   );
 }
 
+function SectionTitle({ icon, title }) {
+  return (
+    <View style={styles.sectionTitleRow}>
+      <Image source={icon} style={styles.sectionTitleIcon} />
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
+}
+
+// Picks the right separated card component for the rail kind.
+function RailCard({ kind, item, onPress, cardW, cardImageH, cardH }) {
+  if (kind === 'clean') return <CleanDealCard item={item} onPress={onPress} />;
+  if (kind === 'overlay') return <OverlayDealCard item={item} width={cardW} height={cardH} onPress={onPress} />;
+  return <FramedDealCard item={item} width={cardW} imageH={cardImageH} onPress={onPress} />;
+}
+
+function DealRail({ title, data, kind = 'framed', cardGap = 12, cardW, cardImageH, cardH, onSeeAll, onPressItem }) {
+  return (
+    <>
+      <View style={styles.sectionHead}>
+        <SectionTitle icon={ICONS.sparkle} title={title} />
+        <TouchableOpacity onPress={onSeeAll}><Text style={styles.seeAll}>See all ›</Text></TouchableOpacity>
+      </View>
+      <FlatList
+        data={data}
+        horizontal
+        keyExtractor={(it, idx) => `${kind}-${it.id || idx}`}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={[styles.dealRail, { gap: cardGap }]}
+        renderItem={({ item }) => <RailCard kind={kind} item={item} cardW={cardW} cardImageH={cardImageH} cardH={cardH} onPress={() => onPressItem(item)} />}
+      />
+    </>
+  );
+}
+
+// "Connect With Your Partner" — full-width section on a lavender→blue→navy
+// gradient (Figma #F5F3FF → #305BA4 → #1A1A2E), serif heading + tilted polaroids,
+// then a slidable rail of cards (180 wide, 160×160 square image).
+function PartnerDealSection({ data, onPressItem }) {
+  return (
+    <ImageBackground source={ICONS.partnerGrad} style={styles.partnerSection} imageStyle={styles.partnerGradImg} resizeMode="stretch">
+      <View style={styles.partnerHead}>
+        <Text style={styles.partnerTitle}>Connect With Your{'\n'}Partner</Text>
+        <View style={styles.polaroids}>
+          <Image source={{ uri: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=300&q=80' }} style={[styles.polaroid, { transform: [{ rotate: '-8deg' }] }]} />
+          <Image source={{ uri: 'https://images.unsplash.com/photo-1503104834685-7205e8607eb9?w=300&q=80' }} style={[styles.polaroid, styles.polaroid2, { transform: [{ rotate: '7deg' }] }]} />
+        </View>
+      </View>
+      <FlatList
+        data={data}
+        horizontal
+        keyExtractor={(it, idx) => `partner-${it.id || idx}`}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.partnerRail}
+        renderItem={({ item }) => <FramedDealCard item={item} width={180} imageH={160} onPress={() => onPressItem(item)} />}
+      />
+    </ImageBackground>
+  );
+}
+
+// Featured "Last Minute Deals" — a centre-focus carousel: the middle card sits
+// forward (full size, elevated) while its neighbours peek behind it, dimmed and
+// scaled down. Sliding brings the next card to the front and pushes the current
+// one back. Card size/style stay the Figma spec (195 wide, image 166).
+const FOCUS_CARD_W = 195;
+const FOCUS_CARD_H = 274;
+const FOCUS_GAP = 16;
+const FOCUS_SNAP = FOCUS_CARD_W + FOCUS_GAP;
+const FOCUS_SIDE = Math.max(16, (SCREEN_W - FOCUS_CARD_W) / 2);
+
+function FocusDealSection({ data, onSeeAll, onPressItem }) {
+  if (!data.length) return null;
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const [active, setActive] = useState(0);
+
+  return (
+    <>
+      <View style={styles.sectionHead}>
+        <SectionTitle icon={ICONS.sparkle} title="Last Minute Deals 2" />
+        <TouchableOpacity onPress={onSeeAll}><Text style={styles.seeAll}>See all ›</Text></TouchableOpacity>
+      </View>
+      <Animated.FlatList
+        data={data}
+        horizontal
+        keyExtractor={(it, idx) => `focus-${it.id || idx}`}
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={FOCUS_SNAP}
+        snapToAlignment="start"
+        scrollEventThrottle={16}
+        contentContainerStyle={{ paddingHorizontal: FOCUS_SIDE, paddingVertical: 8 }}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+          {
+            useNativeDriver: true,
+            listener: (e) => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / FOCUS_SNAP);
+              if (idx !== active) setActive(idx);
+            },
+          },
+        )}
+        renderItem={({ item, index }) => {
+          const inputRange = [(index - 1) * FOCUS_SNAP, index * FOCUS_SNAP, (index + 1) * FOCUS_SNAP];
+          // Centre card sits forward (full size + on top); neighbours scale down
+          // and are pulled IN behind it — they tuck under the centre card (no gap
+          // between them) which leaves the empty margin on the screen edges.
+          const scale = scrollX.interpolate({ inputRange, outputRange: [0.84, 1, 0.84], extrapolate: 'clamp' });
+          const opacity = scrollX.interpolate({ inputRange, outputRange: [0.5, 1, 0.5], extrapolate: 'clamp' });
+          const translateX = scrollX.interpolate({ inputRange, outputRange: [-34, 0, 34], extrapolate: 'clamp' });
+          const isActive = index === active;
+          return (
+            <Animated.View style={[
+              styles.focusItem,
+              { transform: [{ translateX }, { scale }], opacity, zIndex: isActive ? 30 : 10, elevation: isActive ? 14 : 2 },
+            ]}>
+              <FramedDealCard item={item} width={FOCUS_CARD_W} imageH={166} height={FOCUS_CARD_H} onPress={() => onPressItem(item)} />
+            </Animated.View>
+          );
+        }}
+      />
+    </>
+  );
+}
+
 function CatTab({ label, icon, active, onPress }) {
   return (
     <TouchableOpacity onPress={onPress} style={[styles.catTab, active && styles.catTabActive]} activeOpacity={0.8}>
-      <Text style={[styles.catTabText, active && styles.catTabTextActive]}>{icon ? `${icon}  ` : ''}{label}</Text>
+      {!!icon && <Image source={icon} style={[styles.catTabIcon, active && styles.catTabIconActive]} />}
+      <Text style={[styles.catTabText, active && styles.catTabTextActive]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -403,7 +556,9 @@ const styles = StyleSheet.create({
   bellWrap: { padding: 2 },
   bellIcon: { width: 22, height: 22, tintColor: '#fff' },
   bellDot: { position: 'absolute', top: 0, right: 0, width: 9, height: 9, borderRadius: 5, backgroundColor: '#EF4444', borderWidth: 1.5, borderColor: colors.brand },
-  hello: { color: '#fff', fontSize: 15, marginTop: 18, opacity: 0.95, fontWeight: '500' },
+  helloRow: { flexDirection: 'row', alignItems: 'center', marginTop: 18 },
+  helloIcon: { width: 15, height: 15, tintColor: '#FFFFFF', marginRight: 7 },
+  hello: { color: '#fff', fontSize: 15, opacity: 0.95, fontWeight: '500' },
   whatsNext: { color: '#fff', fontSize: 34, fontWeight: '900', marginTop: 6, letterSpacing: 0.2 },
   search: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: radius.pill, paddingLeft: 16, paddingRight: 6, height: 52, marginTop: 20 },
   searchIconImg: { width: 16, height: 16, marginRight: 8, tintColor: colors.inkFaint },
@@ -444,23 +599,68 @@ const styles = StyleSheet.create({
   bannerEmoji: { fontSize: 56, marginLeft: 8 },
 
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: H_PAD, marginTop: 22, marginBottom: 12 },
-  partnerHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: H_PAD, marginTop: 26, marginBottom: 14 },
-  partnerTitle: { fontSize: 22, fontWeight: '800', color: colors.ink, fontFamily: 'serif', lineHeight: 28 },
-  polaroids: { flexDirection: 'row', alignItems: 'center' },
-  polaroid: { width: 52, height: 52, borderRadius: 8, borderWidth: 3, borderColor: '#fff', ...shadow.card },
-  polaroid2: { marginLeft: -14 },
-  sectionTitle: { fontSize: font.h2, fontWeight: '800', color: colors.ink },
-  seeAll: { color: colors.brand, fontWeight: '700' },
+  partnerSection: {
+    marginTop: 28,
+    paddingTop: 22,
+    paddingBottom: 22,
+    overflow: 'hidden',
+  },
+  partnerGradImg: {},
+  partnerHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 16 },
+  partnerTitle: { fontSize: 23, fontWeight: '900', color: '#1A1A2E', fontFamily: 'serif', lineHeight: 28 },
+  polaroids: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  polaroid: { width: 61, height: 70, borderRadius: 4, borderWidth: 2, borderColor: '#FFFFFF', backgroundColor: '#D9D9D9', ...shadow.card },
+  polaroid2: { marginLeft: -18 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', minHeight: 24 },
+  sectionTitleIcon: { width: 16, height: 16, tintColor: colors.brand, marginRight: 6 },
+  sectionTitle: { fontSize: 16, fontWeight: '900', color: '#242235', fontFamily: 'serif' },
+  seeAll: { color: colors.brand, fontWeight: '800', fontSize: 12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: H_PAD },
   masonry: { flexDirection: 'row', paddingHorizontal: H_PAD, gap: GRID_GAP },
   col: { flex: 1 },
+  dealRail: { paddingHorizontal: H_PAD, paddingTop: 4 },
+  focusItem: {
+    width: FOCUS_CARD_W,
+    marginRight: FOCUS_GAP,
+    shadowColor: '#0B1020',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+  },
+  partnerRail: { paddingHorizontal: H_PAD, gap: 10 },
+  focusWrap: {
+    height: 312,
+    marginHorizontal: H_PAD,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  focusCenter: {
+    position: 'absolute',
+    zIndex: 3,
+    transform: [{ scale: 1 }],
+  },
+  focusSideLeft: {
+    position: 'absolute',
+    left: -8,
+    zIndex: 1,
+    transform: [{ scale: 0.92 }],
+  },
+  focusSideRight: {
+    position: 'absolute',
+    right: -8,
+    zIndex: 1,
+    transform: [{ scale: 0.92 }],
+  },
 
   exploreMore: { marginHorizontal: H_PAD, marginTop: 12, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.brand, borderRadius: radius.pill, paddingVertical: 13, alignItems: 'center', ...shadow.card },
   exploreMoreText: { color: colors.brand, fontWeight: '800', fontSize: font.h3 },
 
   catTabs: { paddingHorizontal: H_PAD, gap: 8, paddingBottom: 4 },
-  catTab: { paddingHorizontal: 14, height: 34, borderRadius: radius.pill, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
+  catTab: { flexDirection: 'row', paddingHorizontal: 14, height: 34, borderRadius: radius.pill, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
   catTabActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  catTabIcon: { width: 13, height: 13, tintColor: colors.inkMuted, marginRight: 6 },
+  catTabIconActive: { tintColor: '#fff' },
   catTabText: { color: colors.ink, fontWeight: '600', fontSize: font.small },
   catTabTextActive: { color: '#fff' },
 

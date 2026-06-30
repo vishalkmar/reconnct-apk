@@ -1,17 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, Alert, Modal, Pressable, Linking, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, Alert, Modal, Pressable, Linking, ActivityIndicator, AppState,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../theme';
-import { resolveImage, DUMMY_IMAGE } from '../api/client';
+import { resolveImage, DUMMY_IMAGE, api } from '../api/client';
 import { formatMoney, initials } from '../utils/format';
 import { bookableDateSet, priceBreakdown, MONTHS_FULL } from '../utils/booking';
 import { useAuth } from '../store/AuthContext';
-import { useBookings } from '../store/BookingsContext';
 import { useNav } from '../navigation/NavContext';
 import { shareExperience } from '../utils/share';
-import { createPaymentLink } from '../utils/cashfree';
 import { ICONS } from '../icons';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -23,26 +21,8 @@ const fmtDate = (key) => {
 
 export default function BookingScreen({ item }) {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { pop, navigateTab, push } = useNav();
-  const { addBooking } = useBookings();
-
-  // Save the booking locally so it appears under Profile → My Bookings.
-  const confirmBooking = () => {
-    addBooking({
-      id: bookingCode,
-      bookingCode,
-      status: 'confirmed',
-      item: { name: item.name, image: item.mainImage, mainImage: item.mainImage, city: item.city },
-      scheduledFor: dateKey,
-      slot,
-      currency: item.currency,
-      pricing: { total: b.total },
-      guestCount: adults + children,
-      createdAt: new Date().toISOString(),
-    });
-    setStep(4);
-  };
 
   const [step, setStep] = useState(1); // 1 plan · 2 review · 3 pay · 4 done
   const today = new Date();
@@ -65,25 +45,65 @@ export default function BookingScreen({ item }) {
   const [guest, setGuest] = useState({ name: '', phone: '', email: '' });
   const [paying, setPaying] = useState(false);
   const [payLink, setPayLink] = useState(null);
-  const [bookingCode] = useState('RC-' + Math.floor(10000 + Math.random() * 89999));
+  const [bookingCode, setBookingCode] = useState(null);
+  const [dbBooking, setDbBooking] = useState(null);
 
-  // Create a Cashfree (sandbox) link and open it for the user to pay.
-  const openCashfree = async () => {
-    setStep(3); setPaying(true); setPayLink(null);
-    try {
-      const url = await createPaymentLink({
-        amount: b.total, purpose: item.name,
-        name: primaryName, phone: guest.phone || (user && user.phone), email: guest.email || (user && user.email),
-      });
-      setPayLink(url);
-      Linking.openURL(url).catch(() => {});
-    } catch (e) {
-      Alert.alert('Payment', e.message || 'Could not start the Cashfree payment. Please try again.');
-    } finally { setPaying(false); }
-  };
   const b = priceBreakdown(item, adults, children);
   const guests = adults + children;
   const primaryName = guest.name.trim() || (user && user.name) || 'You';
+  // The amount actually charged comes from the DB booking once created.
+  const payTotal = (dbBooking && dbBooking.pricing && dbBooking.pricing.total) || b.total;
+
+  // Create the REAL booking in the DB, then a Cashfree hosted payment link and
+  // open it. The booking + transaction now live server-side (original data).
+  const startPayment = async () => {
+    setStep(3); setPaying(true); setPayLink(null); setDbBooking(null); setBookingCode(null);
+    try {
+      const res = await api.createBooking(token, {
+        itemType: 'experience',
+        itemId: item.id,
+        scheduledFor: dateKey,
+        guestCount: adults + children,
+        guestName: primaryName,
+        guestEmail: (guest.email || '').trim() || (user && user.email) || '',
+        guestPhone: (guest.phone || '').trim() || (user && user.phone) || '',
+        specialRequests: slot ? `Preferred time: ${slot}` : undefined,
+      });
+      const bk = res.booking;
+      setDbBooking(bk);
+      setBookingCode(bk.bookingCode);
+      const lk = await api.bookingLink(token, bk.bookingCode);
+      setPayLink(lk.linkUrl);
+      Linking.openURL(lk.linkUrl).catch(() => {});
+    } catch (e) {
+      Alert.alert('Payment', e.message || 'Could not start the payment. Please try again.');
+      setStep(2);
+    } finally { setPaying(false); }
+  };
+
+  // Ask the backend whether the link is paid (it confirms the booking + emails
+  // the voucher on success). Used by the auto-poll while we're on the pay step.
+  const checkStatus = async () => {
+    if (!bookingCode) return;
+    try {
+      const res = await api.bookingLinkStatus(token, bookingCode);
+      if (res && res.paid) {
+        if (res.booking) setDbBooking(res.booking);
+        setStep(4);
+      }
+    } catch { /* keep waiting */ }
+  };
+
+  // Auto-detect payment: poll every 4s while on the pay step and immediately
+  // when the user returns to the app (from the Cashfree browser). No manual
+  // "I've paid" button — success/failure is Cashfree's call, we just react.
+  useEffect(() => {
+    if (step !== 3 || !bookingCode) return undefined;
+    const id = setInterval(checkStatus, 4000);
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') checkStatus(); });
+    return () => { clearInterval(id); sub.remove(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, bookingCode]);
 
   // ── Calendar grid ─────────────────────────────────────────────────────
   const monthStart = new Date(view.y, view.m, 1);
@@ -247,28 +267,29 @@ export default function BookingScreen({ item }) {
       {step === 3 && (
         <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
           <Text style={styles.bigQ}>Complete your payment</Text>
-          <View style={styles.dueBox}><Text style={styles.dueTxt}>{formatMoney(b.total, item.currency)} due today</Text></View>
+          <View style={styles.dueBox}><Text style={styles.dueTxt}>{formatMoney(payTotal, item.currency)} due today</Text></View>
 
           <View style={styles.cashfreeCard}>
             {paying ? (
               <><ActivityIndicator color={colors.brand} /><Text style={styles.cashfreeWait}>Opening secure Cashfree checkout…</Text></>
             ) : (
               <>
-                <Image source={ICONS.shield} style={styles.cashfreeShield} />
-                <Text style={styles.cashfreeTitle}>Pay securely with Cashfree</Text>
-                <Text style={styles.cashfreeSub}>The Cashfree checkout has opened in your browser. Finish the payment there, then come back and tap below.</Text>
-                <TouchableOpacity style={styles.cashfreeReopen} onPress={() => (payLink ? Linking.openURL(payLink) : openCashfree())}>
-                  <Image source={ICONS.card} style={styles.cashfreeReopenIcon} />
-                  <Text style={styles.cashfreeReopenTxt}>{payLink ? 'Reopen Cashfree payment' : 'Open Cashfree payment'}</Text>
-                </TouchableOpacity>
+                <ActivityIndicator color={colors.brand} />
+                <Text style={styles.cashfreeTitle}>Waiting for payment…</Text>
+                <Text style={styles.cashfreeSub}>The Cashfree checkout opened in your browser. Finish paying there — we’ll confirm automatically and take you to your booking. No need to tap anything.</Text>
+                {!!payLink && (
+                  <TouchableOpacity style={styles.cashfreeReopen} onPress={() => Linking.openURL(payLink)}>
+                    <Image source={ICONS.card} style={styles.cashfreeReopenIcon} />
+                    <Text style={styles.cashfreeReopenTxt}>Reopen Cashfree payment</Text>
+                  </TouchableOpacity>
+                )}
               </>
             )}
           </View>
 
           <View style={styles.payTotals}>
-            <KV k="Subtotal" v={formatMoney(b.subtotal - b.discountAmt + b.gstAmt, item.currency)} />
-            {b.convAmt > 0 && <KV k="Service fee" v={formatMoney(b.convAmt, item.currency)} />}
-            <KV k="Total" v={formatMoney(b.total, item.currency)} bold last />
+            <KV k="Booking ID" v={bookingCode || '—'} />
+            <KV k="Total" v={formatMoney(payTotal, item.currency)} bold last />
           </View>
           <View style={styles.secure}>
             <Image source={ICONS.shield} style={styles.secureIcon} />
@@ -289,7 +310,7 @@ export default function BookingScreen({ item }) {
           <View style={[styles.doneHero, { paddingTop: insets.top + 30 }]}>
             <View style={styles.doneCheck}><Image source={ICONS.check} style={styles.doneCheckIcon} /></View>
             <Text style={styles.doneTitle}>You’re all set!</Text>
-            <Text style={styles.doneSub}>Your booking is confirmed.</Text>
+            <Text style={styles.doneSub}>Payment received — a voucher has been emailed to you.</Text>
           </View>
 
           <View style={styles.doneCard}>
@@ -305,7 +326,7 @@ export default function BookingScreen({ item }) {
               <KV k="Booking ID" v={bookingCode} />
               <KV k="Date" v={fmtDate(dateKey)} />
               <KV k="Guests" v={`${guests} guest${guests > 1 ? 's' : ''}`} />
-              <KV k="Total paid" v={formatMoney(b.total, item.currency)} bold last />
+              <KV k="Total paid" v={formatMoney(payTotal, item.currency)} bold last />
             </View>
           </View>
 
@@ -336,9 +357,13 @@ export default function BookingScreen({ item }) {
       {step < 4 && (
         <View style={[styles.actionBar, { paddingBottom: insets.bottom + 12 }]}>
           {step === 1 && <Action label="Choose guests & continue" onPress={next1} enabled={!!dateKey && (!slots.length || !!slot)} />}
-          {step === 2 && <Action label={`Continue to payment  ${formatMoney(b.total, item.currency)}`} onPress={openCashfree} enabled />}
-          {step === 3 && <Action label="I’ve completed the payment" onPress={confirmBooking} enabled={!paying} />}
-          {step === 3 && <Text style={styles.terms}>You’ll be redirected back here after paying on Cashfree</Text>}
+          {step === 2 && <Action label={`Continue to payment  ${formatMoney(b.total, item.currency)}`} onPress={startPayment} enabled />}
+          {step === 3 && (
+            <View style={styles.waitRow}>
+              <ActivityIndicator color={colors.brand} />
+              <Text style={styles.waitTxt}>Waiting for payment confirmation… this updates automatically</Text>
+            </View>
+          )}
         </View>
       )}
 
@@ -555,4 +580,6 @@ const styles = StyleSheet.create({
   actionOff: { opacity: 0.45 },
   actionTxt: { color: '#fff', fontWeight: '800', fontSize: font.h3 },
   terms: { textAlign: 'center', fontSize: font.tiny, color: colors.inkMuted, marginTop: 8 },
+  waitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 54 },
+  waitTxt: { flex: 1, fontSize: font.small, color: colors.inkMuted, fontWeight: '600' },
 });

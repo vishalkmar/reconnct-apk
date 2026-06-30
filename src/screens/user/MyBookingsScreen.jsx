@@ -1,19 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Image, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Image, ImageBackground, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { colors, radius, font, space, shadow } from '../../theme';
 import { api, resolveImage } from '../../api/client';
 import { formatMoney } from '../../utils/format';
 import { useAuth } from '../../store/AuthContext';
 import { useBookings } from '../../store/BookingsContext';
 import { useNav } from '../../navigation/NavContext';
+import { ICONS } from '../../icons';
 import ScreenHeader from '../../components/ScreenHeader';
 import EmptyState from '../../components/EmptyState';
 
-const STATUS_COLOR = {
-  confirmed: colors.success, paid: colors.success,
-  pending_payment: '#D97706', cancelled: '#DC2626', refunded: '#6B7280',
+// status → the pill shown on the card image (top-right).
+const PILL = {
+  confirmed: { label: 'Upcoming', bg: colors.brand, fg: '#101010' },
+  paid: { label: 'Upcoming', bg: colors.brand, fg: '#101010' },
+  completed: { label: 'Completed', bg: '#16A34A', fg: '#fff' },
+  pending_payment: { label: 'Pending', bg: '#D97706', fg: '#fff' },
+  pending: { label: 'Pending', bg: '#D97706', fg: '#fff' },
+  cancelled: { label: 'Cancelled', bg: '#DC2626', fg: '#fff' },
+  refunded: { label: 'Refunded', bg: '#6B7280', fg: '#fff' },
 };
-const label = (s) => String(s || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 // Status groups for the filter tabs (no "Upcoming", per spec).
 const GROUPS = {
@@ -28,6 +34,14 @@ const TABS = [
   { key: 'cancelled', label: 'Cancelled' },
 ];
 const inGroup = (status, key) => key === 'all' || (GROUPS[key] || []).includes(status);
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function prettyDate(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return String(v).slice(0, 10);
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
 
 export default function MyBookingsScreen() {
   const { token } = useAuth();
@@ -72,27 +86,8 @@ export default function MyBookingsScreen() {
         <FlatList
           data={shown}
           keyExtractor={(b) => String(b.id || b.bookingCode)}
-          contentContainerStyle={{ padding: space.lg }}
-          renderItem={({ item }) => {
-            const snap = item.item || {};
-            const img = resolveImage(snap.image || snap.mainImage);
-            return (
-              <View style={styles.card}>
-                {img ? <Image source={{ uri: img }} style={styles.img} /> : <View style={[styles.img, styles.imgPh]} />}
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.name} numberOfLines={2}>{snap.name || snap.title || 'Experience'}</Text>
-                  <Text style={styles.code}>#{item.bookingCode}</Text>
-                  {!!item.scheduledFor && <Text style={styles.meta}>📅 {String(item.scheduledFor).slice(0, 10)}</Text>}
-                  <View style={styles.row}>
-                    <Text style={[styles.status, { color: STATUS_COLOR[item.status] || colors.inkMuted }]}>● {label(item.status)}</Text>
-                    {!!(item.pricing && item.pricing.total) && (
-                      <Text style={styles.total}>{formatMoney(item.pricing.total, item.currency)}</Text>
-                    )}
-                  </View>
-                </View>
-              </View>
-            );
-          }}
+          contentContainerStyle={{ padding: space.lg, paddingBottom: 32 }}
+          renderItem={({ item }) => <BookingCard b={item} />}
           ListEmptyComponent={
             <EmptyState emoji="🎟️" title="No bookings yet"
               sub="Your booked experiences will appear here."
@@ -100,6 +95,76 @@ export default function MyBookingsScreen() {
           }
         />
       )}
+    </View>
+  );
+}
+
+function BookingCard({ b }) {
+  const snap = b.item || {};
+  const img = resolveImage(snap.image || snap.mainImage);
+  const pill = PILL[b.status] || PILL.pending_payment;
+  const city = snap.city || (snap.location && snap.location.city) || snap.location || '';
+  const date = prettyDate(b.scheduledFor || b.date);
+  const guests = b.guests || (b.guest && b.guest.count) || (b.pricing && b.pricing.guests) || 1;
+  const total = b.pricing && b.pricing.total;
+  const cancelled = b.status === 'cancelled' || b.status === 'refunded';
+
+  return (
+    <View style={styles.card}>
+      <ImageBackground
+        source={img ? { uri: img } : undefined}
+        style={styles.hero}
+        imageStyle={styles.heroImg}
+      >
+        {!img && <View style={[styles.heroImg, styles.heroPh]} />}
+        <View style={styles.heroShade} />
+        <View style={[styles.pill, { backgroundColor: pill.bg }]}>
+          <Text style={[styles.pillText, { color: pill.fg }]}>{pill.label}</Text>
+        </View>
+        <View style={styles.heroBody}>
+          <Text style={styles.heroTitle} numberOfLines={1}>{snap.name || snap.title || 'Experience'}</Text>
+          {!!city && (
+            <View style={styles.heroLocRow}>
+              <Image source={ICONS.locWhite} style={styles.heroLocIcon} />
+              <Text style={styles.heroLoc} numberOfLines={1}>{city}</Text>
+            </View>
+          )}
+        </View>
+      </ImageBackground>
+
+      <View style={styles.foot}>
+        <View style={styles.metaRow}>
+          <View style={styles.metaItem}>
+            <Image source={ICONS.calendar} style={styles.metaIcon} />
+            <Text style={styles.metaText}>{date || '—'}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Image source={ICONS.people} style={styles.metaIcon} />
+            <Text style={styles.metaText}>{guests} {guests === 1 ? 'guest' : 'guests'}</Text>
+          </View>
+          {!!total && <Text style={styles.price}>{formatMoney(total, b.currency)}</Text>}
+        </View>
+        {!!b.bookingCode && <Text style={styles.code}>{`#${b.bookingCode}`}</Text>}
+
+        <View style={styles.btnRow}>
+          <TouchableOpacity
+            style={[styles.btn, styles.btnGhost]}
+            activeOpacity={0.85}
+            disabled={cancelled}
+            onPress={() => Alert.alert('Cancel booking', 'Cancellation requests are handled by support for now.')}
+          >
+            <Text style={styles.btnGhostText}>{cancelled ? 'Cancelled' : 'Cancel'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.btn, styles.btnPrimary]}
+            activeOpacity={0.9}
+            onPress={() => Alert.alert(snap.name || 'Ticket', `Booking ${b.bookingCode || ''}\n${date || ''} · ${guests} ${guests === 1 ? 'guest' : 'guests'}`)}
+          >
+            <Image source={ICONS.ticket} style={styles.btnIcon} />
+            <Text style={styles.btnPrimaryText}>View Ticket</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 }
@@ -115,13 +180,35 @@ const styles = StyleSheet.create({
   badgeActive: { backgroundColor: 'rgba(255,255,255,0.3)' },
   badgeText: { fontSize: font.tiny, fontWeight: '800', color: colors.inkMuted },
   badgeTextActive: { color: '#fff' },
-  card: { flexDirection: 'row', gap: 12, backgroundColor: colors.surface, borderRadius: radius.lg, padding: 12, marginBottom: 12, ...shadow.card },
-  img: { width: 84, height: 84, borderRadius: radius.md },
-  imgPh: { backgroundColor: '#DCE0E6' },
-  name: { fontSize: font.body, fontWeight: '700', color: colors.ink },
-  code: { fontSize: font.tiny, color: colors.inkFaint, marginTop: 2 },
-  meta: { fontSize: font.small, color: colors.inkMuted, marginTop: 4 },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
-  status: { fontSize: font.small, fontWeight: '700' },
-  total: { fontSize: font.h3, fontWeight: '800', color: colors.price },
+
+  // Card
+  card: { backgroundColor: colors.surface, borderRadius: radius.lg, marginBottom: 16, overflow: 'hidden', ...shadow.card },
+  hero: { height: 150, justifyContent: 'flex-end' },
+  heroImg: { resizeMode: 'cover' },
+  heroPh: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#DCE0E6' },
+  heroShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 92, backgroundColor: 'rgba(8,12,24,0.55)' },
+  pill: { position: 'absolute', top: 12, right: 12, height: 24, paddingHorizontal: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  pillText: { fontSize: 11, fontWeight: '900' },
+  heroBody: { padding: 14 },
+  heroTitle: { color: '#fff', fontSize: 17, fontWeight: '900' },
+  heroLocRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  heroLocIcon: { width: 11, height: 11, marginRight: 4, opacity: 0.92 },
+  heroLoc: { color: 'rgba(255,255,255,0.92)', fontSize: 12, flex: 1 },
+
+  // Footer
+  foot: { padding: 14 },
+  metaRow: { flexDirection: 'row', alignItems: 'center' },
+  metaItem: { flexDirection: 'row', alignItems: 'center', marginRight: 18 },
+  metaIcon: { width: 15, height: 15, marginRight: 6, tintColor: colors.inkMuted },
+  metaText: { fontSize: 13, color: colors.ink, fontWeight: '600' },
+  price: { marginLeft: 'auto', fontSize: 16, fontWeight: '900', color: colors.brandDark },
+  code: { fontSize: 12, color: colors.inkFaint, marginTop: 8, fontWeight: '600' },
+
+  btnRow: { flexDirection: 'row', gap: 12, marginTop: 14 },
+  btn: { flex: 1, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
+  btnGhost: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border },
+  btnGhostText: { color: colors.ink, fontWeight: '800', fontSize: 14 },
+  btnPrimary: { backgroundColor: colors.brand },
+  btnPrimaryText: { color: '#101010', fontWeight: '900', fontSize: 14 },
+  btnIcon: { width: 16, height: 16, marginRight: 7, tintColor: '#101010' },
 });

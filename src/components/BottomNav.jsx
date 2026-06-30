@@ -4,24 +4,32 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, font } from '../theme';
 import { ICONS } from '../icons';
 
-const ITEMS = [
+const TRAVELLER_ITEMS = [
   { key: 'home', label: 'Home', icon: ICONS.navHome },
   { key: 'search', label: 'Search', icon: ICONS.navSearch },
   { key: 'experiences', label: 'Experiences', icon: ICONS.navExp },
   { key: 'inbox', label: 'Inbox', icon: ICONS.navInbox, dot: true },
   { key: 'profile', label: 'Profile', icon: ICONS.navProfile },
 ];
+const HOST_ITEMS = [
+  { key: 'dashboard', label: 'Dashboard', icon: ICONS.chart },
+  { key: 'listings', label: 'Listings', icon: ICONS.compass },
+  { key: 'inbox', label: 'Inbox', icon: ICONS.navInbox, dot: true },
+  { key: 'profile', label: 'Profile', icon: ICONS.navProfile },
+];
 
 /**
  * Floating, frosted bottom navigation with standard (SVG-style) icons. The
- * active tab gets a soft rounded pill and a darker icon/label.
+ * active tab gets a soft rounded pill and a darker icon/label. The tab set
+ * swaps when the app is in host mode.
  */
-export default function BottomNav({ current, onChange }) {
+export default function BottomNav({ current, onChange, mode = 'traveller' }) {
   const insets = useSafeAreaInsets();
+  const items = mode === 'host' ? HOST_ITEMS : TRAVELLER_ITEMS;
   return (
     <View pointerEvents="box-none" style={[styles.host, { bottom: (insets.bottom || 8) + 6 }]}>
       <View style={styles.bar}>
-        {ITEMS.map((it) => {
+        {items.map((it) => {
           const active = current === it.key;
           return (
             <TouchableOpacity key={it.key} style={[styles.item, active && styles.itemActive]} onPress={() => onChange(it.key)} activeOpacity={0.7}>

@@ -49,6 +49,8 @@ export const api = {
   listExperiences: (filters = {}) => request(`/public/experiences${qs(filters)}`),
   getExperience: (idOrSlug) => request(`/public/experiences/${idOrSlug}`),
   taxonomy: () => request('/public/taxonomy'),
+  types: (categoryId) => request(`/public/types${qs({ categoryId })}`),
+  cashfreeLink: (body) => request('/public/payments/cashfree-link', { method: 'POST', body }),
   cities: () => request('/public/cities'),
   appScreen: (key) => request(`/public/app-screen/${key}`),
   offerBanners: () => request('/public/offer-banners'),
@@ -64,6 +66,9 @@ export const api = {
 
   // ── User panel (auth required) ──────────────────────────────────────
   myBookings: (token) => request('/bookings/me', { token }),
+  createBooking: (token, body) => request('/bookings', { method: 'POST', token, body }),
+  bookingLink: (token, code) => request(`/payments/links/${encodeURIComponent(code)}`, { method: 'POST', token }),
+  bookingLinkStatus: (token, code) => request(`/payments/link-status/${encodeURIComponent(code)}`, { token }),
   wallet: (token) => request('/refer-earn/wallet', { token }),
 
   // ── Wishlist (auth required) ────────────────────────────────────────

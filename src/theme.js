@@ -1,7 +1,11 @@
 // Reconnct design tokens — colours pulled from the Figma screens.
 export const colors = {
-  brand: '#F5A623',        // signature golden-amber (header, buttons)
-  brandDark: '#E08A00',
+  // Figma "Linear Gradient" brand yellow: #FFB900 → #F9B402. Used as a solid
+  // (bright stop) everywhere a true gradient isn't practical; the gradient PNG
+  // (ICONS.brandGrad) is used for fill surfaces like the category badge.
+  brand: '#FFB900',        // signature golden-amber (header, buttons)
+  brandGradient: ['#FFB900', '#F9B402'],
+  brandDark: '#F9B402',
   brandSoft: '#FDEFD3',    // light amber chip background
   brandText: '#7A4E00',
 
@@ -20,9 +24,9 @@ export const colors = {
   surfaceAlt: '#F7F8FA',
   border: '#E5E7EB',
 
-  star: '#F5A623',
-  price: '#E08A00',
-  heart: '#F5A623',
+  star: '#FFB900',
+  price: '#F9B402',
+  heart: '#FFB900',
   success: '#16A34A',
   chipBg: '#F1F2F4',
 
