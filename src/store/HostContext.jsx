@@ -53,6 +53,11 @@ const SEED_PROFILE = {
 export function HostProvider({ children }) {
   const [listings, setListings] = useState(SEED_LISTINGS);
   const [profile, setProfileState] = useState(SEED_PROFILE);
+  // In-progress Create-Listing draft — kept in memory so the wizard survives
+  // navigating away / device back until the host submits or saves it.
+  const [listingDraft, setListingDraft] = useState(null);
+  const saveListingDraft = useCallback((d) => setListingDraft(d), []);
+  const clearListingDraft = useCallback(() => setListingDraft(null), []);
 
   const addListing = useCallback((l) => {
     const id = l.id || 'L-' + Math.floor(1000 + Math.random() * 8999);
@@ -90,7 +95,8 @@ export function HostProvider({ children }) {
   const value = useMemo(() => ({
     listings, addListing, removeListing, bookingsForListing,
     profile, setProfile, transactions, stats,
-  }), [listings, addListing, removeListing, bookingsForListing, profile, setProfile, transactions, stats]);
+    listingDraft, saveListingDraft, clearListingDraft,
+  }), [listings, addListing, removeListing, bookingsForListing, profile, setProfile, transactions, stats, listingDraft, saveListingDraft, clearListingDraft]);
 
   return <HostContext.Provider value={value}>{children}</HostContext.Provider>;
 }
@@ -98,4 +104,5 @@ export function HostProvider({ children }) {
 export const useHost = () => useContext(HostContext) || {
   listings: [], addListing: () => {}, removeListing: () => {}, bookingsForListing: () => [],
   profile: {}, setProfile: () => {}, transactions: [], stats: {},
+  listingDraft: null, saveListingDraft: () => {}, clearListingDraft: () => {},
 };

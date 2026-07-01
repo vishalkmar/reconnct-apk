@@ -472,8 +472,11 @@ const FOCUS_SIDE = Math.max(16, (SCREEN_W - FOCUS_CARD_W) / 2);
 
 function FocusDealSection({ data, onSeeAll, onPressItem }) {
   if (!data.length) return null;
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const [active, setActive] = useState(0);
+  // Start centred on the 2nd card so a card peeks on BOTH sides from the start
+  // (otherwise the first card sits flush-left with empty space on the left).
+  const initialIdx = data.length > 1 ? 1 : 0;
+  const scrollX = useRef(new Animated.Value(initialIdx * FOCUS_SNAP)).current;
+  const [active, setActive] = useState(initialIdx);
 
   return (
     <>
@@ -490,6 +493,7 @@ function FocusDealSection({ data, onSeeAll, onPressItem }) {
         snapToInterval={FOCUS_SNAP}
         snapToAlignment="start"
         scrollEventThrottle={16}
+        contentOffset={{ x: initialIdx * FOCUS_SNAP, y: 0 }}
         contentContainerStyle={{ paddingHorizontal: FOCUS_SIDE, paddingVertical: 8 }}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],

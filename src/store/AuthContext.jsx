@@ -17,6 +17,7 @@ export function AuthProvider({ children }) {
     isAuthed: !!token,
     signIn: (t, u) => { setToken(t); setUser(u); },
     signOut: () => { setToken(null); setUser(null); },
+    patchUser: (patch) => setUser((u) => ({ ...(u || {}), ...patch })),
   }), [token, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

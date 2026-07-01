@@ -38,6 +38,7 @@ export const ICONS = {
   partnerGrad: require('./assets/partner-grad.png'),
   brandGrad: require('./assets/brand-grad.png'),
   overlayGrad: require('./assets/overlay-grad.png'),
+  scrimGrad: require('./assets/scrim-grad.png'),
   chart: require('./assets/ic-chart.png'),
   dollar: require('./assets/ic-dollar.png'),
   plane: require('./assets/ic-plane.png'),
@@ -48,4 +49,44 @@ export const ICONS = {
   trash: require('./assets/ic-trash.png'),
   eye: require('./assets/ic-eye.png'),
   edit: require('./assets/ic-edit.png'),
+  signout: require('./assets/ic-signout.png'),
+  // Gray category (broad-category) line icons.
+  catGlobe: require('./assets/cat-globe.png'),
+  catHeart: require('./assets/cat-heart.png'),
+  catMountain: require('./assets/cat-mountain.png'),
+  catSprout: require('./assets/cat-sprout.png'),
+  catPalette: require('./assets/cat-palette.png'),
+  catBook: require('./assets/cat-book.png'),
+  catDumbbell: require('./assets/cat-dumbbell.png'),
+  catFood: require('./assets/cat-food.png'),
+  catUsers: require('./assets/cat-users.png'),
+  catPlane: require('./assets/cat-plane.png'),
+  catSun: require('./assets/cat-sun.png'),
+  catBriefcase: require('./assets/cat-briefcase.png'),
+  catTree: require('./assets/cat-tree.png'),
+  catStar: require('./assets/cat-star.png'),
+  catCompass: require('./assets/cat-compass.png'),
+  catTag: require('./assets/cat-tag.png'),
 };
+
+// Map a broad-category name to a distinct gray icon (keyword match, most
+// specific first; falls back to a generic tag).
+export function iconForCategory(name) {
+  const n = (name || '').toLowerCase();
+  const has = (...ws) => ws.some((w) => n.includes(w));
+  if (has('romantic', 'couple', 'love')) return ICONS.catHeart;
+  if (has('food', 'culinary', 'dining', 'cuisine')) return ICONS.catFood;
+  if (has('fitness', 'gym', 'sport', 'workout')) return ICONS.catDumbbell;
+  if (has('nature', 'wildlife', 'eco', 'garden')) return ICONS.catTree;
+  if (has('adventure', 'trek', 'hiking', 'outdoor', 'play', 'thrill')) return ICONS.catMountain;
+  if (has('art', 'creativ', 'craft', 'paint', 'design')) return ICONS.catPalette;
+  if (has('travel', 'getaway', 'trip', 'tour', 'staycation')) return ICONS.catPlane;
+  if (has('wellness', 'relax', 'spa', 'health', 'well-being', 'wellbeing', 'spiritual', 'inner', 'meditat', 'mindful', 'yoga')) return ICONS.catSun;
+  if (has('corporate', 'team', 'business', 'work', 'professional')) return ICONS.catBriefcase;
+  if (has('learn', 'education', 'knowledge', 'study', 'skill')) return ICONS.catBook;
+  if (has('discover', 'explore', 'journey')) return ICONS.catCompass;
+  if (has('social', 'communit', 'together', 'family', 'group', 'friend', 'connection')) return ICONS.catUsers;
+  if (has('growth', 'personal', 'develop')) return ICONS.catSprout;
+  if (has('cultur', 'heritage', 'histor')) return ICONS.catGlobe;
+  return ICONS.catTag;
+}

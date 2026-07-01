@@ -42,9 +42,9 @@ export default function ExperienceRow({ item, onPress }) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: radius.lg, marginBottom: 12, overflow: 'hidden', ...shadow.card },
-  img: { width: 108, alignSelf: 'stretch', backgroundColor: '#DCE0E6' },
-  body: { flex: 1, paddingVertical: 12, paddingHorizontal: 14 },
-  title: { fontSize: font.body, fontWeight: '700', color: colors.ink, lineHeight: 19 },
+  img: { width: 112, alignSelf: 'stretch', backgroundColor: '#DCE0E6' },
+  body: { flex: 1, paddingVertical: 12, paddingHorizontal: 12 },
+  title: { fontSize: font.body, fontWeight: '700', color: '#1A1A2E', lineHeight: 19 },
   locRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 5 },
   locIcon: { width: 12, height: 12 },
   location: { fontSize: font.small, color: colors.inkMuted, flex: 1 },

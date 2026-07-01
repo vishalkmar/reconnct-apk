@@ -10,12 +10,12 @@ import { initials } from '../utils/format';
 import { ICONS } from '../icons';
 
 const MENU = [
+  { label: 'My Profile', icon: ICONS.navProfile, screen: 'myProfile' },
   { label: 'My Bookings', icon: ICONS.ticket, screen: 'bookings' },
   { label: 'Transactions', icon: ICONS.card, screen: 'transactions' },
   { label: 'Wishlist', icon: ICONS.heart, screen: 'wishlist' },
   { label: 'Notifications', icon: ICONS.bell, screen: 'notifications' },
   { label: 'Language & Region', icon: ICONS.globe, screen: null },
-  { label: 'Settings', icon: ICONS.settings, screen: null },
 ];
 
 export default function ProfileScreen() {
@@ -82,7 +82,8 @@ export default function ProfileScreen() {
       </View>
 
       <TouchableOpacity style={styles.logout} onPress={signOut} activeOpacity={0.85}>
-        <Text style={styles.logoutText}>Log out</Text>
+        <Image source={ICONS.signout} style={styles.logoutIcon} />
+        <Text style={styles.logoutText}>Sign Out</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -126,6 +127,7 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, fontSize: font.body, color: colors.ink, fontWeight: '600' },
   chev: { fontSize: 20, color: colors.inkFaint },
 
-  logout: { marginTop: 18, marginHorizontal: space.lg, borderWidth: 1.5, borderColor: '#FCA5A5', borderRadius: radius.md, paddingVertical: 14, alignItems: 'center' },
-  logoutText: { color: '#DC2626', fontWeight: '800', fontSize: font.h3 },
+  logout: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 18, marginHorizontal: space.lg, borderWidth: 1.5, borderColor: '#F4B0BA', borderRadius: radius.md, paddingVertical: 14 },
+  logoutIcon: { width: 18, height: 18, tintColor: '#D4183D' },
+  logoutText: { color: '#D4183D', fontWeight: '800', fontSize: font.h3 },
 });

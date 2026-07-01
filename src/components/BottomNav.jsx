@@ -34,7 +34,7 @@ export default function BottomNav({ current, onChange, mode = 'traveller' }) {
           return (
             <TouchableOpacity key={it.key} style={[styles.item, active && styles.itemActive]} onPress={() => onChange(it.key)} activeOpacity={0.7}>
               <View>
-                <Image source={it.icon} style={[styles.icon, { tintColor: active ? colors.ink : colors.inkFaint }]} />
+                <Image source={it.icon} style={[styles.icon, { tintColor: '#1A1A2E' }]} />
                 {it.dot && <View style={styles.dot} />}
               </View>
               <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>{it.label}</Text>
@@ -56,9 +56,9 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.14, shadowRadius: 18, elevation: 12,
   },
   item: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: 22 },
-  itemActive: { backgroundColor: colors.brandSoft },
+  itemActive: { backgroundColor: '#ECEDEF' },
   icon: { width: 22, height: 22 },
   dot: { position: 'absolute', top: -2, right: -4, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brand },
-  label: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 4 },
-  labelActive: { color: colors.ink, fontWeight: '700' },
+  label: { fontSize: font.tiny, color: '#1A1A2E', marginTop: 4 },
+  labelActive: { color: '#1A1A2E', fontWeight: '700' },
 });

@@ -24,9 +24,23 @@ export function CategoryBadge({ label, style }) {
 }
 
 // Crossed-out original price → discounted price → /unit.
-export function PriceLine({ item, light, size = 16, strikeColor }) {
+// `stacked` puts the strike price on its own line above the discounted price.
+export function PriceLine({ item, light, size = 16, strikeColor, stacked }) {
   const price = item.fromPrice || 0;
   const strike = price ? Math.round((price * 1.48) / 50) * 50 : 0;
+  if (stacked) {
+    return (
+      <View>
+        {!!strike && <Text style={[parts.strike, parts.strikeStacked, strikeColor && { color: strikeColor }]}>{formatMoney(strike, item.currency)}</Text>}
+        <View style={parts.priceRow}>
+          <Text style={[parts.price, { fontSize: size }, light ? parts.priceLight : parts.priceDark]}>
+            {price ? formatMoney(price, item.currency) : 'Contact'}
+          </Text>
+          {!!price && <Text style={[parts.unit, light ? parts.unitLight : parts.unitDark]}>/{item.priceUnit || 'person'}</Text>}
+        </View>
+      </View>
+    );
+  }
   return (
     <View style={parts.priceRow}>
       {!!strike && <Text style={[parts.strike, strikeColor && { color: strikeColor }]}>{formatMoney(strike, item.currency)}</Text>}
@@ -71,6 +85,7 @@ const parts = StyleSheet.create({
     marginRight: 5,
     marginBottom: 2,
   },
+  strikeStacked: { marginRight: 0, marginBottom: 1 },
   price: { fontWeight: '700', lineHeight: 20 },
   priceLight: { color: '#FFFFFF' },
   priceDark: { color: '#1A1A2E' },

@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image, Switch, Alert, Modal, Pressable,
+  View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image, Switch, Alert, Modal, Pressable, Dimensions, BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../../theme';
@@ -10,6 +10,8 @@ import { ICONS } from '../../icons';
 import { pickFromDevice } from '../../utils/imagePicker';
 import TaxonomyPicker from './TaxonomyPicker';
 
+// Fixed square photo/video tile — 3 per row (matches Figma's 114px on a 390 screen).
+const TILE = Math.floor((Dimensions.get('window').width - 16 * 2 - 10 * 2) / 3);
 const STEPS = ['Basic info', 'Description', 'Pricing', 'Photos'];
 const DURATIONS = [
   { label: '1 hr', h: 1, m: 0 },
@@ -31,7 +33,9 @@ const blank = {
   audiences: [], categoryId: null, typeId: null, typeName: '',
   name: '', location: '', city: '', nearbyLocation: '', durationLabel: '',
   about: '', mode: 'offline',
-  inclusions: [], facilities: [], nearbyPlaces: [], faqs: [],
+  // One empty row open by default so the "What's included" / "Nearby" editors
+  // read as ready-to-fill boxes (host can delete them to close).
+  inclusions: [''], facilities: [], nearbyPlaces: [{ name: '', distance: '', unit: 'km' }], faqs: [],
   termsConditions: '', privacyPolicy: '', refundCancellationPolicy: '',
   priceMethod: 'per_person', adultPrice: '', childrenEnabled: false, childBands: [],
   capacity: 8, durationHours: 0, durationMinutes: 0,
@@ -42,10 +46,21 @@ const blank = {
 export default function CreateListingScreen() {
   const insets = useSafeAreaInsets();
   const { pop, navigateTab } = useNav();
-  const { addListing } = useHost();
-  const [step, setStep] = useState(1);
-  const [form, setForm] = useState(blank);
+  const { addListing, listingDraft, saveListingDraft, clearListingDraft } = useHost();
+  // Restore an in-progress draft (data + step) so nothing is lost on back/exit.
+  const [step, setStep] = useState(() => (listingDraft && listingDraft.step) || 1);
+  const [form, setForm] = useState(() => (listingDraft && listingDraft.form) || blank);
   const patch = (p) => setForm((f) => ({ ...f, ...p }));
+
+  // Persist the draft on every change (data survives leaving the wizard).
+  useEffect(() => { saveListingDraft({ form, step }); }, [form, step, saveListingDraft]);
+
+  // Device/system back → go one step back; only exit the wizard from step 1.
+  useEffect(() => {
+    const onBack = () => { if (step > 1) { setStep((s) => s - 1); return true; } return false; };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+    return () => sub.remove();
+  }, [step]);
 
   const canNext = useMemo(() => {
     if (step === 1) return !!form.name.trim() && !!form.categoryId && !!form.typeId;
@@ -73,6 +88,7 @@ export default function CreateListingScreen() {
       category: form.typeName || '',
       city: form.city || form.location,
     });
+    clearListingDraft();
     Alert.alert(
       status === 'pending' ? 'Submitted for review' : 'Saved as draft',
       status === 'pending'
@@ -254,9 +270,9 @@ function Step3({ form, patch }) {
             {form.childBands.map((b, i) => (
               <View key={i} style={styles.band}>
                 <View style={styles.bandAges}>
-                  <SmallNum label="Start" value={b.startAge} onChange={(v) => setBand(i, { startAge: v })} />
+                  <SmallNum label="Min Age" value={b.startAge} onChange={(v) => setBand(i, { startAge: v })} />
                   <Text style={styles.toText}>to</Text>
-                  <SmallNum label="End" value={b.endAge} onChange={(v) => setBand(i, { endAge: v })} />
+                  <SmallNum label="Max Age" value={b.endAge} onChange={(v) => setBand(i, { endAge: v })} />
                 </View>
                 <View style={styles.bandPrice}>
                   <TouchableOpacity style={styles.checkRow} onPress={() => setBand(i, { charge: !b.charge })}>
@@ -275,10 +291,10 @@ function Step3({ form, patch }) {
         )}
       </View>
 
-      {/* Max group size */}
-      <View>
-        <Label>Max group size</Label>
-        <Stepper value={form.capacity} onChange={(v) => patch({ capacity: v })} min={1} max={100} />
+      {/* Guests per session */}
+      <View style={styles.guestBox}>
+        <Text style={styles.guestLabel}>Guests per session</Text>
+        <Stepper value={form.capacity} onChange={(v) => patch({ capacity: v })} min={1} max={100} bare />
       </View>
 
       {/* Availability */}
@@ -300,8 +316,8 @@ function Step4({ form, patch }) {
       <Text style={styles.bigQ}>Add photos &amp; videos</Text>
       <Text style={styles.hint}>Pick from your device or paste a URL. The first photo is your cover.</Text>
 
-      <MediaSection
-        title="Photos" kind="photo" items={form.photos}
+      <PhotoGrid
+        items={form.photos}
         onAdd={() => setPicker('photo')}
         onRemove={(i) => patch({ photos: form.photos.filter((_, idx) => idx !== i) })}
       />
@@ -317,6 +333,46 @@ function Step4({ form, patch }) {
           <UrlPicker kind={picker} onPick={add} onClose={() => setPicker(null)} />
         </View>
       </Modal>
+    </View>
+  );
+}
+
+// Fixed 6-slot photo grid (Figma "Add photos"): first slot is the Cover with a
+// gold + on a light-gold dashed tile; the rest show a gray upload icon centred
+// on a gray dashed tile. Filled slots show the photo (+ Cover tag) with a ✕.
+const PHOTO_SLOTS = 6;
+function PhotoGrid({ items, onAdd, onRemove }) {
+  return (
+    <View>
+      <Label>Photos</Label>
+      <Text style={styles.hint}>Great photos increase bookings by up to 3×</Text>
+      <View style={styles.grid}>
+        {Array.from({ length: PHOTO_SLOTS }).map((_, i) => {
+          const url = items[i];
+          const isCover = i === 0;
+          if (url) {
+            return (
+              <View key={i} style={styles.tile}>
+                <Image source={{ uri: url }} style={styles.tileImg} />
+                {isCover && <View style={styles.coverTag}><Text style={styles.coverTagText}>Cover</Text></View>}
+                <TouchableOpacity style={styles.tileRemove} onPress={() => onRemove(i)}><Text style={styles.tileRemoveText}>✕</Text></TouchableOpacity>
+              </View>
+            );
+          }
+          return (
+            <TouchableOpacity key={i} style={[styles.tile, isCover ? styles.coverSlot : styles.uploadSlot]} activeOpacity={0.85} onPress={onAdd}>
+              {isCover ? (
+                <>
+                  <Image source={ICONS.plus} style={styles.coverPlus} />
+                  <Text style={styles.coverSlotLabel}>Cover</Text>
+                </>
+              ) : (
+                <Image source={ICONS.upload} style={styles.uploadSlotIcon} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -599,9 +655,9 @@ function SmallNum({ label, value, onChange, suffix }) {
     </View>
   );
 }
-function Stepper({ value, onChange, min = 0, max = 100 }) {
+function Stepper({ value, onChange, min = 0, max = 100, bare }) {
   return (
-    <View style={styles.stepper}>
+    <View style={[styles.stepper, bare && styles.stepperBare]}>
       <TouchableOpacity style={styles.stepBtn} onPress={() => onChange(Math.max(min, value - 1))}><Text style={styles.stepSign}>−</Text></TouchableOpacity>
       <Text style={styles.stepVal}>{value}</Text>
       <TouchableOpacity style={[styles.stepBtn, styles.stepBtnPlus]} onPress={() => onChange(Math.min(max, value + 1))}><Text style={[styles.stepSign, { color: '#101010' }]}>＋</Text></TouchableOpacity>
@@ -745,7 +801,10 @@ const styles = StyleSheet.create({
   addLink: { color: colors.brand, fontWeight: '800', fontSize: font.small, marginTop: 4 },
   removeLink: { color: '#DC2626', fontWeight: '700', fontSize: font.tiny },
 
+  guestBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1.5, borderColor: colors.border, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 16 },
+  guestLabel: { fontSize: font.body, fontWeight: '800', color: colors.ink },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: 16, alignSelf: 'flex-start', borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 10, height: 48 },
+  stepperBare: { borderWidth: 0, paddingHorizontal: 0, height: 'auto', gap: 14 },
   stepBtn: { width: 32, height: 32, borderRadius: 16, borderWidth: 1.5, borderColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   stepBtnPlus: { backgroundColor: colors.brand },
   stepSign: { fontSize: 18, color: colors.brand, fontWeight: '800' },
@@ -789,11 +848,17 @@ const styles = StyleSheet.create({
 
   // photos & videos
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  tile: { width: '31%', aspectRatio: 1, borderRadius: radius.md, overflow: 'hidden', borderWidth: 1.5, borderColor: colors.border },
-  uploadTile: { borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceAlt },
+  tile: { width: TILE, height: TILE, borderRadius: 14, overflow: 'hidden', borderWidth: 1.5, borderColor: colors.border },
+  uploadTile: { borderStyle: 'dashed', borderWidth: 2, borderColor: 'rgba(0,0,0,0.14)', alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFEFEF' },
   tileImg: { width: '100%', height: '100%' },
-  tileIcon: { width: 22, height: 22, tintColor: colors.inkFaint },
+  tileIcon: { width: 20, height: 20, tintColor: '#888899' },
   tileLabel: { fontSize: font.tiny, color: colors.brand, fontWeight: '800', marginTop: 4 },
+  // fixed photo slots (Figma: 114×114, radius 14, dashed 2px, cover #F9B402·10% bg / ·40% border)
+  coverSlot: { borderStyle: 'dashed', borderWidth: 2, borderColor: 'rgba(249,180,2,0.4)', backgroundColor: 'rgba(249,180,2,0.1)', alignItems: 'center', justifyContent: 'center' },
+  coverPlus: { width: 24, height: 24, tintColor: '#F9B402' },
+  coverSlotLabel: { fontSize: font.tiny, color: '#F9B402', fontWeight: '800', marginTop: 4 },
+  uploadSlot: { borderStyle: 'dashed', borderWidth: 2, borderColor: 'rgba(0,0,0,0.14)', backgroundColor: '#EFEFEF', alignItems: 'center', justifyContent: 'center' },
+  uploadSlotIcon: { width: 20, height: 20, tintColor: '#888899' },
   videoTile: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#101A33', padding: 6 },
   videoIcon: { width: 22, height: 22, tintColor: '#fff', marginBottom: 4 },
   videoUrl: { fontSize: 8, color: 'rgba(255,255,255,0.8)' },

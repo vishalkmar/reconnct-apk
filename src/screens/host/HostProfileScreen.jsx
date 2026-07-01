@@ -84,7 +84,7 @@ export default function HostProfileScreen() {
       </View>
 
       <TouchableOpacity style={styles.signout} onPress={signOut} activeOpacity={0.85}>
-        <Image source={ICONS.swap} style={{ width: 16, height: 16, tintColor: '#DC2626' }} />
+        <Image source={ICONS.signout} style={{ width: 18, height: 18, tintColor: '#D4183D' }} />
         <Text style={styles.signoutText}>Sign Out</Text>
       </TouchableOpacity>
     </ScrollView>

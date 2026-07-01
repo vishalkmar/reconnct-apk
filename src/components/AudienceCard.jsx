@@ -13,11 +13,14 @@ export default function AudienceCard({ data, onPress, style }) {
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={[styles.card, style]}>
       <Image source={{ uri: data.image }} style={styles.bg} resizeMode="cover" />
-      <Image source={ICONS.cardGradient} style={styles.gradient} resizeMode="stretch" />
+      <Image source={ICONS.scrimGrad} style={styles.gradient} resizeMode="stretch" />
 
       <View style={styles.top}>
-        <View style={styles.pill}><Text style={styles.pillText}>💛 Reconnect</Text></View>
-        <View style={styles.heart}><Text style={styles.heartIcon}>♡</Text></View>
+        <View style={styles.pill}>
+          <Image source={ICONS.heartFill} style={styles.pillHeart} />
+          <Text style={styles.pillText}>Reconnect</Text>
+        </View>
+        <View style={styles.heart}><Image source={ICONS.heart} style={styles.heartIcon} resizeMode="contain" /></View>
       </View>
 
       <View style={styles.content}>
@@ -64,12 +67,13 @@ export const themeForAudience = (a) => {
 const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, overflow: 'hidden', height: 250, backgroundColor: '#2b3040', ...shadow.card },
   bg: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
-  gradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '78%' },
+  gradient: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, width: '100%', height: '100%' },
   top: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', padding: 10, zIndex: 2 },
-  pill: { backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
+  pillHeart: { width: 12, height: 12, tintColor: colors.brand },
   pillText: { color: '#fff', fontSize: font.tiny, fontWeight: '700' },
   heart: { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
-  heartIcon: { color: colors.ink, fontSize: 14 },
+  heartIcon: { width: 14, height: 14, tintColor: colors.inkMuted },
   content: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 12, paddingBottom: 12, alignItems: 'center', zIndex: 2 },
   chip: { backgroundColor: 'rgba(255,255,255,0.94)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.pill, marginBottom: 8 },
   chipText: { color: colors.heart, fontSize: font.tiny, fontWeight: '800' },

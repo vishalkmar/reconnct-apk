@@ -95,17 +95,17 @@ export default function ExperiencesScreen({ initialFilters, tagMode = 'category'
         {/* Quick tabs — audiences (All/Family/Friends/Kids…) or broad categories */}
         {audienceMode ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-            <Tab label="All" icon="✨" active={!filters.audienceId} onPress={() => setFilters((f) => ({ ...f, audienceId: null }))} />
+            <Tab label="All" icon={ICONS.globe} active={!filters.audienceId} onPress={() => setFilters((f) => ({ ...f, audienceId: null }))} />
             {auds.map((a) => (
-              <Tab key={a.id} label={a.name} icon={a.icon} active={filters.audienceId === a.id}
+              <Tab key={a.id} label={a.name} icon={ICONS.tag} active={filters.audienceId === a.id}
                 onPress={() => setFilters((f) => ({ ...f, audienceId: f.audienceId === a.id ? null : a.id }))} />
             ))}
           </ScrollView>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-            <Tab label="All" icon="🌐" active={!filters.categoryId} onPress={() => setFilters((f) => ({ ...f, categoryId: null }))} />
+            <Tab label="All" icon={ICONS.globe} active={!filters.categoryId} onPress={() => setFilters((f) => ({ ...f, categoryId: null }))} />
             {cats.map((c) => (
-              <Tab key={c.id} label={c.name} icon={c.icon} active={filters.categoryId === c.id}
+              <Tab key={c.id} label={c.name} icon={ICONS.tag} active={filters.categoryId === c.id}
                 onPress={() => setFilters((f) => ({ ...f, categoryId: f.categoryId === c.id ? null : c.id }))} />
             ))}
           </ScrollView>
@@ -153,7 +153,8 @@ export default function ExperiencesScreen({ initialFilters, tagMode = 'category'
 function Tab({ label, icon, active, onPress }) {
   return (
     <TouchableOpacity onPress={onPress} style={[styles.tab, active && styles.tabActive]} activeOpacity={0.8}>
-      <Text style={[styles.tabText, active && styles.tabTextActive]}>{icon ? `${icon}  ` : ''}{label}</Text>
+      {!!icon && <Image source={icon} style={[styles.tabIcon, active && styles.tabIconActive]} />}
+      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -170,14 +171,16 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: font.h3, color: colors.ink, marginLeft: 4, height: 40 },
   headerRight: { flexDirection: 'row', alignItems: 'center' },
   hIcon: { fontSize: 18 },
-  hIconImg: { width: 22, height: 22 },
+  hIconImg: { width: 22, height: 22, tintColor: colors.ink },
   dot: { position: 'absolute', top: 4, right: 4, backgroundColor: colors.brand, minWidth: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   dotText: { color: '#fff', fontSize: 10, fontWeight: '800' },
   tabs: { paddingHorizontal: H_PAD, gap: 8, paddingTop: 4 },
-  tab: { paddingHorizontal: 14, height: 34, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
+  tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 34, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
   tabActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  tabIcon: { width: 14, height: 14, tintColor: colors.inkMuted },
+  tabIconActive: { tintColor: '#101010' },
   tabText: { color: colors.ink, fontWeight: '600', fontSize: font.small },
-  tabTextActive: { color: '#fff' },
+  tabTextActive: { color: '#101010', fontWeight: '800' },
   center: { alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 10 },
   muted: { color: colors.inkMuted, textAlign: 'center' },
   retry: { color: colors.brand, fontWeight: '700' },

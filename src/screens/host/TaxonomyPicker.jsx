@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { colors, radius, font } from '../../theme';
 import { api } from '../../api/client';
 import { categoryAudiences } from '../../data/categoryAudiences';
 import { typesForCategorySlug } from '../../data/categoryTypes';
+import { ICONS, iconForCategory } from '../../icons';
 
 /**
  * The Reconnct experience cascade, mirroring the website admin picker:
@@ -94,7 +95,7 @@ export default function TaxonomyPicker({ value, onChange }) {
         ) : (
           <Chips>
             {filteredCategories.map((c) => (
-              <Chip key={c.id} active={categoryId === c.id} onPress={() => pickCategory(c.id)}>{c.icon ? `${c.icon} ` : ''}{c.name}</Chip>
+              <Chip key={c.id} active={categoryId === c.id} icon={iconForCategory(c.name)} onPress={() => pickCategory(c.id)}>{c.name}</Chip>
             ))}
           </Chips>
         )}
@@ -142,9 +143,10 @@ function Section({ title, hint, children }) {
   );
 }
 function Chips({ children }) { return <View style={styles.chips}>{children}</View>; }
-function Chip({ active, onPress, children }) {
+function Chip({ active, onPress, children, icon }) {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={[styles.chip, active && styles.chipActive]}>
+      {!!icon && <Image source={icon} style={[styles.chipIcon, active && styles.chipIconActive]} />}
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{children}</Text>
     </TouchableOpacity>
   );
@@ -175,8 +177,10 @@ const styles = StyleSheet.create({
   hint: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 3, marginBottom: 10 },
   empty: { fontSize: font.small, color: colors.inkMuted, fontStyle: 'italic' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 13, paddingVertical: 8, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
   chipActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  chipIcon: { width: 15, height: 15, tintColor: '#888899' },
+  chipIconActive: { tintColor: '#101010' },
   chipText: { fontSize: font.small, fontWeight: '700', color: colors.ink },
   chipTextActive: { color: '#101010' },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

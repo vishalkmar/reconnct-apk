@@ -24,7 +24,7 @@ function TrendingRow({ item, onPress }) {
         <CategoryBadge label={category} style={styles.badge} />
       </View>
       <View style={styles.body}>
-        <PriceLine item={item} size={16} strikeColor="#D4183D" />
+        <PriceLine item={item} size={16} strikeColor="#D4183D" stacked />
         <LocationLine city={item.city} />
         <Text style={styles.rowTitle} numberOfLines={2}>{item.name}</Text>
       </View>
@@ -72,8 +72,6 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     height: 120,
-    borderWidth: 1,
-    borderColor: '#ECEEF2',
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
@@ -81,6 +79,6 @@ const styles = StyleSheet.create({
   imgWrap: { width: 120, height: '100%' },
   img: { width: '100%', height: '100%', backgroundColor: '#DCE0E6' },
   badge: { position: 'absolute', top: 8, left: 8 },
-  body: { flex: 1, paddingHorizontal: 10, paddingVertical: 10 },
-  rowTitle: { color: '#1A1A2E', fontSize: 13.5, fontWeight: '800', lineHeight: 17, marginTop: 3 },
+  body: { flex: 1, paddingHorizontal: 10, paddingVertical: 10, justifyContent: 'center' },
+  rowTitle: { color: '#1A1A2E', fontSize: 14, fontWeight: '700', lineHeight: 18, marginTop: 3 },
 });

@@ -88,8 +88,8 @@ export default function FilterSheet({ visible, taxonomy, initial, onApply, onClo
                 <View style={styles.labelRow}><Image source={ICONS.heartFill} style={[styles.labelIcon, { tintColor: colors.brand }]} /><Text style={styles.label}>Reconnect with</Text></View>
                 <View style={styles.audGrid}>
                   <TouchableOpacity style={[styles.audCard, !draft.audienceId && styles.audCardSel]} onPress={() => setDraft((d) => ({ ...d, audienceId: null }))} activeOpacity={0.85}>
-                    <Text style={styles.audIcon}>✨</Text>
-                    <Text style={styles.audName}>All</Text>
+                    <Image source={ICONS.globe} style={styles.audIconImg} />
+                    <Text style={styles.audName} numberOfLines={2}>All</Text>
                   </TouchableOpacity>
                   {audiences.map((a) => {
                     const sel = draft.audienceId === a.id;
@@ -100,8 +100,8 @@ export default function FilterSheet({ visible, taxonomy, initial, onApply, onClo
                         onPress={() => toggle('audienceId', a.id)}
                         activeOpacity={0.85}
                       >
-                        <Text style={styles.audIcon}>{a.icon || AUD_ICON[a.slug] || '✨'}</Text>
-                        <Text style={styles.audName}>{a.name}</Text>
+                        <Image source={ICONS.groups} style={styles.audIconImg} />
+                        <Text style={styles.audName} numberOfLines={2}>{a.name}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -123,7 +123,8 @@ export default function FilterSheet({ visible, taxonomy, initial, onApply, onClo
                         onPress={() => toggle('categoryId', c.id)}
                         activeOpacity={0.85}
                       >
-                        <Text style={[styles.chipText, sel && styles.chipTextSel]}>{c.icon ? `${c.icon}  ` : ''}{c.name}</Text>
+                        <Image source={ICONS.tag} style={[styles.chipIcon, sel && styles.chipIconSel]} />
+                        <Text style={[styles.chipText, sel && styles.chipTextSel]}>{c.name}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -189,18 +190,20 @@ const styles = StyleSheet.create({
 
   audGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   audCard: {
-    width: '47%', flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, padding: 12,
+    width: '47%', minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, paddingVertical: 10, paddingHorizontal: 12,
   },
   audCardSel: { borderColor: colors.brand, backgroundColor: colors.brandSoft },
-  audIcon: { fontSize: 20 },
-  audName: { fontSize: font.body, fontWeight: '700', color: colors.ink },
+  audIconImg: { width: 20, height: 20, tintColor: colors.inkMuted, flexShrink: 0 },
+  audName: { flex: 1, fontSize: font.small, fontWeight: '700', color: colors.ink, lineHeight: 17 },
 
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
   chipSel: { backgroundColor: colors.brand, borderColor: colors.brand },
+  chipIcon: { width: 13, height: 13, tintColor: colors.inkMuted },
+  chipIconSel: { tintColor: '#101010' },
   chipText: { color: colors.ink, fontWeight: '600', fontSize: font.small },
-  chipTextSel: { color: '#fff' },
+  chipTextSel: { color: '#101010', fontWeight: '800' },
 
   priceRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

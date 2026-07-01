@@ -38,8 +38,8 @@ export default function ReconnectScreen() {
             <TouchableOpacity style={styles.back} onPress={pop}><Text style={styles.backIcon}>‹</Text></TouchableOpacity>
             <Image source={ICONS.logoWhite} style={styles.logo} resizeMode="contain" />
           </View>
-          <View style={styles.pill}>
-            <Image source={ICONS.heartFill} style={styles.pillHeart} />
+          <View style={styles.reconnectRow}>
+            <View style={styles.heartBadge}><Image source={ICONS.heartFill} style={styles.heartBadgeIcon} /></View>
             <Text style={styles.pillText}>RECONNECT</Text>
           </View>
           <Text style={styles.title}>Who are you reconnecting with?</Text>
@@ -77,9 +77,10 @@ const styles = StyleSheet.create({
   back: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   backIcon: { fontSize: 26, color: '#fff', marginTop: -3 },
   logo: { width: 118, height: 24 },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(245,166,35,0.16)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, marginTop: 22 },
-  pillHeart: { width: 14, height: 14, tintColor: colors.brand },
-  pillText: { color: colors.brand, fontWeight: '800', fontSize: font.tiny, letterSpacing: 1 },
+  reconnectRow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginTop: 22 },
+  heartBadge: { width: 32, height: 32, borderRadius: 9, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  heartBadgeIcon: { width: 18, height: 18, tintColor: '#fff' },
+  pillText: { color: colors.brand, fontWeight: '800', fontSize: font.small, letterSpacing: 1 },
   title: { color: '#fff', fontSize: 28, fontWeight: '800', fontFamily: 'serif', marginTop: 14, lineHeight: 36 },
   subtitle: { color: 'rgba(255,255,255,0.7)', fontSize: font.body, marginTop: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: H_PAD },
