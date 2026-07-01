@@ -25,11 +25,13 @@ export default function ProfileScreen() {
   const { count: wishCount } = useWishlist();
   const { push, switchMode } = useNav();
   const [trips, setTrips] = useState(0);
+  const [supportUnread, setSupportUnread] = useState(0);
 
   const name = (user && user.name) || 'Guest';
 
   useEffect(() => {
     api.myBookings(token).then((d) => setTrips((d.bookings || []).length)).catch(() => {});
+    api.supportUnread(token).then((d) => setSupportUnread((d && d.unread && d.unread.user) || 0)).catch(() => {});
   }, [token]);
 
   const soon = (what) => Alert.alert(what, 'Coming soon.');
@@ -77,6 +79,9 @@ export default function ProfileScreen() {
           >
             <Image source={m.icon} style={styles.rowIconImg} />
             <Text style={styles.rowText}>{m.label}</Text>
+            {m.screen === 'support' && supportUnread > 0 && (
+              <View style={styles.unreadPill}><Text style={styles.unreadPillText}>{supportUnread > 99 ? '99+' : supportUnread}</Text></View>
+            )}
             <Text style={styles.chev}>›</Text>
           </TouchableOpacity>
         ))}
@@ -127,6 +132,8 @@ const styles = StyleSheet.create({
   rowIconImg: { width: 20, height: 20, tintColor: colors.brand },
   rowText: { flex: 1, fontSize: font.body, color: colors.ink, fontWeight: '600' },
   chev: { fontSize: 20, color: colors.inkFaint },
+  unreadPill: { minWidth: 20, height: 20, paddingHorizontal: 6, borderRadius: 10, backgroundColor: '#D4183D', alignItems: 'center', justifyContent: 'center', marginRight: 6 },
+  unreadPillText: { color: '#fff', fontSize: 11, fontWeight: '800' },
 
   logout: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 18, marginHorizontal: space.lg, borderWidth: 1.5, borderColor: '#F4B0BA', borderRadius: radius.md, paddingVertical: 14 },
   logoutIcon: { width: 18, height: 18, tintColor: '#D4183D' },

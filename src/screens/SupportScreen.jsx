@@ -67,9 +67,27 @@ export default function SupportScreen({ queue = 'user' }) {
       socketRef.current = s;
       if (!s) return;
 
-      const join = () => { if (convIdRef.current) s.emit('support:join', { conversationId: convIdRef.current }); };
-      s.on('connect', join);
-      if (s.connected) join();
+      // On reconnect, re-join the room AND refetch to fill any gap missed while
+      // offline (keep local pending/failed bubbles).
+      const refetch = async () => {
+        try {
+          const d = await api.supportConversation(token, queue);
+          setMessages((prev) => {
+            const keep = prev.filter((m) => m._pending || m._failed);
+            const server = d.messages || [];
+            const ids = new Set(server.map((m) => m.id));
+            return [...server, ...keep.filter((m) => !ids.has(m.id))];
+          });
+        } catch { /* ignore */ }
+      };
+      let hadConnected = false;
+      const onConnect = () => {
+        if (convIdRef.current) s.emit('support:join', { conversationId: convIdRef.current });
+        if (hadConnected) refetch();
+        hadConnected = true;
+      };
+      s.on('connect', onConnect);
+      if (s.connected) onConnect();
 
       s.on('support:message', (m) => {
         if (m.conversationId !== convIdRef.current) return;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../../theme';
@@ -6,6 +6,7 @@ import { useAuth } from '../../store/AuthContext';
 import { useNav } from '../../navigation/NavContext';
 import { useHost } from '../../store/HostContext';
 import { initials, formatMoney } from '../../utils/format';
+import { api } from '../../api/client';
 import { ICONS } from '../../icons';
 
 const NAVY = '#15233F';
@@ -20,12 +21,17 @@ const MENU = [
 
 export default function HostProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { user, signOut } = useAuth();
+  const { user, signOut, token } = useAuth();
   const { switchMode, push, navigateTab } = useNav();
   const { stats } = useHost();
+  const [supportUnread, setSupportUnread] = useState(0);
   const name = (user && user.name) || 'Host';
   const email = (user && user.email) || '';
   const soon = (w) => Alert.alert(w, 'Coming soon.');
+
+  useEffect(() => {
+    api.supportUnread(token).then((d) => setSupportUnread((d && d.unread && d.unread.supplier) || 0)).catch(() => {});
+  }, [token]);
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
@@ -72,6 +78,9 @@ export default function HostProfileScreen() {
               <Text style={styles.rowText}>{m.label}</Text>
               {!!m.sub && <Text style={styles.rowSub}>{m.sub}</Text>}
             </View>
+            {m.screen === 'support' && supportUnread > 0 && (
+              <View style={styles.unreadPill}><Text style={styles.unreadPillText}>{supportUnread > 99 ? '99+' : supportUnread}</Text></View>
+            )}
             <Text style={styles.chev}>›</Text>
           </TouchableOpacity>
         ))}
@@ -132,6 +141,8 @@ const styles = StyleSheet.create({
   rowText: { fontSize: font.body, color: colors.ink, fontWeight: '700' },
   rowSub: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 2 },
   chev: { fontSize: 20, color: colors.inkFaint },
+  unreadPill: { minWidth: 20, height: 20, paddingHorizontal: 6, borderRadius: 10, backgroundColor: '#D4183D', alignItems: 'center', justifyContent: 'center', marginRight: 6 },
+  unreadPillText: { color: '#fff', fontSize: 11, fontWeight: '800' },
 
   adminRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: space.lg, marginTop: 14, backgroundColor: '#EEF0F3', borderRadius: radius.lg, paddingVertical: 15, paddingHorizontal: 16 },
   adminIconWrap: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#E2E5EA', alignItems: 'center', justifyContent: 'center' },
