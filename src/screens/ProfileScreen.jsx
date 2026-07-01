@@ -15,6 +15,7 @@ const MENU = [
   { label: 'Transactions', icon: ICONS.card, screen: 'transactions' },
   { label: 'Wishlist', icon: ICONS.heart, screen: 'wishlist' },
   { label: 'Notifications', icon: ICONS.bell, screen: 'notifications' },
+  { label: 'Support', icon: ICONS.navInbox, screen: 'support', params: { queue: 'user' } },
   { label: 'Language & Region', icon: ICONS.globe, screen: null },
 ];
 
@@ -72,7 +73,7 @@ export default function ProfileScreen() {
             key={m.label}
             style={[styles.row, i === MENU.length - 1 && styles.rowLast]}
             activeOpacity={0.7}
-            onPress={() => (m.screen ? push(m.screen) : soon(m.label))}
+            onPress={() => (m.screen ? push(m.screen, m.params) : soon(m.label))}
           >
             <Image source={m.icon} style={styles.rowIconImg} />
             <Text style={styles.rowText}>{m.label}</Text>

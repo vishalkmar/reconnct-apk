@@ -76,7 +76,38 @@ export const api = {
   wishlistKeys: (token) => request('/wishlist/keys', { token }),
   wishlistAdd: (token, entityType, entityId) => request('/wishlist', { method: 'POST', token, body: { entityType, entityId } }),
   wishlistRemove: (token, entityType, entityId) => request('/wishlist', { method: 'DELETE', token, body: { entityType, entityId } }),
+
+  // ── Support chat (party = user / host) ──────────────────────────────
+  supportConversation: (token, queue = 'user') => request(`/support/me/conversation${qs({ queue })}`, { token }),
+  supportMessages: (token, conversationId, before) => request(`/support/me/messages${qs({ conversationId, before })}`, { token }),
+  supportSend: (token, body) => request('/support/me/messages', { method: 'POST', token, body }),
+  supportRead: (token, conversationId) => request('/support/me/read', { method: 'POST', token, body: { conversationId } }),
+  supportUnread: (token) => request('/support/me/unread', { token }),
+  // Multipart image upload → { type, url, name, size }.
+  supportUpload: (token, asset) => uploadRequest('/support/attachments', asset, token),
 };
+
+// Multipart upload helper (RN FormData with { uri, name, type }).
+async function uploadRequest(path, asset, token) {
+  const form = new FormData();
+  form.append('file', { uri: asset.uri, name: asset.name, type: asset.type });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: form,
+    });
+  } catch (e) {
+    throw new Error('Network error while uploading.');
+  }
+  let json = null;
+  try { json = await res.json(); } catch (_) { /* non-JSON */ }
+  if (!res.ok || (json && json.success === false)) {
+    throw new Error((json && json.message) || `Upload failed (${res.status})`);
+  }
+  return json ? json.data : null;
+}
 
 // A small dummy image so cards/screens never render blank while real media loads
 // or when an item has no image set. (Unsplash — picsum was unreachable on-device.)

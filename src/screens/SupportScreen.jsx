@@ -1,0 +1,290 @@
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Image,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Linking, Alert,
+} from 'react-native';
+import { colors, radius, font } from '../theme';
+import { api, resolveImage } from '../api/client';
+import { useAuth } from '../store/AuthContext';
+import { ICONS } from '../icons';
+import { pickAsset } from '../utils/imagePicker';
+import { connectSupport, disconnectSupport } from '../services/supportSocket';
+import ScreenHeader from '../components/ScreenHeader';
+
+const fmtTime = (d) => new Date(d).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+const dayKey = (d) => new Date(d).toDateString();
+const dayLabel = (d) => {
+  const date = new Date(d); const now = new Date();
+  if (dayKey(date) === dayKey(now)) return 'Today';
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  if (dayKey(date) === dayKey(y)) return 'Yesterday';
+  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+/**
+ * Support chat — `queue` is 'user' (opened from Profile) or 'supplier' (from
+ * Host Profile). Real-time via the /support socket; REST loads history + is the
+ * fallback. The party's own messages are 'user'/'supplier'; admin replies come
+ * in on the left.
+ */
+export default function SupportScreen({ queue = 'user' }) {
+  const { token } = useAuth();
+  const [conv, setConv] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [pending, setPending] = useState([]); // uploaded, not yet sent
+  const [uploading, setUploading] = useState(false);
+  const [typingPeer, setTypingPeer] = useState(false);
+
+  const socketRef = useRef(null);
+  const convIdRef = useRef(null);
+  const listRef = useRef(null);
+  const typingSentRef = useRef(false);
+  const typingTimerRef = useRef(null);
+
+  const scrollEnd = useCallback(() => {
+    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+  }, []);
+
+  // Load history, then open the socket + join the room.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const data = await api.supportConversation(token, queue);
+        if (!alive) return;
+        setConv(data.conversation);
+        convIdRef.current = data.conversation.id;
+        setMessages(data.messages || []);
+      } catch (e) {
+        Alert.alert('Support', e.message || 'Could not open support chat.');
+      } finally {
+        if (alive) setLoading(false);
+      }
+
+      const s = connectSupport(token, queue);
+      socketRef.current = s;
+      if (!s) return;
+
+      const join = () => { if (convIdRef.current) s.emit('support:join', { conversationId: convIdRef.current }); };
+      s.on('connect', join);
+      if (s.connected) join();
+
+      s.on('support:message', (m) => {
+        if (m.conversationId !== convIdRef.current) return;
+        setMessages((prev) => {
+          if (m.tempId && prev.some((x) => x.id === m.tempId)) return prev.map((x) => (x.id === m.tempId ? m : x));
+          if (prev.some((x) => x.id === m.id)) return prev;
+          return [...prev, m];
+        });
+        if (m.senderRole === 'admin') s.emit('support:read', { conversationId: m.conversationId });
+      });
+      s.on('support:read', ({ conversationId, by }) => {
+        if (conversationId === convIdRef.current && by === 'admin') {
+          setMessages((prev) => prev.map((x) => (x.senderRole !== 'admin' ? { ...x, readByAdmin: true } : x)));
+        }
+      });
+      s.on('support:typing', ({ conversationId, role, typing }) => {
+        if (conversationId === convIdRef.current && role === 'admin') setTypingPeer(!!typing);
+      });
+    })();
+
+    return () => { alive = false; disconnectSupport(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queue]);
+
+  useEffect(() => { if (messages.length) scrollEnd(); }, [messages.length, typingPeer, scrollEnd]);
+
+  const emitTyping = (typing) => {
+    const s = socketRef.current;
+    if (s && convIdRef.current) s.emit('support:typing', { conversationId: convIdRef.current, typing });
+  };
+  const onInput = (v) => {
+    setText(v);
+    if (!typingSentRef.current) { typingSentRef.current = true; emitTyping(true); }
+    clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => { typingSentRef.current = false; emitTyping(false); }, 1200);
+  };
+
+  const send = () => {
+    const body = text.trim();
+    const attachments = pending;
+    if (!body && attachments.length === 0) return;
+    const s = socketRef.current;
+    const tempId = `tmp-${Date.now()}`;
+    const optimistic = {
+      id: tempId, tempId, conversationId: convIdRef.current, senderRole: queue,
+      body, attachments, readByAdmin: false, readByParty: true,
+      createdAt: new Date().toISOString(), _pending: true,
+    };
+    setMessages((prev) => [...prev, optimistic]);
+    setText(''); setPending([]);
+    clearTimeout(typingTimerRef.current); typingSentRef.current = false; emitTyping(false);
+
+    const settle = (real) => setMessages((prev) => prev.map((m) => (m.id === tempId ? real : m)));
+    const failMark = () => setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, _pending: false, _failed: true } : m)));
+
+    if (s && s.connected) {
+      s.emit('support:message', { queue, conversationId: convIdRef.current, body, attachments, tempId }, (res) => {
+        if (res?.error) failMark();
+        else if (res?.message) settle(res.message);
+      });
+    } else {
+      api.supportSend(token, { queue, body, attachments })
+        .then((data) => settle(data.message))
+        .catch(() => failMark());
+    }
+  };
+
+  const attach = async () => {
+    try {
+      const asset = await pickAsset('photo');
+      if (!asset) return;
+      setUploading(true);
+      const att = await api.supportUpload(token, asset);
+      if (att?.url) setPending((prev) => [...prev, att]);
+    } catch (e) {
+      Alert.alert('Upload', e.message || 'Could not upload the photo.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const renderItem = ({ item, index }) => {
+    const prev = messages[index - 1];
+    const showDay = !prev || dayLabel(prev.createdAt) !== dayLabel(item.createdAt);
+    const mine = item.senderRole !== 'admin';
+    return (
+      <View>
+        {showDay && (
+          <View style={styles.dayWrap}><Text style={styles.dayText}>{dayLabel(item.createdAt)}</Text></View>
+        )}
+        <View style={[styles.row, mine ? styles.rowMine : styles.rowTheir]}>
+          <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheir, item._failed && styles.bubbleFailed]}>
+            {(item.attachments || []).map((a, i) => <Attachment key={i} att={a} />)}
+            {!!item.body && <Text style={styles.msgText}>{item.body}</Text>}
+            <View style={styles.metaRow}>
+              <Text style={styles.metaTime}>{fmtTime(item.createdAt)}</Text>
+              {mine && !item._failed && (
+                item._pending
+                  ? <Text style={styles.tick}>·</Text>
+                  : <Text style={[styles.tick, item.readByAdmin && styles.tickRead]}>{item.readByAdmin ? '✓✓' : '✓'}</Text>
+              )}
+              {item._failed && <Text style={styles.failText}>failed</Text>}
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#ECE5DC' }}>
+      <ScreenHeader title={queue === 'supplier' ? 'Support (Host)' : 'Support'} />
+      {loading ? (
+        <View style={styles.center}><ActivityIndicator color={colors.brand} /></View>
+      ) : (
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={8}>
+          <FlatList
+            ref={listRef}
+            data={messages}
+            keyExtractor={(m) => String(m.id)}
+            renderItem={renderItem}
+            contentContainerStyle={{ padding: 12, paddingBottom: 4 }}
+            onContentSizeChange={scrollEnd}
+            ListEmptyComponent={<Text style={styles.empty}>Send a message — our support team will reply here.</Text>}
+          />
+          {typingPeer && <Text style={styles.typing}>Support is typing…</Text>}
+
+          {pending.length > 0 && (
+            <View style={styles.pendingRow}>
+              {pending.map((a, i) => (
+                <View key={i} style={styles.pendThumbWrap}>
+                  <Image source={{ uri: resolveImage(a.url) }} style={styles.pendThumb} />
+                  <TouchableOpacity style={styles.pendX} onPress={() => setPending((p) => p.filter((_, idx) => idx !== i))}>
+                    <Text style={styles.pendXText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <View style={styles.composer}>
+            <TouchableOpacity style={styles.attachBtn} onPress={attach} disabled={uploading}>
+              {uploading ? <ActivityIndicator size="small" color={colors.inkMuted} /> : <Image source={ICONS.upload} style={styles.attachIcon} />}
+            </TouchableOpacity>
+            <TextInput
+              style={styles.input}
+              value={text}
+              onChangeText={onInput}
+              placeholder="Type a message…"
+              placeholderTextColor={colors.inkFaint}
+              multiline
+            />
+            <TouchableOpacity style={[styles.sendBtn, !text.trim() && pending.length === 0 && styles.sendOff]} onPress={send} disabled={!text.trim() && pending.length === 0}>
+              <Image source={ICONS.navExp} style={styles.sendIcon} />
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      )}
+    </View>
+  );
+}
+
+function Attachment({ att }) {
+  const url = resolveImage(att.url);
+  if (att.type === 'image') {
+    return (
+      <TouchableOpacity onPress={() => Linking.openURL(url)} activeOpacity={0.9}>
+        <Image source={{ uri: url }} style={styles.attImg} resizeMode="cover" />
+      </TouchableOpacity>
+    );
+  }
+  return (
+    <TouchableOpacity style={styles.pdfChip} onPress={() => Linking.openURL(url)} activeOpacity={0.85}>
+      <Text style={styles.pdfIcon}>📄</Text>
+      <Text style={styles.pdfName} numberOfLines={1}>{att.name || 'Document.pdf'}</Text>
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  empty: { textAlign: 'center', color: colors.inkMuted, marginTop: 40, paddingHorizontal: 30, fontSize: font.small },
+  dayWrap: { alignItems: 'center', marginVertical: 10 },
+  dayText: { fontSize: font.tiny, color: '#5A5E6C', backgroundColor: 'rgba(255,255,255,0.75)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, overflow: 'hidden' },
+  row: { flexDirection: 'row', marginBottom: 6 },
+  rowMine: { justifyContent: 'flex-end' },
+  rowTheir: { justifyContent: 'flex-start' },
+  bubble: { maxWidth: '80%', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 7, ...(Platform.OS === 'android' ? { elevation: 1 } : {}) },
+  bubbleMine: { backgroundColor: '#FFE7A8', borderTopRightRadius: 4 },
+  bubbleTheir: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 4 },
+  bubbleFailed: { opacity: 0.7 },
+  msgText: { color: '#1A1A2E', fontSize: font.body, lineHeight: 20 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 2 },
+  metaTime: { fontSize: 10, color: '#7A7E8C' },
+  tick: { fontSize: 11, color: '#7A7E8C', fontWeight: '700' },
+  tickRead: { color: '#34B7F1' },
+  failText: { fontSize: 10, color: '#D4183D', fontWeight: '700' },
+
+  attImg: { width: 200, height: 150, borderRadius: 10, marginBottom: 4, backgroundColor: '#DCE0E6' },
+  pdfChip: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 8, padding: 8, marginBottom: 4 },
+  pdfIcon: { fontSize: 18 },
+  pdfName: { fontSize: font.small, color: '#1A1A2E', flexShrink: 1 },
+
+  typing: { fontSize: font.tiny, color: '#5A5E6C', paddingHorizontal: 16, paddingBottom: 4 },
+  pendingRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#F1EDE6' },
+  pendThumbWrap: { position: 'relative' },
+  pendThumb: { width: 54, height: 54, borderRadius: 8, backgroundColor: '#DCE0E6' },
+  pendX: { position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: 10, backgroundColor: '#1A1A2E', alignItems: 'center', justifyContent: 'center' },
+  pendXText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+
+  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 8, paddingVertical: 8, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
+  attachBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  attachIcon: { width: 22, height: 22, tintColor: colors.inkMuted },
+  input: { flex: 1, maxHeight: 110, backgroundColor: '#F1F2F4', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10, fontSize: font.body, color: colors.ink },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  sendOff: { opacity: 0.4 },
+  sendIcon: { width: 20, height: 20, tintColor: '#1A1A2E' },
+});

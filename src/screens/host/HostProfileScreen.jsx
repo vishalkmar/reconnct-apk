@@ -15,6 +15,7 @@ const MENU = [
   { label: 'My Listings', sub: 'Listings & their bookings', icon: ICONS.compass, tab: 'listings' },
   { label: 'Notifications', sub: 'Messages, updates & emails', icon: ICONS.bell, screen: 'hostNotifications' },
   { label: 'Transactions', sub: 'Revenue, completed & pending', icon: ICONS.card, screen: 'hostTransactions' },
+  { label: 'Support', sub: 'Chat with the reconnct team', icon: ICONS.navInbox, screen: 'support', params: { queue: 'supplier' } },
 ];
 
 export default function HostProfileScreen() {
@@ -65,7 +66,7 @@ export default function HostProfileScreen() {
       <View style={styles.list}>
         {MENU.map((m, i) => (
           <TouchableOpacity key={m.label} style={[styles.row, i === MENU.length - 1 && styles.rowLast]} activeOpacity={0.7}
-            onPress={() => (m.tab ? navigateTab(m.tab) : m.screen ? push(m.screen) : soon(m.label))}>
+            onPress={() => (m.tab ? navigateTab(m.tab) : m.screen ? push(m.screen, m.params) : soon(m.label))}>
             <View style={styles.rowIconWrap}><Image source={m.icon} style={styles.rowIcon} /></View>
             <View style={{ flex: 1 }}>
               <Text style={styles.rowText}>{m.label}</Text>
