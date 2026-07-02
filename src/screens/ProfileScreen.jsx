@@ -15,7 +15,6 @@ const MENU = [
   { label: 'Transactions', icon: ICONS.card, screen: 'transactions' },
   { label: 'Wishlist', icon: ICONS.heart, screen: 'wishlist' },
   { label: 'Notifications', icon: ICONS.bell, screen: 'notifications' },
-  { label: 'Support', icon: ICONS.navInbox, screen: 'support', params: { queue: 'user' } },
   { label: 'Language & Region', icon: ICONS.globe, screen: null },
 ];
 
@@ -25,13 +24,11 @@ export default function ProfileScreen() {
   const { count: wishCount } = useWishlist();
   const { push, switchMode } = useNav();
   const [trips, setTrips] = useState(0);
-  const [supportUnread, setSupportUnread] = useState(0);
 
   const name = (user && user.name) || 'Guest';
 
   useEffect(() => {
     api.myBookings(token).then((d) => setTrips((d.bookings || []).length)).catch(() => {});
-    api.supportUnread(token).then((d) => setSupportUnread((d && d.unread && d.unread.user) || 0)).catch(() => {});
   }, [token]);
 
   const soon = (what) => Alert.alert(what, 'Coming soon.');
@@ -79,9 +76,6 @@ export default function ProfileScreen() {
           >
             <Image source={m.icon} style={styles.rowIconImg} />
             <Text style={styles.rowText}>{m.label}</Text>
-            {m.screen === 'support' && supportUnread > 0 && (
-              <View style={styles.unreadPill}><Text style={styles.unreadPillText}>{supportUnread > 99 ? '99+' : supportUnread}</Text></View>
-            )}
             <Text style={styles.chev}>›</Text>
           </TouchableOpacity>
         ))}

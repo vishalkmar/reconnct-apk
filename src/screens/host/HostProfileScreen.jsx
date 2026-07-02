@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../../theme';
@@ -6,7 +6,6 @@ import { useAuth } from '../../store/AuthContext';
 import { useNav } from '../../navigation/NavContext';
 import { useHost } from '../../store/HostContext';
 import { initials, formatMoney } from '../../utils/format';
-import { api } from '../../api/client';
 import { ICONS } from '../../icons';
 
 const NAVY = '#15233F';
@@ -16,22 +15,16 @@ const MENU = [
   { label: 'My Listings', sub: 'Listings & their bookings', icon: ICONS.compass, tab: 'listings' },
   { label: 'Notifications', sub: 'Messages, updates & emails', icon: ICONS.bell, screen: 'hostNotifications' },
   { label: 'Transactions', sub: 'Revenue, completed & pending', icon: ICONS.card, screen: 'hostTransactions' },
-  { label: 'Support', sub: 'Chat with the reconnct team', icon: ICONS.navInbox, screen: 'support', params: { queue: 'supplier' } },
 ];
 
 export default function HostProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { user, signOut, token } = useAuth();
+  const { user, signOut } = useAuth();
   const { switchMode, push, navigateTab } = useNav();
   const { stats } = useHost();
-  const [supportUnread, setSupportUnread] = useState(0);
   const name = (user && user.name) || 'Host';
   const email = (user && user.email) || '';
   const soon = (w) => Alert.alert(w, 'Coming soon.');
-
-  useEffect(() => {
-    api.supportUnread(token).then((d) => setSupportUnread((d && d.unread && d.unread.supplier) || 0)).catch(() => {});
-  }, [token]);
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
@@ -78,9 +71,6 @@ export default function HostProfileScreen() {
               <Text style={styles.rowText}>{m.label}</Text>
               {!!m.sub && <Text style={styles.rowSub}>{m.sub}</Text>}
             </View>
-            {m.screen === 'support' && supportUnread > 0 && (
-              <View style={styles.unreadPill}><Text style={styles.unreadPillText}>{supportUnread > 99 ? '99+' : supportUnread}</Text></View>
-            )}
             <Text style={styles.chev}>›</Text>
           </TouchableOpacity>
         ))}

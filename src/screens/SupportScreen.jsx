@@ -3,13 +3,14 @@ import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Image,
   KeyboardAvoidingView, Platform, ActivityIndicator, Linking, Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font } from '../theme';
 import { api, resolveImage } from '../api/client';
 import { useAuth } from '../store/AuthContext';
+import { useNav } from '../navigation/NavContext';
 import { ICONS } from '../icons';
 import { pickAsset } from '../utils/imagePicker';
 import { connectSupport, disconnectSupport } from '../services/supportSocket';
-import ScreenHeader from '../components/ScreenHeader';
 
 const fmtTime = (d) => new Date(d).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
 const dayKey = (d) => new Date(d).toDateString();
@@ -27,8 +28,10 @@ const dayLabel = (d) => {
  * fallback. The party's own messages are 'user'/'supplier'; admin replies come
  * in on the left.
  */
-export default function SupportScreen({ queue = 'user' }) {
+export default function SupportScreen({ queue = 'user', embedded = false }) {
   const { token } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { pop } = useNav();
   const [conv, setConv] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
@@ -197,13 +200,29 @@ export default function SupportScreen({ queue = 'user' }) {
     );
   };
 
+  // On Android rely on the manifest's adjustResize (edge-to-edge is off) so the
+  // composer lifts above the keyboard; a KeyboardAvoidingView here fights it.
+  const Wrapper = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
+  const wrapperProps = Platform.OS === 'ios' ? { behavior: 'padding' } : {};
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#ECE5DC' }}>
-      <ScreenHeader title={queue === 'supplier' ? 'Support (Host)' : 'Support'} />
+    <View style={[styles.root, embedded && { paddingBottom: insets.bottom + 64 }]}>
+      {/* WhatsApp-style header */}
+      <View style={[styles.appHeader, { paddingTop: insets.top + 8 }]}>
+        {!embedded && (
+          <TouchableOpacity onPress={pop} style={styles.headerBack}><Text style={styles.headerBackIcon}>‹</Text></TouchableOpacity>
+        )}
+        <View style={styles.headerAvatar}><Text style={styles.headerAvatarText}>R</Text></View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>reconnct Support</Text>
+          <Text style={styles.headerSub}>{typingPeer ? 'typing…' : (queue === 'supplier' ? 'Host support' : 'Chat with our team')}</Text>
+        </View>
+      </View>
+
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={colors.brand} /></View>
       ) : (
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={8}>
+        <Wrapper style={{ flex: 1 }} {...wrapperProps}>
           <FlatList
             ref={listRef}
             data={messages}
@@ -244,7 +263,7 @@ export default function SupportScreen({ queue = 'user' }) {
               <Image source={ICONS.navExp} style={styles.sendIcon} />
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </Wrapper>
       )}
     </View>
   );
@@ -268,6 +287,14 @@ function Attachment({ att }) {
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#ECE5DC' },
+  appHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingBottom: 10, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
+  headerBack: { width: 30, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerBackIcon: { fontSize: 30, color: colors.ink, marginTop: -4 },
+  headerAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  headerAvatarText: { color: '#1A1A2E', fontWeight: '900', fontSize: 17 },
+  headerTitle: { fontSize: font.h3, fontWeight: '800', color: colors.ink },
+  headerSub: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { textAlign: 'center', color: colors.inkMuted, marginTop: 40, paddingHorizontal: 30, fontSize: font.small },
   dayWrap: { alignItems: 'center', marginVertical: 10 },

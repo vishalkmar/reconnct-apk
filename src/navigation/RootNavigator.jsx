@@ -17,7 +17,7 @@ function TabScreen({ tab, mode }) {
     switch (tab) {
       case 'dashboard': return lazy(() => require('../screens/host/HostDashboardScreen'));
       case 'listings': return lazy(() => require('../screens/host/MyListingsScreen'));
-      case 'inbox': return lazy(() => require('../screens/InboxScreen'));
+      case 'inbox': { const C = require('../screens/SupportScreen').default; return <C queue="supplier" embedded />; }
       case 'profile': return lazy(() => require('../screens/host/HostProfileScreen'));
       default: return lazy(() => require('../screens/host/HostDashboardScreen'));
     }
@@ -26,7 +26,7 @@ function TabScreen({ tab, mode }) {
     case 'home': return lazy(() => require('../screens/HomeScreen'));
     case 'search': return lazy(() => require('../screens/SearchScreen'));
     case 'experiences': return lazy(() => require('../screens/ExperiencesScreen'));
-    case 'inbox': return lazy(() => require('../screens/InboxScreen'));
+    case 'inbox': { const C = require('../screens/SupportScreen').default; return <C queue="user" embedded />; }
     case 'profile': return lazy(() => require('../screens/ProfileScreen'));
     default: return lazy(() => require('../screens/HomeScreen'));
   }
