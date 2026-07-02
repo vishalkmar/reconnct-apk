@@ -8,7 +8,7 @@ import { colors, radius, font, space } from '../../theme';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 import { api } from '../../api/client';
-import { useAuth } from '../../store/AuthContext';
+import { toast } from '../../utils/toast';
 import { DEMO_EMAIL, DEMO_OTP } from '../../config';
 
 const LENGTH = 6;
@@ -19,10 +19,9 @@ const OTP_DEFAULTS = {
   secureText: 'Secure & encrypted',
 };
 
-export default function OtpScreen({ email, onBack, content }) {
+export default function OtpScreen({ email, onBack, content, onVerified }) {
   const c = { ...OTP_DEFAULTS, ...(content || {}) };
   const insets = useSafeAreaInsets();
-  const { signIn } = useAuth();
   const inputRef = useRef(null);
   const isDemo = (email || '').toLowerCase() === DEMO_EMAIL;
   const [code, setCode] = useState(isDemo ? DEMO_OTP : '');
@@ -44,9 +43,10 @@ export default function OtpScreen({ email, onBack, content }) {
     setLoading(true);
     try {
       const data = await api.verifyOtp(email, value);
-      signIn(data.token, data.user); // unmounts the auth flow → main app
+      onVerified(data); // AuthNavigator routes: onboarding (new) or straight in
     } catch (e) {
       setError(e.message);
+      toast(e.message || 'Verification failed');
       setLoading(false);
     }
   };
@@ -65,8 +65,10 @@ export default function OtpScreen({ email, onBack, content }) {
       await api.resendOtp(email);
       setSeconds(90);
       setCode('');
+      toast('A new code has been sent');
     } catch (e) {
       setError(e.message);
+      toast(e.message || 'Could not resend the code');
     }
   };
 

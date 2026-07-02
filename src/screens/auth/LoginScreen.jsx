@@ -6,6 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space } from '../../theme';
 import { api } from '../../api/client';
+import { toast } from '../../utils/toast';
 import { DEMO_EMAIL } from '../../config';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -25,7 +26,7 @@ const DEFAULTS = {
 export default function LoginScreen({ onOtpSent, content }) {
   const insets = useSafeAreaInsets();
   const c = { ...DEFAULTS, ...(content || {}) };
-  const [email, setEmail] = useState(DEMO_EMAIL);
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const valid = EMAIL_RE.test(email.trim());
@@ -35,8 +36,9 @@ export default function LoginScreen({ onOtpSent, content }) {
     setError(''); setLoading(true);
     try {
       const data = await api.requestOtp(email.trim().toLowerCase());
+      toast(data && data.emailDelivered === false ? 'OTP generated (check server log in dev)' : 'OTP sent to your email');
       onOtpSent(email.trim().toLowerCase(), data);
-    } catch (e) { setError(e.message); } finally { setLoading(false); }
+    } catch (e) { setError(e.message); toast(e.message || 'Could not send OTP'); } finally { setLoading(false); }
   };
 
   const heroUrl = c.heroMedia && c.heroMedia.url;

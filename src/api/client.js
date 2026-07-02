@@ -61,6 +61,7 @@ export const api = {
   requestOtp: (email) => request('/user-auth/request-otp', { method: 'POST', body: { email } }),
   resendOtp: (email) => request('/user-auth/resend-otp', { method: 'POST', body: { email } }),
   verifyOtp: (email, code) => request('/user-auth/verify-otp', { method: 'POST', body: { email, code } }),
+  completeProfile: (token, body) => request('/user-auth/complete-profile', { method: 'POST', token, body }),
   me: (token) => request('/user-auth/me', { token }),
   updateProfile: (token, body) => request('/user-auth/profile', { method: 'PATCH', token, body }),
 
