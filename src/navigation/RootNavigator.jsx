@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
-import { View, StatusBar, BackHandler } from 'react-native';
+import { View, StatusBar, BackHandler, ActivityIndicator, Image } from 'react-native';
 import { useAuth } from '../store/AuthContext';
+import { ICONS } from '../icons';
 import { useNav } from './NavContext';
 import { colors } from '../theme';
 
@@ -56,7 +57,7 @@ function StackScreen({ name, params }) {
 }
 
 export default function RootNavigator() {
-  const { isAuthed } = useAuth();
+  const { isAuthed, booting } = useAuth();
   const { tab, top, navigateTab, goBack, mode } = useNav();
 
   // Android hardware/system back → one step back inside the app instead of
@@ -76,6 +77,18 @@ export default function RootNavigator() {
       ? (tab === 'dashboard' || tab === 'profile' ? colors.navy : colors.surface)
       : (tab === 'home' || tab === 'profile' ? colors.brand : colors.surface);
   const darkHeader = onHeader === colors.brand || onHeader === colors.navy;
+
+  // Restoring a saved session — show a splash instead of flashing the login
+  // screen on every launch.
+  if (booting) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}>
+        <StatusBar barStyle="light-content" backgroundColor={colors.brand} />
+        <Image source={ICONS.logoWhite} style={{ width: 150, height: 34, marginBottom: 18 }} resizeMode="contain" />
+        <ActivityIndicator color="#fff" />
+      </View>
+    );
+  }
 
   if (!isAuthed) {
     return (

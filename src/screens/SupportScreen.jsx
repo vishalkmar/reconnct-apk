@@ -209,9 +209,9 @@ export default function SupportScreen({ queue = 'user', embedded = false }) {
     );
   };
 
-  // Composer clearance: above the keyboard when open, else above the floating
-  // bottom nav (when this screen is a tab).
-  const bottomPad = kbHeight > 0 ? kbHeight : (embedded ? insets.bottom + 70 : insets.bottom);
+  // Composer clearance: above the keyboard (+ a small buffer) when open, else
+  // above the floating bottom nav (when this screen is a tab).
+  const bottomPad = kbHeight > 0 ? kbHeight + 14 : (embedded ? insets.bottom + 90 : insets.bottom);
 
   return (
     <View style={styles.root}>
