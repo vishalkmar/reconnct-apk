@@ -50,6 +50,7 @@ export const ICONS = {
   eye: require('./assets/ic-eye.png'),
   edit: require('./assets/ic-edit.png'),
   signout: require('./assets/ic-signout.png'),
+  send: require('./assets/ic-send.png'),
   // Gray category (broad-category) line icons.
   catGlobe: require('./assets/cat-globe.png'),
   catHeart: require('./assets/cat-heart.png'),

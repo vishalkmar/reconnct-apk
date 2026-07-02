@@ -9,7 +9,6 @@ import { colors, radius, font, space } from '../../theme';
 const { height: SCREEN_H } = Dimensions.get('window');
 import { api } from '../../api/client';
 import { toast } from '../../utils/toast';
-import { DEMO_EMAIL, DEMO_OTP } from '../../config';
 
 const LENGTH = 6;
 const OTP_DEFAULTS = {
@@ -23,8 +22,7 @@ export default function OtpScreen({ email, onBack, content, onVerified }) {
   const c = { ...OTP_DEFAULTS, ...(content || {}) };
   const insets = useSafeAreaInsets();
   const inputRef = useRef(null);
-  const isDemo = (email || '').toLowerCase() === DEMO_EMAIL;
-  const [code, setCode] = useState(isDemo ? DEMO_OTP : '');
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [seconds, setSeconds] = useState(90);
@@ -123,7 +121,7 @@ export default function OtpScreen({ email, onBack, content, onVerified }) {
             caretHidden
           />
 
-          <Text style={styles.secure}>🔒 {c.secureText}</Text>
+          <Text style={styles.secure}>{c.secureText}</Text>
           {!!error && <Text style={styles.error}>{error}</Text>}
 
           <TouchableOpacity

@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space } from '../../theme';
 import { api } from '../../api/client';
 import { toast } from '../../utils/toast';
-import { DEMO_EMAIL } from '../../config';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -63,7 +62,6 @@ export default function LoginScreen({ onOtpSent, content }) {
             <Text style={styles.subtitle}>{c.subtitle}</Text>
 
             <View style={styles.inputWrap}>
-              <Text style={styles.inputIcon}>✉️</Text>
               <TextInput
                 style={styles.input}
                 placeholder={c.emailPlaceholder}
@@ -78,11 +76,6 @@ export default function LoginScreen({ onOtpSent, content }) {
             <TouchableOpacity style={[styles.button, (!valid || loading) && styles.buttonDisabled]} onPress={sendOtp} activeOpacity={0.9} disabled={!valid || loading}>
               {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{c.buttonText}  ›</Text>}
             </TouchableOpacity>
-
-            <View style={styles.demoBox}>
-              <Text style={styles.demoTitle}>🔑 Test login (phase 1)</Text>
-              <Text style={styles.demoText}>Email: {DEMO_EMAIL}{'\n'}OTP: 123456</Text>
-            </View>
 
             <Text style={styles.legal}>{c.legal}</Text>
           </View>

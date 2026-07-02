@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Image,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Linking, Alert,
+  Platform, ActivityIndicator, Linking, Alert, Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font } from '../theme';
@@ -39,6 +39,7 @@ export default function SupportScreen({ queue = 'user', embedded = false }) {
   const [pending, setPending] = useState([]); // uploaded, not yet sent
   const [uploading, setUploading] = useState(false);
   const [typingPeer, setTypingPeer] = useState(false);
+  const [kbHeight, setKbHeight] = useState(0);
 
   const socketRef = useRef(null);
   const convIdRef = useRef(null);
@@ -116,6 +117,14 @@ export default function SupportScreen({ queue = 'user', embedded = false }) {
   }, [queue]);
 
   useEffect(() => { if (messages.length) scrollEnd(); }, [messages.length, typingPeer, scrollEnd]);
+
+  // Track the keyboard height so the composer lifts cleanly above it (reliable
+  // on ROMs where the window doesn't auto-resize, e.g. MIUI).
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) => { setKbHeight(e.endCoordinates?.height || 0); scrollEnd(); });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, [scrollEnd]);
 
   const emitTyping = (typing) => {
     const s = socketRef.current;
@@ -200,13 +209,12 @@ export default function SupportScreen({ queue = 'user', embedded = false }) {
     );
   };
 
-  // On Android rely on the manifest's adjustResize (edge-to-edge is off) so the
-  // composer lifts above the keyboard; a KeyboardAvoidingView here fights it.
-  const Wrapper = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
-  const wrapperProps = Platform.OS === 'ios' ? { behavior: 'padding' } : {};
+  // Composer clearance: above the keyboard when open, else above the floating
+  // bottom nav (when this screen is a tab).
+  const bottomPad = kbHeight > 0 ? kbHeight : (embedded ? insets.bottom + 70 : insets.bottom);
 
   return (
-    <View style={[styles.root, embedded && { paddingBottom: insets.bottom + 64 }]}>
+    <View style={styles.root}>
       {/* WhatsApp-style header */}
       <View style={[styles.appHeader, { paddingTop: insets.top + 8 }]}>
         {!embedded && (
@@ -222,7 +230,7 @@ export default function SupportScreen({ queue = 'user', embedded = false }) {
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={colors.brand} /></View>
       ) : (
-        <Wrapper style={{ flex: 1 }} {...wrapperProps}>
+        <View style={{ flex: 1, paddingBottom: bottomPad }}>
           <FlatList
             ref={listRef}
             data={messages}
@@ -260,10 +268,10 @@ export default function SupportScreen({ queue = 'user', embedded = false }) {
               multiline
             />
             <TouchableOpacity style={[styles.sendBtn, !text.trim() && pending.length === 0 && styles.sendOff]} onPress={send} disabled={!text.trim() && pending.length === 0}>
-              <Image source={ICONS.navExp} style={styles.sendIcon} />
+              <Image source={ICONS.send} style={styles.sendIcon} />
             </TouchableOpacity>
           </View>
-        </Wrapper>
+        </View>
       )}
     </View>
   );
