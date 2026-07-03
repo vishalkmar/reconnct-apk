@@ -79,7 +79,9 @@ export const api = {
   wishlist: (token) => request('/wishlist', { token }),
   wishlistKeys: (token) => request('/wishlist/keys', { token }),
   wishlistAdd: (token, entityType, entityId) => request('/wishlist', { method: 'POST', token, body: { entityType, entityId } }),
-  wishlistRemove: (token, entityType, entityId) => request('/wishlist', { method: 'DELETE', token, body: { entityType, entityId } }),
+  // Send the item BOTH in the body and as query params — some hosts/proxies drop
+  // the body on DELETE, and the backend reads either, so remove always persists.
+  wishlistRemove: (token, entityType, entityId) => request(`/wishlist${qs({ entityType, entityId })}`, { method: 'DELETE', token, body: { entityType, entityId } }),
 
   // ── Host ("Switch to Host") — auth required ─────────────────────────
   hostSummary: (token) => request('/host/summary', { token }),
