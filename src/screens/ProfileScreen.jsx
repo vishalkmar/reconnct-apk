@@ -42,7 +42,7 @@ export default function ProfileScreen() {
           <View style={{ flex: 1, marginLeft: 14 }}>
             <Text style={styles.name}>{name}</Text>
             {!!(user && user.email) && <Text style={styles.email}>{user.email}</Text>}
-            <View style={styles.badge}><Text style={styles.badgeText}>Member since 2024</Text></View>
+            {!!(user && user.createdAt) && <View style={styles.badge}><Text style={styles.badgeText}>Member since {new Date(user.createdAt).getFullYear()}</Text></View>}
           </View>
         </View>
 

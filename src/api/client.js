@@ -72,6 +72,9 @@ export const api = {
   bookingLinkStatus: (token, code) => request(`/payments/link-status/${encodeURIComponent(code)}`, { token }),
   wallet: (token) => request('/refer-earn/wallet', { token }),
 
+  // ── Notifications (auth required) ───────────────────────────────────
+  notifications: (token) => request('/notifications', { token }),
+
   // ── Wishlist (auth required) ────────────────────────────────────────
   wishlist: (token) => request('/wishlist', { token }),
   wishlistKeys: (token) => request('/wishlist/keys', { token }),

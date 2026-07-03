@@ -1,60 +1,31 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Image } from 'react-native';
 import { colors, radius, font, space, shadow } from '../theme';
 import { api } from '../api/client';
 import { formatMoney } from '../utils/format';
 import { useAuth } from '../store/AuthContext';
+import { ICONS } from '../icons';
 import ScreenHeader from '../components/ScreenHeader';
+import EmptyState from '../components/EmptyState';
 
-// Builds a notification feed from the user's real activity (bookings + wallet),
-// newest first, with a welcome note so the screen is never empty.
-function buildFeed({ bookings, wallet, name }) {
-  const feed = [];
-  (bookings || []).forEach((b) => {
-    const title = (b.item && (b.item.name || b.item.title)) || 'your experience';
-    const paid = ['confirmed', 'paid'].includes(b.status);
-    feed.push({
-      id: 'b' + b.id, icon: paid ? '✅' : '🕒',
-      title: paid ? 'Booking confirmed' : 'Booking pending payment',
-      body: `${title} — #${b.bookingCode}`,
-      amount: b.pricing && b.pricing.total ? formatMoney(b.pricing.total, b.currency) : null,
-      at: b.createdAt || b.scheduledFor,
-    });
-  });
-  (wallet && wallet.transactions || []).forEach((t) => {
-    feed.push({
-      id: 'w' + (t.id || Math.random()), icon: '💳',
-      title: 'Wallet update', body: t.description || t.type || 'Transaction',
-      at: t.createdAt,
-    });
-  });
-  feed.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
-  feed.push({
-    id: 'welcome', icon: '🎉', title: `Welcome to reconnct${name ? ', ' + name.split(' ')[0] : ''}!`,
-    body: 'Discover experiences near you and book in seconds.', at: '',
-  });
-  return feed;
-}
+// Icon per notification kind. The feed itself comes from the backend
+// (/api/notifications) so the app and website always show the same list.
+const ICON_FOR = { booking: ICONS.ticket, wallet: ICONS.card, welcome: ICONS.bell };
+const TINT_FOR = { booking: colors.brand, wallet: '#2563EB', welcome: '#16A34A' };
 
 export default function NotificationsScreen() {
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const [feed, setFeed] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
-    Promise.allSettled([api.myBookings(token), api.wallet(token)])
-      .then(([b, w]) => {
-        if (!alive) return;
-        setFeed(buildFeed({
-          bookings: b.status === 'fulfilled' ? b.value.bookings : [],
-          wallet: w.status === 'fulfilled' ? w.value : null,
-          name: user && user.name,
-        }));
-      })
+    api.notifications(token)
+      .then((d) => { if (alive) setFeed((d && d.notifications) || []); })
+      .catch(() => {})
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [token, user]);
+  }, [token]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -68,15 +39,18 @@ export default function NotificationsScreen() {
           contentContainerStyle={{ padding: space.lg }}
           renderItem={({ item }) => (
             <View style={styles.row}>
-              <View style={styles.iconWrap}><Text style={styles.icon}>{item.icon}</Text></View>
+              <View style={[styles.iconWrap, { backgroundColor: (TINT_FOR[item.kind] || colors.brand) + '22' }]}>
+                <Image source={ICON_FOR[item.kind] || ICONS.bell} style={[styles.icon, { tintColor: TINT_FOR[item.kind] || colors.brand }]} />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.title}>{item.title}</Text>
                 <Text style={styles.body} numberOfLines={2}>{item.body}</Text>
                 {!!item.at && <Text style={styles.at}>{String(item.at).slice(0, 10)}</Text>}
               </View>
-              {!!item.amount && <Text style={styles.amount}>{item.amount}</Text>}
+              {item.amount != null && <Text style={styles.amount}>{formatMoney(item.amount, 'INR')}</Text>}
             </View>
           )}
+          ListEmptyComponent={<EmptyState emoji="🔔" title="No notifications yet" sub="Booking and wallet updates will show up here." />}
         />
       )}
     </View>
@@ -85,8 +59,8 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 12, backgroundColor: colors.surface, borderRadius: radius.md, padding: 14, marginBottom: 10, ...shadow.card },
-  iconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
-  icon: { fontSize: 18 },
+  iconWrap: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  icon: { width: 18, height: 18 },
   title: { fontSize: font.body, fontWeight: '700', color: colors.ink },
   body: { fontSize: font.small, color: colors.inkMuted, marginTop: 2 },
   at: { fontSize: font.tiny, color: colors.inkFaint, marginTop: 4 },
