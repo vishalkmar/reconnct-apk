@@ -77,26 +77,27 @@ export default function CreateListingScreen() {
   };
   const goBack = () => (step > 1 ? setStep((s) => s - 1) : pop());
 
-  const submit = (status) => {
-    const id = addListing({
-      status,
-      title: form.name.trim(),
-      price: Number(form.adultPrice) || 0,
-      priceUnit: form.priceMethod === 'per_day' || form.priceMethod === 'days' ? 'day' : 'person',
-      durationLabel: form.durationLabel || `${form.durationHours}h${form.durationMinutes ? ` ${form.durationMinutes}m` : ''}`,
-      image: form.photos[0] || FALLBACK_IMAGE,
-      category: form.typeName || '',
-      city: form.city || form.location,
-    });
-    clearListingDraft();
-    Alert.alert(
-      status === 'pending' ? 'Submitted for review' : 'Saved as draft',
-      status === 'pending'
-        ? `“${form.name.trim()}” is now pending approval — you’ll be notified once it’s live.`
-        : `“${form.name.trim()}” is saved as a draft in your listings.`,
-      [{ text: 'OK', onPress: () => { navigateTab('listings'); } }],
-    );
-    return id;
+  const [submitting, setSubmitting] = useState(false);
+  const submit = async (isReview) => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      // Give the listing a cover fallback if the host added no photos at all.
+      const payload = form.photos.length ? form : { ...form, photos: [FALLBACK_IMAGE] };
+      await addListing(payload, isReview);
+      clearListingDraft();
+      Alert.alert(
+        isReview ? 'Submitted for review' : 'Saved as draft',
+        isReview
+          ? `“${form.name.trim()}” is now pending approval — you’ll be notified once it’s live.`
+          : `“${form.name.trim()}” is saved as a draft in your listings.`,
+        [{ text: 'OK', onPress: () => { navigateTab('listings'); } }],
+      );
+    } catch (e) {
+      Alert.alert('Could not save', e.message || 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -130,11 +131,11 @@ export default function CreateListingScreen() {
           </TouchableOpacity>
         ) : (
           <View style={styles.finalRow}>
-            <TouchableOpacity style={styles.ghost} onPress={() => submit('draft')} activeOpacity={0.9}>
-              <Text style={styles.ghostText}>Save Draft</Text>
+            <TouchableOpacity style={[styles.ghost, submitting && styles.primaryOff]} disabled={submitting} onPress={() => submit(false)} activeOpacity={0.9}>
+              <Text style={styles.ghostText}>{submitting ? 'Saving…' : 'Save Draft'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.primary, { flex: 1.4 }]} onPress={() => submit('pending')} activeOpacity={0.9}>
-              <Text style={styles.primaryText}>Submit for Review</Text>
+            <TouchableOpacity style={[styles.primary, { flex: 1.4 }, submitting && styles.primaryOff]} disabled={submitting} onPress={() => submit(true)} activeOpacity={0.9}>
+              <Text style={styles.primaryText}>{submitting ? 'Submitting…' : 'Submit for Review'}</Text>
             </TouchableOpacity>
           </View>
         )}

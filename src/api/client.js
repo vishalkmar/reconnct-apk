@@ -78,6 +78,14 @@ export const api = {
   wishlistAdd: (token, entityType, entityId) => request('/wishlist', { method: 'POST', token, body: { entityType, entityId } }),
   wishlistRemove: (token, entityType, entityId) => request('/wishlist', { method: 'DELETE', token, body: { entityType, entityId } }),
 
+  // ── Host ("Switch to Host") — auth required ─────────────────────────
+  hostSummary: (token) => request('/host/summary', { token }),
+  hostListings: (token) => request('/host/listings', { token }),
+  hostListing: (token, id) => request(`/host/listings/${id}`, { token }),
+  hostCreateListing: (token, form, submit = false) => request('/host/listings', { method: 'POST', token, body: { form, submit } }),
+  hostUpdateListing: (token, id, form, submit = false) => request(`/host/listings/${id}`, { method: 'PUT', token, body: { form, submit } }),
+  hostDeleteListing: (token, id) => request(`/host/listings/${id}`, { method: 'DELETE', token }),
+
   // ── Support chat (party = user / host) ──────────────────────────────
   supportConversation: (token, queue = 'user') => request(`/support/me/conversation${qs({ queue })}`, { token }),
   supportMessages: (token, conversationId, before) => request(`/support/me/messages${qs({ conversationId, before })}`, { token }),
