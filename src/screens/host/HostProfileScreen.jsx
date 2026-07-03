@@ -36,10 +36,12 @@ export default function HostProfileScreen() {
           <View style={{ flex: 1, marginLeft: 14 }}>
             <Text style={styles.name}>{name}</Text>
             {!!email && <Text style={styles.email}>{email}</Text>}
-            <View style={styles.superhost}>
-              <Image source={ICONS.star} style={styles.superhostIcon} />
-              <Text style={styles.superhostText}>Superhost</Text>
-            </View>
+            {stats.listingCount > 0 && (
+              <View style={styles.superhost}>
+                <Image source={ICONS.star} style={styles.superhostIcon} />
+                <Text style={styles.superhostText}>{stats.listingCount} listing{stats.listingCount > 1 ? 's' : ''}</Text>
+              </View>
+            )}
           </View>
         </View>
         <View style={styles.stats}>
