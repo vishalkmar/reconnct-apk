@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { api } from '../api/client';
 import { useAuth } from './AuthContext';
+import { toast } from '../utils/toast';
 
 /**
  * Wishlist that works instantly and visibly:
@@ -42,16 +43,26 @@ export function WishlistProvider({ children }) {
   const toggle = useCallback((type, id, item) => {
     const key = `${type}:${id}`;
     const wished = map.has(key);
+    // Optimistic flip for snappy UI…
     setMap((prev) => {
       const next = new Map(prev);
       if (wished) next.delete(key);
       else next.set(key, item || { id, type });
       return next;
     });
-    // Background sync — never blocks or reverts the UI.
-    if (isAuthed) {
-      (wished ? api.wishlistRemove(token, type, id) : api.wishlistAdd(token, type, id)).catch(() => {});
-    }
+    if (!isAuthed) return;
+    // …then persist. If the server call fails, revert so the local heart always
+    // matches the database (this is what makes the app + website tally).
+    (wished ? api.wishlistRemove(token, type, id) : api.wishlistAdd(token, type, id))
+      .catch((e) => {
+        setMap((prev) => {
+          const next = new Map(prev);
+          if (wished) next.set(key, item || { id, type });
+          else next.delete(key);
+          return next;
+        });
+        toast(e.message || 'Could not update wishlist');
+      });
   }, [map, token, isAuthed]);
 
   const items = useMemo(() => Array.from(map.values()), [map]);
