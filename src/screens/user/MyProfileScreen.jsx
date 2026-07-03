@@ -1,38 +1,84 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image, Modal, Pressable, Alert } from 'react-native';
 import { colors, radius, font, space, shadow } from '../../theme';
+import { api } from '../../api/client';
 import { useAuth } from '../../store/AuthContext';
 import { initials } from '../../utils/format';
+import { toast } from '../../utils/toast';
 import { ICONS } from '../../icons';
 import { pickFromDevice } from '../../utils/imagePicker';
 import ScreenHeader from '../../components/ScreenHeader';
 
 /**
- * Traveller "My Profile" — mirrors the host profile detail. Shows user photo,
- * name, email, phone, address, company; an "Edit profile" button at the bottom
- * flips into an editable form. Extra fields persist on the in-memory user via
- * AuthContext.patchUser (swap for a real API call when the backend is ready).
+ * Traveller "My Profile" — mirrors the host profile detail. Backed by the real
+ * backend user: on mount we refresh from /user-auth/me and on save we PATCH
+ * /user-auth/profile, so what's shown here is exactly what the website shows
+ * for the same account. Backend field names (addressLine, avatarUrl) are mapped
+ * to the local ones (address, photo) both ways.
  */
 export default function MyProfileScreen() {
-  const { user, patchUser } = useAuth();
+  const { user, token, patchUser } = useAuth();
   const merged = {
     name: (user && user.name) || 'Guest',
     email: (user && user.email) || '',
     phone: (user && user.phone) || '',
-    address: (user && user.address) || '',
+    address: (user && (user.address || user.addressLine)) || '',
     company: (user && user.company) || '',
-    photo: (user && user.photo) || '',
+    photo: (user && (user.photo || user.avatarUrl)) || '',
   };
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(merged);
   const [photoModal, setPhotoModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Refresh from the backend so the app reflects the same profile as the website.
+  useEffect(() => {
+    if (!token) return;
+    let alive = true;
+    api.me(token)
+      .then((d) => {
+        const u = (d && d.user) || d;
+        if (!alive || !u) return;
+        patchUser({
+          name: u.name, email: u.email, phone: u.phone,
+          address: u.addressLine || '', photo: u.avatarUrl || '',
+        });
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [token]);
 
   const startEdit = () => { setDraft(merged); setEditing(true); };
-  const save = () => { patchUser(draft); setEditing(false); };
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const d = await api.updateProfile(token, {
+        name: draft.name,
+        phone: draft.phone,
+        addressLine: draft.address,
+        avatarUrl: draft.photo,
+      });
+      const u = (d && d.user) || d || {};
+      patchUser({
+        name: u.name ?? draft.name,
+        phone: u.phone ?? draft.phone,
+        address: u.addressLine ?? draft.address,
+        photo: u.avatarUrl ?? draft.photo,
+        company: draft.company,
+      });
+      setEditing(false);
+      toast('Profile updated');
+    } catch (e) {
+      Alert.alert('Could not save', e.message || 'Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const FIELDS = [
     { key: 'name', label: 'Full name', required: true },
-    { key: 'email', label: 'Email', required: true, keyboardType: 'email-address' },
+    { key: 'email', label: 'Email', required: true, keyboardType: 'email-address', readOnly: true },
     { key: 'phone', label: 'Phone number', required: true, keyboardType: 'phone-pad' },
     { key: 'address', label: 'Address', required: true },
     { key: 'company', label: 'Company name (optional)', required: false },
@@ -63,14 +109,17 @@ export default function MyProfileScreen() {
                 <Text style={styles.label}>{f.label}{f.required && <Text style={{ color: '#D4183D' }}> *</Text>}</Text>
                 <TextInput
                   value={draft[f.key]} onChangeText={(t) => setDraft({ ...draft, [f.key]: t })}
+                  editable={!f.readOnly}
                   keyboardType={f.keyboardType} autoCapitalize={f.key === 'email' ? 'none' : 'sentences'}
-                  placeholder={f.label} placeholderTextColor={colors.inkFaint} style={styles.input}
+                  placeholder={f.label} placeholderTextColor={colors.inkFaint}
+                  style={[styles.input, f.readOnly && styles.inputReadOnly]}
                 />
+                {f.readOnly && <Text style={styles.hint}>Email can't be changed.</Text>}
               </View>
             ))}
             <View style={styles.btnRow}>
-              <TouchableOpacity style={styles.ghost} onPress={() => setEditing(false)}><Text style={styles.ghostText}>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.primary, { flex: 1.4 }]} onPress={save}><Text style={styles.primaryText}>Save changes</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.ghost} disabled={saving} onPress={() => setEditing(false)}><Text style={styles.ghostText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.primary, { flex: 1.4 }]} disabled={saving} onPress={save}><Text style={styles.primaryText}>{saving ? 'Saving…' : 'Save changes'}</Text></TouchableOpacity>
             </View>
           </View>
         ) : (
@@ -162,6 +211,8 @@ const styles = StyleSheet.create({
 
   label: { fontSize: font.small, fontWeight: '800', color: colors.ink, marginBottom: 7 },
   input: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, height: 50, fontSize: font.body, color: colors.ink },
+  inputReadOnly: { backgroundColor: colors.chipBg, color: colors.inkMuted },
+  hint: { fontSize: font.tiny, color: colors.inkFaint, marginTop: 5 },
   btnRow: { flexDirection: 'row', gap: 12, marginTop: 6 },
   primary: { backgroundColor: colors.brand, height: 52, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   primaryText: { color: '#101010', fontWeight: '900', fontSize: font.h3 },
