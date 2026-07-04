@@ -703,7 +703,7 @@ function NearbyEditor({ value, onChange }) {
       <Text style={styles.hint}>Famous spots near the location and how far they are.</Text>
       {value.map((it, i) => (
         <View key={i} style={[styles.row, { marginBottom: 8 }]}>
-          <TextInput value={it.name} onChangeText={(t) => update(i, { name: t })} placeholder="Place" placeholderTextColor={colors.inkFaint} style={[styles.input, { flex: 1 }]} />
+          <TextInput value={it.name} onChangeText={(t) => update(i, { name: t })} placeholder="Place name" placeholderTextColor={colors.inkFaint} style={[styles.input, { flex: 1 }]} />
           <TextInput value={String(it.distance)} onChangeText={(t) => update(i, { distance: t.replace(/[^\d.]/g, '') })} keyboardType="numeric" placeholder="0" placeholderTextColor={colors.inkFaint} style={[styles.input, { width: 56 }]} />
           <TouchableOpacity style={styles.unitDrop} onPress={() => setOpenRow(i)}>
             <Text style={styles.unitChipText}>{(it.unit || 'km')}</Text>

@@ -74,8 +74,20 @@ export default function BookingScreen({ item }) {
       const bk = res.booking;
       setDbBooking(bk);
       setBookingCode(bk.bookingCode);
-      const lk = await api.bookingLink(token, bk.bookingCode);
-      if (!lk || !lk.linkUrl) throw new Error('Could not start the payment. Please try again.');
+      // Create the Cashfree link — retry a few times. The link endpoint is
+      // idempotent (it reuses the booking's existing link), and the backend on
+      // a free host can cold-start / the gateway can hiccup on the first hit,
+      // which showed up as "Could not initialise payment". Retrying fixes that.
+      let lk = null; let lastErr = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          lk = await api.bookingLink(token, bk.bookingCode);
+          if (lk && lk.linkUrl) break;
+          lastErr = new Error('Could not start the payment. Please try again.');
+        } catch (e) { lastErr = e; }
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+      if (!lk || !lk.linkUrl) throw lastErr || new Error('Could not start the payment. Please try again.');
       setPayLink(lk.linkUrl);
       // Open the Cashfree checkout INSIDE the app (WebView). The old external
       // browser open (Linking.openURL) failed silently on some devices.

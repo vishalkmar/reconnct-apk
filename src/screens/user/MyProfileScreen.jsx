@@ -170,16 +170,16 @@ export default function MyProfileScreen() {
           </View>
         ) : (
           <>
-            <View style={styles.card}>
-              <InfoRow icon={ICONS.bell} label="Email" value={merged.email || '—'} />
-              <InfoRow icon={ICONS.people} label="Phone" value={merged.phone || '—'} />
-              <InfoRow icon={ICONS.people} label="Gender" value={GENDER_LABEL[merged.gender] || '—'} />
-              <InfoRow icon={ICONS.calendar} label="Date of birth" value={merged.dob || '—'} />
-              <InfoRow icon={ICONS.locGray} label="Address" value={merged.address || '—'} />
-              <InfoRow icon={ICONS.locGray} label="City" value={merged.city || '—'} />
-              <InfoRow icon={ICONS.locGray} label="State" value={merged.state || '—'} />
-              <InfoRow icon={ICONS.locGray} label="Country" value={merged.country || '—'} />
-              <InfoRow icon={ICONS.shield} label="Pincode" value={merged.pincode || '—'} last />
+            <View style={styles.grid}>
+              <InfoCell icon={ICONS.bell} label="Email" value={merged.email || '—'} />
+              <InfoCell icon={ICONS.people} label="Phone" value={merged.phone || '—'} />
+              <InfoCell icon={ICONS.people} label="Gender" value={GENDER_LABEL[merged.gender] || '—'} />
+              <InfoCell icon={ICONS.calendar} label="Date of birth" value={merged.dob || '—'} />
+              <InfoCell icon={ICONS.locGray} label="Address" value={merged.address || '—'} full />
+              <InfoCell icon={ICONS.locGray} label="City" value={merged.city || '—'} />
+              <InfoCell icon={ICONS.locGray} label="State" value={merged.state || '—'} />
+              <InfoCell icon={ICONS.locGray} label="Country" value={merged.country || '—'} />
+              <InfoCell icon={ICONS.shield} label="Pincode" value={merged.pincode || '—'} />
             </View>
             <TouchableOpacity style={styles.editBtn} onPress={startEdit} activeOpacity={0.9}>
               <Image source={ICONS.edit} style={styles.editIcon} />
@@ -226,13 +226,15 @@ function PhotoUrl({ value, onSave, onClose }) {
   );
 }
 
-function InfoRow({ icon, label, value, last }) {
+// Two-per-row info tiles (Address spans the full width). Reads much cleaner than
+// one long single-column list.
+function InfoCell({ icon, label, value, full }) {
   return (
-    <View style={[styles.infoRow, !last && styles.infoBorder]}>
-      <View style={styles.infoIcon}><Image source={icon} style={styles.infoIconImg} /></View>
-      <View style={{ flex: 1 }}>
+    <View style={[styles.cellOuter, full && styles.cellOuterFull]}>
+      <View style={styles.cellInner}>
+        <View style={styles.infoIcon}><Image source={icon} style={styles.infoIconImg} /></View>
         <Text style={styles.infoLabel}>{label}</Text>
-        <Text style={styles.infoValue}>{value}</Text>
+        <Text style={styles.infoValue} numberOfLines={2}>{value}</Text>
       </View>
     </View>
   );
@@ -248,11 +250,12 @@ const styles = StyleSheet.create({
   nameBig: { fontSize: font.h2, fontWeight: '900', color: colors.ink, marginTop: 12 },
   companyBig: { fontSize: font.body, color: colors.inkMuted, marginTop: 2 },
 
-  card: { backgroundColor: colors.surface, borderRadius: radius.lg, paddingHorizontal: 16, ...shadow.card },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15 },
-  infoBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
-  infoIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
-  infoIconImg: { width: 17, height: 17, tintColor: colors.brand },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6 },
+  cellOuter: { width: '50%', padding: 6 },
+  cellOuterFull: { width: '100%' },
+  cellInner: { backgroundColor: colors.surface, borderRadius: radius.md, padding: 14, minHeight: 86, ...shadow.card },
+  infoIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  infoIconImg: { width: 16, height: 16, tintColor: colors.brand },
   infoLabel: { fontSize: font.tiny, color: colors.inkMuted },
   infoValue: { fontSize: font.body, color: colors.ink, fontWeight: '700', marginTop: 2 },
 
