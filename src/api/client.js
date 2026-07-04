@@ -71,7 +71,9 @@ export const api = {
   cancelQuote: (token, code) => request(`/bookings/me/${encodeURIComponent(code)}/cancel-quote`, { token }),
   cancelBooking: (token, code, body) => request(`/bookings/me/${encodeURIComponent(code)}/cancel`, { method: 'POST', token, body }),
   createBooking: (token, body) => request('/bookings', { method: 'POST', token, body }),
-  bookingLink: (token, code) => request(`/payments/links/${encodeURIComponent(code)}`, { method: 'POST', token }),
+  // Pass { linkId, linkUrl } to register an app-created (direct) Cashfree link
+  // with the booking; omit the body to have the backend create the link itself.
+  bookingLink: (token, code, body) => request(`/payments/links/${encodeURIComponent(code)}`, { method: 'POST', token, body }),
   bookingLinkStatus: (token, code) => request(`/payments/link-status/${encodeURIComponent(code)}`, { token }),
   wallet: (token) => request('/refer-earn/wallet', { token }),
 

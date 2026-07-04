@@ -10,6 +10,7 @@ import { bookableDateSet, priceBreakdown, MONTHS_FULL } from '../utils/booking';
 import { useAuth } from '../store/AuthContext';
 import { useNav } from '../navigation/NavContext';
 import { shareExperience } from '../utils/share';
+import { createDirectPaymentLink } from '../utils/cashfree';
 import PaymentWebView from '../components/PaymentWebView';
 import { ICONS } from '../icons';
 
@@ -74,23 +75,35 @@ export default function BookingScreen({ item }) {
       const bk = res.booking;
       setDbBooking(bk);
       setBookingCode(bk.bookingCode);
-      // Create the Cashfree link — retry a few times. The link endpoint is
-      // idempotent (it reuses the booking's existing link), and the backend on
-      // a free host can cold-start / the gateway can hiccup on the first hit,
-      // which showed up as "Could not initialise payment". Retrying fixes that.
-      let lk = null; let lastErr = null;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          lk = await api.bookingLink(token, bk.bookingCode);
-          if (lk && lk.linkUrl) break;
-          lastErr = new Error('Could not start the payment. Please try again.');
-        } catch (e) { lastErr = e; }
-        await new Promise((r) => setTimeout(r, 1500));
+      // Phase-1: create the Cashfree link DIRECTLY from the app (reliable on all
+      // devices — the server round-trip was failing to open the checkout on some
+      // phones), then register its id with our backend so the booking still
+      // auto-confirms when the link is paid. Backend-created link is a fallback.
+      let linkUrl = null;
+      try {
+        const linkId = `${bk.bookingCode}-${Date.now().toString(36)}`;
+        const direct = await createDirectPaymentLink({
+          amount: (bk.pricing && bk.pricing.total) || b.total,
+          name: primaryName,
+          phone: (guest.phone || '').trim() || (user && user.phone) || '',
+          email: (guest.email || '').trim() || (user && user.email) || '',
+          purpose: item.name,
+          linkId,
+        });
+        linkUrl = direct.linkUrl;
+        try { await api.bookingLink(token, bk.bookingCode, { linkId: direct.linkId, linkUrl: direct.linkUrl }); } catch (_) { /* registration is best-effort */ }
+      } catch (directErr) {
+        // Fallback: let the backend create the link (retry for free-host cold starts).
+        let lk = null;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try { lk = await api.bookingLink(token, bk.bookingCode); if (lk && lk.linkUrl) break; } catch (_) { /* retry */ }
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+        linkUrl = lk && lk.linkUrl;
       }
-      if (!lk || !lk.linkUrl) throw lastErr || new Error('Could not start the payment. Please try again.');
-      setPayLink(lk.linkUrl);
-      // Open the Cashfree checkout INSIDE the app (WebView). The old external
-      // browser open (Linking.openURL) failed silently on some devices.
+      if (!linkUrl) throw new Error('Could not start the payment. Please try again.');
+      setPayLink(linkUrl);
+      // Open the Cashfree checkout INSIDE the app (WebView).
       setShowPayWeb(true);
     } catch (e) {
       Alert.alert('Payment', e.message || 'Could not start the payment. Please try again.');

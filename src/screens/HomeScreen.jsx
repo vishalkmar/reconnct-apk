@@ -34,7 +34,7 @@ const greeting = () => {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { city, selectedCity, coords, detectedCity } = useLocation();
+  const { city, selectedCity, coords, detectedCity, fullAddress } = useLocation();
   const { push, navigateTab } = useNav();
 
   const [items, setItems] = useState([]);
@@ -246,7 +246,7 @@ export default function HomeScreen() {
               <View style={styles.geoIconWrap}><Image source={ICONS.locMuted} style={styles.geoPin} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.geoTitle}>You’re in {detectedCity}</Text>
-                <Text style={styles.geoText}>Showing experiences nearby you first.</Text>
+                <Text style={styles.geoText} numberOfLines={2}>{fullAddress || 'Showing experiences nearby you first.'}</Text>
               </View>
               <TouchableOpacity onPress={() => setGeoDismissed(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Text style={styles.geoClose}>✕</Text>

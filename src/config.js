@@ -17,3 +17,21 @@ export const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '');
 // Phase-1 demo sign-in (handled by the backend's userAuth backdoor).
 export const DEMO_EMAIL = 'demo@reconnct.app';
 export const DEMO_OTP = '123456';
+
+/**
+ * Cashfree — SANDBOX / TEST credentials only (phase-1). These are TEST keys, so
+ * no real money moves. The app creates the hosted payment LINK directly against
+ * Cashfree's sandbox so the checkout always opens on-device (the server round
+ * trip was failing for some phones), then registers the link id with our backend
+ * so the booking still auto-confirms on payment.
+ *
+ * ⚠️ NEVER put a production/live Cashfree secret in the app — it ships inside the
+ * APK and can be extracted. Live keys must stay on the backend only.
+ */
+export const CASHFREE = {
+  MODE: 'TEST',
+  APP_ID: '__CASHFREE_APP_ID_REDACTED__',
+  APP_SECRET: '__CASHFREE_APP_SECRET_REDACTED__',
+  API_BASE: 'https://sandbox.cashfree.com/pg',
+  API_VERSION: '2025-01-01',
+};

@@ -119,7 +119,7 @@ export default function MyProfileScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScreenHeader title="My Profile" />
-      <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[{ padding: space.lg, paddingBottom: 40 }, !editing && styles.readCenter]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Avatar */}
         <View style={styles.avatarWrap}>
           <TouchableOpacity disabled={!editing} onPress={() => setPhotoModal(true)} activeOpacity={0.85}>
@@ -170,16 +170,16 @@ export default function MyProfileScreen() {
           </View>
         ) : (
           <>
-            <View style={styles.grid}>
-              <InfoCell icon={ICONS.bell} label="Email" value={merged.email || '—'} />
-              <InfoCell icon={ICONS.people} label="Phone" value={merged.phone || '—'} />
-              <InfoCell icon={ICONS.people} label="Gender" value={GENDER_LABEL[merged.gender] || '—'} />
-              <InfoCell icon={ICONS.calendar} label="Date of birth" value={merged.dob || '—'} />
-              <InfoCell icon={ICONS.locGray} label="Address" value={merged.address || '—'} full />
-              <InfoCell icon={ICONS.locGray} label="City" value={merged.city || '—'} />
-              <InfoCell icon={ICONS.locGray} label="State" value={merged.state || '—'} />
-              <InfoCell icon={ICONS.locGray} label="Country" value={merged.country || '—'} />
-              <InfoCell icon={ICONS.shield} label="Pincode" value={merged.pincode || '—'} />
+            <View style={styles.fieldCard}>
+              <FieldRow icon={ICONS.bell} label="Email" value={merged.email || '—'} />
+              <FieldRow icon={ICONS.people} label="Phone" value={merged.phone || '—'} />
+              <FieldRow icon={ICONS.people} label="Gender" value={GENDER_LABEL[merged.gender] || '—'} />
+              <FieldRow icon={ICONS.calendar} label="Date of birth" value={merged.dob || '—'} />
+              <FieldRow icon={ICONS.locGray} label="Address" value={merged.address || '—'} />
+              <FieldRow icon={ICONS.locGray} label="City" value={merged.city || '—'} />
+              <FieldRow icon={ICONS.locGray} label="State" value={merged.state || '—'} />
+              <FieldRow icon={ICONS.locGray} label="Country" value={merged.country || '—'} />
+              <FieldRow icon={ICONS.shield} label="Pincode" value={merged.pincode || '—'} last />
             </View>
             <TouchableOpacity style={styles.editBtn} onPress={startEdit} activeOpacity={0.9}>
               <Image source={ICONS.edit} style={styles.editIcon} />
@@ -226,16 +226,14 @@ function PhotoUrl({ value, onSave, onClose }) {
   );
 }
 
-// Two-per-row info tiles (Address spans the full width). Reads much cleaner than
-// one long single-column list.
-function InfoCell({ icon, label, value, full }) {
+// Compact single-line field: icon sits inside the row (left), label, then value
+// on the right. A tidy list that fits on one screen without scrolling.
+function FieldRow({ icon, label, value, last }) {
   return (
-    <View style={[styles.cellOuter, full && styles.cellOuterFull]}>
-      <View style={styles.cellInner}>
-        <View style={styles.infoIcon}><Image source={icon} style={styles.infoIconImg} /></View>
-        <Text style={styles.infoLabel}>{label}</Text>
-        <Text style={styles.infoValue} numberOfLines={2}>{value}</Text>
-      </View>
+    <View style={[styles.fieldRow, !last && styles.fieldDivider]}>
+      <View style={styles.fieldIconWrap}><Image source={icon} style={styles.fieldIconImg} /></View>
+      <Text style={styles.fieldLabelText}>{label}</Text>
+      <Text style={styles.fieldValueText} numberOfLines={1}>{value}</Text>
     </View>
   );
 }
@@ -250,14 +248,14 @@ const styles = StyleSheet.create({
   nameBig: { fontSize: font.h2, fontWeight: '900', color: colors.ink, marginTop: 12 },
   companyBig: { fontSize: font.body, color: colors.inkMuted, marginTop: 2 },
 
-  grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6 },
-  cellOuter: { width: '50%', padding: 6 },
-  cellOuterFull: { width: '100%' },
-  cellInner: { backgroundColor: colors.surface, borderRadius: radius.md, padding: 14, minHeight: 86, ...shadow.card },
-  infoIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  infoIconImg: { width: 16, height: 16, tintColor: colors.brand },
-  infoLabel: { fontSize: font.tiny, color: colors.inkMuted },
-  infoValue: { fontSize: font.body, color: colors.ink, fontWeight: '700', marginTop: 2 },
+  readCenter: { flexGrow: 1, justifyContent: 'center' },
+  fieldCard: { backgroundColor: colors.surface, borderRadius: radius.lg, paddingHorizontal: 4, ...shadow.card },
+  fieldRow: { flexDirection: 'row', alignItems: 'center', height: 50, paddingHorizontal: 12, gap: 12 },
+  fieldDivider: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  fieldIconWrap: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
+  fieldIconImg: { width: 15, height: 15, tintColor: colors.brand },
+  fieldLabelText: { fontSize: font.small, color: colors.inkMuted, width: 96 },
+  fieldValueText: { flex: 1, fontSize: font.body, color: colors.ink, fontWeight: '700', textAlign: 'right' },
 
   editBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16, backgroundColor: colors.brand, height: 52, borderRadius: radius.md },
   editIcon: { width: 17, height: 17, tintColor: '#101010' },
