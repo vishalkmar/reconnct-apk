@@ -10,6 +10,7 @@ import { bookableDateSet, priceBreakdown, MONTHS_FULL } from '../utils/booking';
 import { useAuth } from '../store/AuthContext';
 import { useNav } from '../navigation/NavContext';
 import { shareExperience } from '../utils/share';
+import PaymentWebView from '../components/PaymentWebView';
 import { ICONS } from '../icons';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -45,6 +46,7 @@ export default function BookingScreen({ item }) {
   const [guest, setGuest] = useState({ name: '', phone: '', email: '' });
   const [paying, setPaying] = useState(false);
   const [payLink, setPayLink] = useState(null);
+  const [showPayWeb, setShowPayWeb] = useState(false);
   const [bookingCode, setBookingCode] = useState(null);
   const [dbBooking, setDbBooking] = useState(null);
 
@@ -73,8 +75,11 @@ export default function BookingScreen({ item }) {
       setDbBooking(bk);
       setBookingCode(bk.bookingCode);
       const lk = await api.bookingLink(token, bk.bookingCode);
+      if (!lk || !lk.linkUrl) throw new Error('Could not start the payment. Please try again.');
       setPayLink(lk.linkUrl);
-      Linking.openURL(lk.linkUrl).catch(() => {});
+      // Open the Cashfree checkout INSIDE the app (WebView). The old external
+      // browser open (Linking.openURL) failed silently on some devices.
+      setShowPayWeb(true);
     } catch (e) {
       Alert.alert('Payment', e.message || 'Could not start the payment. Please try again.');
       setStep(2);
@@ -89,6 +94,7 @@ export default function BookingScreen({ item }) {
       const res = await api.bookingLinkStatus(token, bookingCode);
       if (res && res.paid) {
         if (res.booking) setDbBooking(res.booking);
+        setShowPayWeb(false);
         setStep(4);
       }
     } catch { /* keep waiting */ }
@@ -276,12 +282,17 @@ export default function BookingScreen({ item }) {
               <>
                 <ActivityIndicator color={colors.brand} />
                 <Text style={styles.cashfreeTitle}>Waiting for payment…</Text>
-                <Text style={styles.cashfreeSub}>The Cashfree checkout opened in your browser. Finish paying there — we’ll confirm automatically and take you to your booking. No need to tap anything.</Text>
+                <Text style={styles.cashfreeSub}>Finish paying in the Cashfree checkout — we’ll confirm automatically and take you to your booking. No need to tap anything.</Text>
                 {!!payLink && (
-                  <TouchableOpacity style={styles.cashfreeReopen} onPress={() => Linking.openURL(payLink)}>
-                    <Image source={ICONS.card} style={styles.cashfreeReopenIcon} />
-                    <Text style={styles.cashfreeReopenTxt}>Reopen Cashfree payment</Text>
-                  </TouchableOpacity>
+                  <>
+                    <TouchableOpacity style={styles.cashfreeReopen} onPress={() => setShowPayWeb(true)}>
+                      <Image source={ICONS.card} style={styles.cashfreeReopenIcon} />
+                      <Text style={styles.cashfreeReopenTxt}>Reopen Cashfree payment</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.cashfreeBrowser} onPress={() => Linking.openURL(payLink).catch(() => {})}>
+                      <Text style={styles.cashfreeBrowserTxt}>Open in browser instead ↗</Text>
+                    </TouchableOpacity>
+                  </>
                 )}
               </>
             )}
@@ -366,6 +377,14 @@ export default function BookingScreen({ item }) {
           )}
         </View>
       )}
+
+      {/* In-app Cashfree checkout */}
+      <PaymentWebView
+        visible={showPayWeb}
+        url={payLink}
+        onClose={() => { setShowPayWeb(false); checkStatus(); }}
+        onReturn={() => { setShowPayWeb(false); checkStatus(); }}
+      />
 
       {/* Primary guest popup */}
       <Modal visible={showGuest} transparent animationType="fade" onRequestClose={() => setShowGuest(false)}>
@@ -549,6 +568,8 @@ const styles = StyleSheet.create({
   cashfreeReopen: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.brandSoft, paddingHorizontal: 18, height: 46, borderRadius: radius.pill, marginTop: 16 },
   cashfreeReopenIcon: { width: 18, height: 18, tintColor: colors.brandText },
   cashfreeReopenTxt: { color: colors.brandText, fontWeight: '800', fontSize: font.body },
+  cashfreeBrowser: { marginTop: 10 },
+  cashfreeBrowserTxt: { color: colors.inkMuted, fontWeight: '700', fontSize: font.small },
 
   doneHero: { backgroundColor: colors.brand, alignItems: 'center', paddingBottom: 40, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   doneCheck: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadow.card },

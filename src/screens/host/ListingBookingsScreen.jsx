@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { colors, radius, font, space, shadow } from '../../theme';
 import { useHost } from '../../store/HostContext';
-import { resolveImage } from '../../api/client';
+import { useAuth } from '../../store/AuthContext';
+import { api, resolveImage } from '../../api/client';
 import { initials, formatMoney } from '../../utils/format';
-import { ICONS } from '../../icons';
 import ScreenHeader from '../../components/ScreenHeader';
 
 const TABS = [
@@ -21,11 +21,28 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const pretty = (s) => { const [y, m, d] = String(s).split('-').map(Number); return `${MONTHS[m - 1]} ${d}, ${y}`; };
 
 export default function ListingBookingsScreen({ listing }) {
+  const { token } = useAuth();
   const { bookingsForListing } = useHost();
   const [tab, setTab] = useState('all');
-  const all = (listing && (bookingsForListing(listing.id) || listing.bookings)) || [];
+  // Fetch the listing detail so we get the REAL bookings feed for this
+  // experience (the list endpoint carries none). Falls back to any bookings
+  // already on the passed-in listing while the request is in flight.
+  const [bookings, setBookings] = useState((listing && (listing.bookings || bookingsForListing(listing.id))) || []);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    if (!listing || !listing.id) { setLoading(false); return undefined; }
+    api.hostListing(token, listing.id)
+      .then((d) => { if (alive && d && d.listing) setBookings(d.listing.bookings || []); })
+      .catch(() => {})
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [token, listing]);
+
+  const all = bookings || [];
   const counts = TABS.reduce((a, t) => { a[t.key] = t.key === 'all' ? all.length : all.filter((b) => b.status === t.key).length; return a; }, {});
-  const shown = [...(tab === 'all' ? all : all.filter((b) => b.status === tab))].sort((a, b) => b.date.localeCompare(a.date));
+  const shown = [...(tab === 'all' ? all : all.filter((b) => b.status === tab))].sort((a, b) => String(b.date).localeCompare(String(a.date)));
   const revenue = all.filter((b) => b.status === 'completed').reduce((n, b) => n + b.amount, 0);
 
   return (
@@ -75,7 +92,9 @@ export default function ListingBookingsScreen({ listing }) {
             </View>
           );
         }}
-        ListEmptyComponent={<Text style={styles.empty}>No {tab === 'all' ? '' : tab} bookings yet for this listing.</Text>}
+        ListEmptyComponent={loading
+          ? <ActivityIndicator color={colors.brand} style={{ marginTop: 40 }} />
+          : <Text style={styles.empty}>No {tab === 'all' ? '' : tab} bookings yet for this listing.</Text>}
       />
     </View>
   );

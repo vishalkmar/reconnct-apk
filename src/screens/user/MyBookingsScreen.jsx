@@ -46,7 +46,7 @@ function prettyDate(v) {
 export default function MyBookingsScreen() {
   const { token } = useAuth();
   const { bookings: localBookings } = useBookings();
-  const { navigateTab } = useNav();
+  const { navigateTab, push } = useNav();
   const [fetched, setFetched] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all');
@@ -69,7 +69,7 @@ export default function MyBookingsScreen() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScreenHeader title="My Bookings" />
       <Text style={styles.sub}>Track your upcoming trips, completed visits and cancellations — all in one place.</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
         {TABS.map((t) => {
           const active = tab === t.key;
           return (
@@ -87,7 +87,13 @@ export default function MyBookingsScreen() {
           data={shown}
           keyExtractor={(b) => String(b.id || b.bookingCode)}
           contentContainerStyle={{ padding: space.lg, paddingBottom: 32 }}
-          renderItem={({ item }) => <BookingCard b={item} />}
+          renderItem={({ item }) => (
+            <BookingCard
+              b={item}
+              onOpen={(bk) => push('bookingDetail', { code: bk.bookingCode })}
+              onCancel={(bk) => push('bookingDetail', { code: bk.bookingCode, startCancel: true })}
+            />
+          )}
           ListEmptyComponent={
             <EmptyState emoji="🎟️" title="No bookings yet"
               sub="Your booked experiences will appear here."
@@ -99,7 +105,7 @@ export default function MyBookingsScreen() {
   );
 }
 
-function BookingCard({ b }) {
+function BookingCard({ b, onOpen, onCancel }) {
   const snap = b.item || {};
   const img = resolveImage(snap.image || snap.mainImage);
   const pill = PILL[b.status] || PILL.pending_payment;
@@ -150,15 +156,15 @@ function BookingCard({ b }) {
           <TouchableOpacity
             style={[styles.btn, styles.btnGhost]}
             activeOpacity={0.85}
-            disabled={cancelled}
-            onPress={() => Alert.alert('Cancel booking', 'Cancellation requests are handled by support for now.')}
+            disabled={cancelled || !b.bookingCode}
+            onPress={() => onCancel && onCancel(b)}
           >
             <Text style={styles.btnGhostText}>{cancelled ? 'Cancelled' : 'Cancel'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.btn, styles.btnPrimary]}
             activeOpacity={0.9}
-            onPress={() => Alert.alert(snap.name || 'Ticket', `Booking ${b.bookingCode || ''}\n${date || ''} · ${guests} ${guests === 1 ? 'guest' : 'guests'}`)}
+            onPress={() => onOpen && onOpen(b)}
           >
             <Image source={ICONS.ticket} style={styles.btnIcon} />
             <Text style={styles.btnPrimaryText}>View Ticket</Text>
@@ -171,6 +177,9 @@ function BookingCard({ b }) {
 
 const styles = StyleSheet.create({
   sub: { color: colors.inkMuted, fontSize: font.small, paddingHorizontal: space.lg, paddingTop: 12 },
+  // flexGrow:0 stops the horizontal tab strip from stretching to fill the
+  // column's vertical space (which pushed the list down, leaving a top gap).
+  tabsScroll: { flexGrow: 0, flexShrink: 0 },
   tabs: { paddingHorizontal: space.lg, paddingVertical: 12, gap: 8 },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 38, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   tabActive: { backgroundColor: colors.brand, borderColor: colors.brand },

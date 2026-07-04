@@ -17,6 +17,7 @@
     "react-native": "0.86.0",
     "react-native-image-picker": "^8.2.1",
     "react-native-safe-area-context": "^5.5.2",
+    "react-native-webview": "^14.0.1",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {

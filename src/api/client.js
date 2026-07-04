@@ -67,6 +67,9 @@ export const api = {
 
   // ── User panel (auth required) ──────────────────────────────────────
   myBookings: (token) => request('/bookings/me', { token }),
+  booking: (token, code) => request(`/bookings/me/${encodeURIComponent(code)}`, { token }),
+  cancelQuote: (token, code) => request(`/bookings/me/${encodeURIComponent(code)}/cancel-quote`, { token }),
+  cancelBooking: (token, code, body) => request(`/bookings/me/${encodeURIComponent(code)}/cancel`, { method: 'POST', token, body }),
   createBooking: (token, body) => request('/bookings', { method: 'POST', token, body }),
   bookingLink: (token, code) => request(`/payments/links/${encodeURIComponent(code)}`, { method: 'POST', token }),
   bookingLinkStatus: (token, code) => request(`/payments/link-status/${encodeURIComponent(code)}`, { token }),

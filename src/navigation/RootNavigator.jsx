@@ -43,6 +43,7 @@ function StackScreen({ name, params }) {
     case 'myProfile': return lazy(() => require('../screens/user/MyProfileScreen'));
     case 'support': { const C = require('../screens/SupportScreen').default; return <C queue={(params && params.queue) || 'user'} />; }
     case 'bookings': return lazy(() => require('../screens/user/MyBookingsScreen'));
+    case 'bookingDetail': { const C = require('../screens/user/BookingDetailScreen').default; return <C code={params.code} startCancel={params.startCancel} />; }
     case 'wishlist': return lazy(() => require('../screens/user/WishlistScreen'));
     case 'transactions': return lazy(() => require('../screens/user/TransactionsScreen'));
     case 'notifications': return lazy(() => require('../screens/NotificationsScreen'));
