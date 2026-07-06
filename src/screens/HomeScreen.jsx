@@ -7,12 +7,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { colors, radius, font, space, shadow } from '../theme';
 import { AUD_META, AUD_DEFAULT } from '../components/connectWithIcons';
-import { api } from '../api/client';
+import { api, resolveImage, DUMMY_IMAGE } from '../api/client';
+import { formatMoney } from '../utils/format';
 import { useAuth } from '../store/AuthContext';
 import { useLocation } from '../store/LocationContext';
+import { useWishlist } from '../store/WishlistContext';
 import { useNav } from '../navigation/NavContext';
 import ExperienceCard from '../components/ExperienceCard';
-import AudienceCard, { AUDIENCE_CARDS } from '../components/AudienceCard';
+import AudienceCard, { themeForAudience } from '../components/AudienceCard';
 import FramedDealCard from '../components/deals/FramedDealCard';
 import CleanDealCard from '../components/deals/CleanDealCard';
 import OverlayDealCard from '../components/deals/OverlayDealCard';
@@ -109,21 +111,6 @@ export default function HomeScreen() {
   const firstName = (user && user.name) ? user.name.split(' ')[0] : 'there';
   const openDetail = (item) => push('detail', { idOrSlug: item.slug || item.id });
 
-  // Explore = a 2-col grid where every row pairs ONE overlay audience card with
-  // ONE experience card, and the audience card alternates left/right each row.
-  const mixed = [];
-  let ei = 0;
-  AUDIENCE_CARDS.forEach((aud, r) => {
-    if (r % 2 === 0) {
-      mixed.push({ __aud: aud });
-      if (items[ei]) mixed.push({ __exp: items[ei++] });
-    } else {
-      if (items[ei]) mixed.push({ __exp: items[ei++] });
-      mixed.push({ __aud: aud });
-    }
-  });
-  while (ei < items.length) mixed.push({ __exp: items[ei++] });
-  const gridMixed = mixed.slice(0, 12);
   const featShown = activeCat ? featured.filter((e) => e.category && e.category.id === activeCat) : featured;
   // Partner-audience experiences for the "Connect With Your Partner" rail.
   const partnerItems = (() => {
@@ -137,10 +124,6 @@ export default function HomeScreen() {
     push('experiences', { tagMode: 'audience', initialFilters: match ? { audienceId: match.id } : {} });
   };
 
-  // One Explore card (audience overlay OR experience).
-  const renderMixed = (m) => (m.__aud
-    ? <AudienceCard key={'a' + m.__aud.slug} data={m.__aud} style={{ marginBottom: GRID_GAP }} onPress={() => goAudience(m.__aud.slug)} />
-    : <ExperienceCard key={'e' + m.__exp.id} item={m.__exp} style={{ marginBottom: GRID_GAP }} onPress={() => openDetail(m.__exp)} />);
   const renderExp = (it) => <ExperienceCard key={it.id} item={it} style={{ marginBottom: GRID_GAP }} onPress={() => openDetail(it)} />;
   // Split a list into two independent columns → masonry (no row-height gaps).
   const evens = (arr) => arr.filter((_, i) => i % 2 === 0);
@@ -240,17 +223,6 @@ export default function HomeScreen() {
           {/* Connect With — audience taxonomy from the DB, tap opens that audience's experiences */}
           <ConnectWithSection auds={auds} onPressAud={goAudience} onSeeAll={() => push('reconnect')} />
 
-          {/* Trending Near You */}
-          <TrendingNearbySection
-            data={items.slice(0, 12)}
-            onSeeAll={() => navigateTab('experiences')}
-            onPressItem={openDetail}
-          />
-
-          <View style={styles.sectionHead}>
-            <SectionTitle icon={ICONS.globe} title="Explore" />
-          </View>
-
           {loading ? (
             <ActivityIndicator color={colors.brand} style={{ marginTop: 24 }} />
           ) : error ? (
@@ -260,14 +232,11 @@ export default function HomeScreen() {
             </View>
           ) : (
             <>
-              <View style={styles.masonry}>
-                <View style={styles.col}>{evens(gridMixed).map(renderMixed)}</View>
-                <View style={styles.col}>{odds(gridMixed).map(renderMixed)}</View>
-              </View>
+              {/* Trending Near You — standalone experience cards, replaces the old Explore grid */}
+              <TrendingNearYouSection data={items} onSeeAll={() => navigateTab('experiences')} onPressItem={openDetail} />
 
-              <TouchableOpacity style={styles.exploreMore} onPress={() => navigateTab('experiences')} activeOpacity={0.9}>
-                <Text style={styles.exploreMoreText}>Explore more  →</Text>
-              </TouchableOpacity>
+              {/* Experiences for every moment — one tile per broad audience category */}
+              <ExperienceMomentsSection auds={auds} onPressAud={goAudience} />
             </>
           )}
 
@@ -349,6 +318,12 @@ export default function HomeScreen() {
                 onSeeAll={() => navigateTab('experiences')}
                 onPressItem={openDetail}
               />
+              {/* Trending Nearby — grouped-stack carousel, stays at the very end of Home */}
+              <TrendingNearbySection
+                data={items.slice(0, 12)}
+                onSeeAll={() => navigateTab('experiences')}
+                onPressItem={openDetail}
+              />
             </>
           )}
           </>
@@ -413,6 +388,92 @@ function ConnectWithSection({ auds, onPressAud, onSeeAll }) {
             </TouchableOpacity>
           );
         })}
+      </ScrollView>
+    </>
+  );
+}
+
+// "Trending Near You" — standalone compact experience cards (image, badge,
+// heart, title, location, rating + price), horizontal scroll. Replaces the
+// old "Explore" masonry grid. Distinct from TrendingNearbySection (the
+// grouped-stack-of-3 carousel that stays at the very bottom of Home).
+const TNY_CARD_W = 152;
+function TrendingNearYouCard({ item, onPress }) {
+  const { isWished, toggle } = useWishlist();
+  const img = resolveImage(item.mainImage) || DUMMY_IMAGE;
+  const wished = isWished('experience', item.id);
+  return (
+    <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.tnyCard}>
+      <View style={styles.tnyImgWrap}>
+        <Image source={{ uri: img }} style={styles.tnyImg} resizeMode="cover" />
+        {!!(item.category && item.category.name) && (
+          <View style={styles.tnyBadge}><Text style={styles.tnyBadgeText} numberOfLines={1}>{item.category.name}</Text></View>
+        )}
+        <TouchableOpacity
+          style={styles.tnyHeart}
+          onPress={() => toggle('experience', item.id, { ...item, type: 'experience' })}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Image source={wished ? ICONS.heartFill : ICONS.heart} style={[styles.tnyHeartIcon, { tintColor: wished ? colors.heart : colors.inkMuted }]} resizeMode="contain" />
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.tnyTitle} numberOfLines={2}>{item.name}</Text>
+      {!!item.city && (
+        <View style={styles.tnyLocRow}>
+          <Image source={ICONS.locGray} style={styles.tnyLocIcon} />
+          <Text style={styles.tnyLoc} numberOfLines={1}>{item.city}</Text>
+        </View>
+      )}
+      <View style={styles.tnyFoot}>
+        <View style={styles.tnyRatingRow}>
+          <Image source={ICONS.star} style={styles.tnyStar} />
+          <Text style={styles.tnyRating}>{Number(item.rating || 0).toFixed(1)}</Text>
+        </View>
+        <Text style={styles.tnyPrice} numberOfLines={1}>{item.fromPrice ? formatMoney(item.fromPrice, item.currency) : 'Contact'}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+function TrendingNearYouSection({ data, onSeeAll, onPressItem }) {
+  if (!data.length) return null;
+  return (
+    <>
+      <View style={styles.sectionHead}>
+        <SectionTitle icon={ICONS.sparkle} title="Trending Near You" />
+        <TouchableOpacity onPress={onSeeAll}><Text style={styles.seeAll}>See all ›</Text></TouchableOpacity>
+      </View>
+      <FlatList
+        data={data.slice(0, 12)}
+        horizontal
+        keyExtractor={(it, idx) => `tny-${it.id || idx}`}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 12, paddingTop: 4 }}
+        renderItem={({ item }) => <TrendingNearYouCard item={item} onPress={() => onPressItem(item)} />}
+      />
+    </>
+  );
+}
+
+// "Experiences for every moment" — one tile per broad audience category (Self,
+// Partner, Family, Friends, Corporate, …), live from the taxonomy. Tapping a
+// tile opens that audience's experiences. Reuses the AudienceCard icon-tile
+// design at a compact size, 4 fitting comfortably per screen.
+function ExperienceMomentsSection({ auds, onPressAud }) {
+  if (!auds.length) return null;
+  return (
+    <>
+      <View style={styles.sectionHead}>
+        <SectionTitle icon={ICONS.globe} title="Experiences for every moment" />
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 10, paddingTop: 4 }}>
+        {auds.map((a) => (
+          <AudienceCard
+            key={a.id}
+            data={themeForAudience(a)}
+            style={styles.momentCard}
+            onPress={() => onPressAud(a.slug)}
+          />
+        ))}
       </ScrollView>
     </>
   );
@@ -637,6 +698,25 @@ const styles = StyleSheet.create({
   connectIconFallback: { width: 32, height: 32, tintColor: colors.brandText },
   connectTitle: { fontSize: 13, fontWeight: '800', color: colors.ink, marginTop: 8, textAlign: 'center' },
   connectSub: { fontSize: 11, color: colors.inkMuted, marginTop: 2, textAlign: 'center', lineHeight: 14 },
+
+  tnyCard: { width: TNY_CARD_W },
+  tnyImgWrap: { position: 'relative', borderRadius: radius.lg, overflow: 'hidden' },
+  tnyImg: { width: '100%', height: 110, backgroundColor: '#DCE0E6' },
+  tnyBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(255,255,255,0.95)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, maxWidth: '75%' },
+  tnyBadgeText: { color: colors.ink, fontSize: 10, fontWeight: '800' },
+  tnyHeart: { position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.95)', alignItems: 'center', justifyContent: 'center' },
+  tnyHeartIcon: { width: 13, height: 13 },
+  tnyTitle: { fontSize: 13, fontWeight: '800', color: colors.ink, marginTop: 8, lineHeight: 16 },
+  tnyLocRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 },
+  tnyLocIcon: { width: 10, height: 10 },
+  tnyLoc: { fontSize: 11, color: colors.inkMuted, flex: 1 },
+  tnyFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
+  tnyRatingRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  tnyStar: { width: 11, height: 11, tintColor: colors.star },
+  tnyRating: { fontSize: 11, fontWeight: '700', color: colors.ink },
+  tnyPrice: { fontSize: 13, fontWeight: '900', color: colors.price },
+
+  momentCard: { width: 92, height: 122, borderRadius: radius.md },
 
   banner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FBD38D', marginHorizontal: H_PAD, marginTop: 16, borderRadius: radius.lg, padding: 16, overflow: 'hidden' },
   bannerTag: { backgroundColor: colors.brandDark, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.sm },
