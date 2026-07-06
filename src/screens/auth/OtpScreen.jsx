@@ -1,27 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Pressable, Image, Dimensions,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radius, font, space } from '../../theme';
-
-const { height: SCREEN_H } = Dimensions.get('window');
+import { colors, font, space } from '../../theme';
 import { api } from '../../api/client';
 import { toast } from '../../utils/toast';
+import { AuthHeader, AuthField, AuthButton, MAIL_SVG, LOCK_SVG } from './authUi';
 
 const LENGTH = 6;
-const OTP_DEFAULTS = {
-  otpHeadline: 'Almost there!',
-  otpSubtitle: 'We’ve sent a 6-digit code to',
-  otpMedia: { url: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=900&q=80' },
-  secureText: 'Secure & encrypted',
-};
 
-export default function OtpScreen({ email, onBack, content, onVerified }) {
-  const c = { ...OTP_DEFAULTS, ...(content || {}) };
-  const insets = useSafeAreaInsets();
-  const inputRef = useRef(null);
+export default function OtpScreen({ email, onBack, onVerified }) {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -31,9 +20,6 @@ export default function OtpScreen({ email, onBack, content, onVerified }) {
     const t = setInterval(() => setSeconds((s) => (s > 0 ? s - 1 : 0)), 1000);
     return () => clearInterval(t);
   }, []);
-
-  const mmss = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
-  const digits = code.padEnd(LENGTH).split('').slice(0, LENGTH);
 
   const verify = async (value = code) => {
     if (value.length !== LENGTH || loading) return;
@@ -71,124 +57,52 @@ export default function OtpScreen({ email, onBack, content, onVerified }) {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={{ flexGrow: 1 }}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Full-bleed hero image with the text overlaid on top */}
-        <View style={styles.hero}>
-          {c.otpMedia && c.otpMedia.url
-            ? <Image source={{ uri: c.otpMedia.url }} style={styles.heroBg} resizeMode="cover" />
-            : <View style={[styles.heroBg, { backgroundColor: colors.brandSoft }]} />}
-          <View style={styles.heroScrim} />
-          <TouchableOpacity style={[styles.backBtn, { top: insets.top + 10 }]} onPress={onBack}>
-            <Text style={styles.backIcon}>‹</Text>
-          </TouchableOpacity>
-          <View style={[styles.heroContent, { paddingTop: insets.top }]}>
-            <Text style={styles.title}>{c.otpHeadline}</Text>
-            <Text style={styles.subtitle}>{c.otpSubtitle}</Text>
-            <View style={styles.emailRow}>
-              <Text style={styles.email}>{email}</Text>
-              <TouchableOpacity onPress={onBack}><Text style={styles.edit}>  Edit ✎</Text></TouchableOpacity>
-            </View>
-          </View>
-        </View>
+    <View style={styles.screen}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <AuthHeader />
 
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + 24 }]}>
-          <Text style={styles.enterLabel}>Enter OTP</Text>
-          <Text style={styles.expire}>Code will expire in <Text style={styles.timer}>{mmss}</Text></Text>
+          <View style={styles.body}>
+            <AuthField icon={MAIL_SVG} value={email} editable={false} />
 
-          <Pressable style={styles.boxes} onPress={() => inputRef.current && inputRef.current.focus()}>
-            {digits.map((d, i) => (
-              <View key={i} style={[styles.box, code.length === i && styles.boxActive]}>
-                <Text style={styles.boxText}>{d.trim()}</Text>
-              </View>
-            ))}
-          </Pressable>
+            <View style={{ height: 12 }} />
 
-          {/* Hidden field that actually captures input */}
-          <TextInput
-            ref={inputRef}
-            value={code}
-            onChangeText={onChange}
-            keyboardType="number-pad"
-            maxLength={LENGTH}
-            autoFocus
-            style={styles.hiddenInput}
-            caretHidden
-          />
-
-          <Text style={styles.secure}>{c.secureText}</Text>
-          {!!error && <Text style={styles.error}>{error}</Text>}
-
-          <TouchableOpacity
-            style={[styles.button, (code.length !== LENGTH || loading) && styles.buttonDisabled]}
-            onPress={() => verify()}
-            activeOpacity={0.9}
-            disabled={code.length !== LENGTH || loading}
-          >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Verify &amp; Continue  ›</Text>}
-          </TouchableOpacity>
-
-          <Text style={styles.resendRow}>
-            Didn’t receive the code?{' '}
-            <Text style={[styles.link, seconds > 0 && styles.linkMuted]} onPress={resend}>
-              {seconds > 0 ? `Resend OTP (${seconds}s)` : 'Resend OTP'}
+            <AuthField
+              icon={LOCK_SVG}
+              placeholder="OTP"
+              value={code}
+              onChangeText={onChange}
+              keyboardType="number-pad"
+              maxLength={LENGTH}
+              secureTextEntry={code.length === LENGTH}
+              autoFocus
+            />
+            <Text style={styles.helper}>
+              A one time password has been sent to the email address.{' '}
+              <Text style={[styles.resend, seconds > 0 && styles.resendMuted]} onPress={resend}>
+                {seconds > 0 ? `Resend (${seconds}s)` : 'Resend'}
+              </Text>
             </Text>
-          </Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            {!!error && <Text style={styles.error}>{error}</Text>}
+
+            <AuthButton label="Verify" active={code.length === LENGTH} loading={loading} onPress={() => verify()} />
+
+            <TouchableOpacity onPress={onBack} style={{ marginTop: 16 }}>
+              <Text style={styles.back}>‹ Change email</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.surface },
-  hero: { height: Math.round(SCREEN_H * 0.42), borderBottomLeftRadius: 34, borderBottomRightRadius: 34, overflow: 'hidden', justifyContent: 'center' },
-  heroBg: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
-  heroScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,18,32,0.45)' },
-  backBtn: {
-    position: 'absolute', left: space.xl, zIndex: 3,
-    width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff',
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6, elevation: 2,
-  },
-  backIcon: { fontSize: 28, color: colors.navy, marginTop: -4 },
-  heroContent: { paddingHorizontal: space.xl, alignItems: 'center', zIndex: 2 },
-  title: { fontSize: 32, fontWeight: '900', color: '#fff', marginTop: 8, textShadowColor: 'rgba(0,0,0,0.3)', textShadowRadius: 8 },
-  subtitle: { fontSize: font.body, color: 'rgba(255,255,255,0.92)', marginTop: 10 },
-  emailRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  email: { fontSize: font.h3, fontWeight: '800', color: '#fff' },
-  edit: { fontSize: font.body, color: '#FFE2A8', fontWeight: '700' },
-  sheet: {
-    flex: 1, backgroundColor: colors.surface,
-    borderTopLeftRadius: 34, borderTopRightRadius: 34,
-    marginTop: -22, paddingHorizontal: space.xl, paddingTop: 28, alignItems: 'center',
-  },
-  enterLabel: { fontSize: 22, fontWeight: '800', color: colors.navy },
-  expire: { fontSize: font.body, color: colors.inkMuted, marginTop: 6 },
-  timer: { color: colors.brand, fontWeight: '700' },
-  boxes: { flexDirection: 'row', gap: 10, marginTop: 22 },
-  box: {
-    width: 46, height: 54, borderRadius: radius.md,
-    borderWidth: 1.5, borderColor: colors.border,
-    alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface,
-  },
-  boxActive: { borderColor: colors.brand },
-  boxText: { fontSize: 22, fontWeight: '700', color: colors.ink },
-  hiddenInput: { position: 'absolute', opacity: 0, height: 1, width: 1 },
-  secure: { fontSize: font.small, color: colors.inkMuted, marginTop: 18 },
-  error: { color: '#DC2626', fontSize: font.small, marginTop: 10, textAlign: 'center' },
-  button: {
-    backgroundColor: colors.brand, height: 56, borderRadius: radius.pill,
-    alignItems: 'center', justifyContent: 'center', marginTop: 22, width: '100%',
-  },
-  buttonDisabled: { opacity: 0.5 },
-  buttonText: { color: '#fff', fontSize: font.h3, fontWeight: '800' },
-  resendRow: { marginTop: 22, color: colors.ink, fontSize: font.body, textAlign: 'center' },
-  link: { color: '#2563EB', fontWeight: '700' },
-  linkMuted: { color: colors.inkFaint },
+  screen: { flex: 1, backgroundColor: '#FEFEFE' },
+  body: { paddingHorizontal: space.xl, paddingTop: 8 },
+  helper: { fontSize: font.tiny, color: colors.inkFaint, marginTop: 6, lineHeight: 16 },
+  resend: { color: '#2563EB', fontWeight: '700' },
+  resendMuted: { color: colors.inkFaint },
+  error: { color: '#DC2626', fontSize: font.small, marginTop: 10 },
+  back: { color: colors.inkMuted, fontWeight: '700', fontSize: font.small },
 });

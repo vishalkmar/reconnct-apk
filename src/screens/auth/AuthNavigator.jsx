@@ -3,23 +3,14 @@ import { BackHandler } from 'react-native';
 import LoginScreen from './LoginScreen';
 import OtpScreen from './OtpScreen';
 import OnboardingScreen from './OnboardingScreen';
-import { api } from '../../api/client';
 import { useAuth } from '../../store/AuthContext';
 
 // Auth flow: email → OTP → (first-time only) name+phone onboarding → app.
-// The login/OTP media is admin-controlled via /api/public/app-screen/login.
 export default function AuthNavigator() {
   const [step, setStep] = useState('login');
   const [email, setEmail] = useState('');
-  const [content, setContent] = useState(null);
   const [pending, setPending] = useState(null); // { token, user } awaiting onboarding
   const { signIn } = useAuth();
-
-  useEffect(() => {
-    let alive = true;
-    api.appScreen('login').then((d) => { if (alive) setContent(d.content); }).catch(() => {});
-    return () => { alive = false; };
-  }, []);
 
   // System back: OTP → email; onboarding is a required step so back is blocked.
   useEffect(() => {
@@ -42,7 +33,7 @@ export default function AuthNavigator() {
     return <OnboardingScreen email={email} token={pending.token} onDone={(user) => signIn(pending.token, user)} />;
   }
   if (step === 'otp') {
-    return <OtpScreen email={email} content={content} onBack={() => setStep('login')} onVerified={handleVerified} />;
+    return <OtpScreen email={email} onBack={() => setStep('login')} onVerified={handleVerified} />;
   }
-  return <LoginScreen content={content} onOtpSent={(e) => { setEmail(e); setStep('otp'); }} />;
+  return <LoginScreen onOtpSent={(e) => { setEmail(e); setStep('otp'); }} />;
 }
