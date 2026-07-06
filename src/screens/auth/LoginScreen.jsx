@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { font } from '../../theme';
+import { colors, font } from '../../theme';
 import { api } from '../../api/client';
 import { toast } from '../../utils/toast';
+import { useNav } from '../../navigation/NavContext';
 import { AuthHeader, AuthField, AuthButton, MAIL_SVG, FIELD_W, px } from './authUi';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export default function LoginScreen({ onOtpSent }) {
   const insets = useSafeAreaInsets();
+  const { setGuestMode } = useNav();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -27,6 +29,12 @@ export default function LoginScreen({ onOtpSent }) {
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* Browse without signing in — Book Now (and other account actions)
+          will drop back into login when actually needed. */}
+      <TouchableOpacity style={[styles.skip, { top: insets.top + 14 }]} onPress={() => setGuestMode(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <Text style={styles.skipText}>Skip</Text>
+      </TouchableOpacity>
+
       <AuthHeader />
 
       {/* The field block sits centred in the remaining space (flex above +
@@ -55,6 +63,8 @@ export default function LoginScreen({ onOtpSent }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FEFEFE' },
+  skip: { position: 'absolute', left: 20, zIndex: 5 },
+  skipText: { color: colors.inkMuted, fontWeight: '700', fontSize: font.body },
   middle: { flex: 1, justifyContent: 'center' },
   body: { alignItems: 'center' },
   // Exact spec: width 302 (Fill, matches the field), font-size 14, color #1A1A2E.

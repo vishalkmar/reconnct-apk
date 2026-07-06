@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
+import { useAuth } from '../store/AuthContext';
 
 /**
  * Dependency-free navigator: a bottom-tab root with a push/pop stack layered
@@ -12,9 +13,15 @@ export const HOST_TABS = ['dashboard', 'listings', 'inbox', 'profile'];
 const HOME_TAB = { traveller: 'home', host: 'dashboard' };
 
 export function NavProvider({ children }) {
+  const { isAuthed } = useAuth();
   const [mode, setMode] = useState('traveller'); // 'traveller' | 'host'
   const [tab, setTab] = useState('home');
   const [stack, setStack] = useState([]); // [{ name, params }]
+  // Guest browsing: skipping login on the Login screen sets this true so
+  // RootNavigator shows the main app without a signed-in session. Actions
+  // that need an account (Book Now, etc.) go through requireAuth below.
+  const [guestMode, setGuestMode] = useState(false);
+  const [pendingAuth, setPendingAuth] = useState(null); // { name, params } to resume after login
 
   const push = useCallback((name, params = {}) => {
     setStack((s) => [...s, { name, params }]);
@@ -47,10 +54,30 @@ export function NavProvider({ children }) {
     return false;
   }, [stack.length, tab, mode]);
 
+  // Once sign-in completes, resume whatever action was gated behind it
+  // (e.g. Book Now tapped as a guest) by pushing straight to it.
+  useEffect(() => {
+    if (isAuthed && pendingAuth) {
+      push(pendingAuth.name, pendingAuth.params);
+      setPendingAuth(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthed]);
+
+  // Gate an action behind login: run it immediately if already signed in;
+  // otherwise stash the destination and drop into the login flow (exiting
+  // guest mode) — signing in resumes it via the effect above.
+  const requireAuth = useCallback((name, params) => {
+    if (isAuthed) { push(name, params); return; }
+    setPendingAuth({ name, params });
+    setGuestMode(false);
+  }, [isAuthed, push]);
+
   const value = useMemo(() => ({
     mode, switchMode, tab, stack, push, pop, navigateTab, goBack,
     top: stack.length ? stack[stack.length - 1] : null,
-  }), [mode, switchMode, tab, stack, push, pop, navigateTab, goBack]);
+    guestMode, setGuestMode, requireAuth,
+  }), [mode, switchMode, tab, stack, push, pop, navigateTab, goBack, guestMode, requireAuth]);
 
   return <NavContext.Provider value={value}>{children}</NavContext.Provider>;
 }

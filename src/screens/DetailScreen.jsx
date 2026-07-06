@@ -23,7 +23,7 @@ const stripHtml = (s) => String(s || '')
 
 export default function DetailScreen({ idOrSlug }) {
   const insets = useSafeAreaInsets();
-  const { pop, push } = useNav();
+  const { pop, requireAuth } = useNav();
   const { isWished, toggle } = useWishlist();
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -162,7 +162,7 @@ export default function DetailScreen({ idOrSlug }) {
             {item.fromPrice ? <Text style={styles.fromUnit}>/{item.priceUnit}</Text> : null}
           </Text>
         </View>
-        <TouchableOpacity style={styles.bookBtn} activeOpacity={0.9} onPress={() => push('booking', { item })}>
+        <TouchableOpacity style={styles.bookBtn} activeOpacity={0.9} onPress={() => requireAuth('booking', { item })}>
           <Text style={styles.bookText}>Book Now</Text>
         </TouchableOpacity>
       </View>

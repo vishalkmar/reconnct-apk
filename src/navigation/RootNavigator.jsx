@@ -60,21 +60,22 @@ function StackScreen({ name, params }) {
 
 export default function RootNavigator() {
   const { isAuthed, booting } = useAuth();
-  const { tab, top, navigateTab, goBack, mode } = useNav();
+  const { tab, top, navigateTab, goBack, mode, guestMode } = useNav();
   const [introDone, setIntroDone] = useState(false);
+  const browsing = isAuthed || guestMode; // guests get the same main-app shell
 
   // Android hardware/system back → one step back inside the app instead of
   // closing it. When goBack() can't go further (Home, nothing pushed) we
   // return false so the OS performs its default (exit).
   useEffect(() => {
-    const onBack = () => (isAuthed ? goBack() : false);
+    const onBack = () => (browsing ? goBack() : false);
     const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
     return () => sub.remove();
-  }, [isAuthed, goBack]);
+  }, [browsing, goBack]);
 
   // Header colour drives the status bar. Host dashboard/profile use the dark
   // navy header; traveller home/profile use the amber header.
-  const onHeader = !isAuthed
+  const onHeader = !browsing
     ? colors.surface
     : mode === 'host'
       ? (tab === 'dashboard' || tab === 'profile' ? colors.navy : colors.surface)
@@ -93,7 +94,7 @@ export default function RootNavigator() {
     );
   }
 
-  if (!isAuthed) {
+  if (!browsing) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.brandSoft }}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.brandSoft} />
