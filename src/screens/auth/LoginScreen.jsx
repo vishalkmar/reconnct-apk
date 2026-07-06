@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, font } from '../../theme';
+import { font } from '../../theme';
 import { api } from '../../api/client';
 import { toast } from '../../utils/toast';
-import { AuthHeader, AuthField, AuthButton, MAIL_SVG, FIELD_W } from './authUi';
+import { AuthHeader, AuthField, AuthButton, MAIL_SVG, FIELD_W, px } from './authUi';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -57,6 +57,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FEFEFE' },
   middle: { flex: 1, justifyContent: 'center' },
   body: { alignItems: 'center' },
-  helper: { width: FIELD_W, fontSize: font.tiny, color: colors.inkFaint, marginTop: 6 },
+  // Exact spec: width 302 (Fill, matches the field), font-size 14, color #1A1A2E.
+  helper: { width: FIELD_W, fontSize: px(14), color: '#1A1A2E', marginTop: 6 },
   error: { width: FIELD_W, color: '#DC2626', fontSize: font.small, marginTop: 10 },
 });

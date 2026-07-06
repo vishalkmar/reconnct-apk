@@ -78,7 +78,11 @@ export const authStyles = StyleSheet.create({
     width: px(85), height: px(85), borderRadius: px(42.5),
     backgroundColor: colors.brandDark,
   },
-  logoImg: { width: px(235), height: px(36), marginTop: px(224), marginLeft: px(78), tintColor: colors.brandDark },
+  // width fixed at the spec value; height follows the logo PNG's real native
+  // aspect ratio (600x111) instead of a guessed fixed height — with "contain"
+  // a mismatched box ratio was shrinking the rendered logo well below its
+  // intended width, which is why it wasn't reading as bigger than the tagline.
+  logoImg: { width: px(235), aspectRatio: 600 / 111, marginTop: px(224), marginLeft: px(78), tintColor: colors.brandDark },
   // Exact spec: width 204 / height 26, top 261 (≈1px under the logo's own
   // bottom edge of 224+36=260), left 93, font-size 22.
   tagline: { width: px(204), fontSize: px(22), lineHeight: px(26), color: colors.inkMuted, marginTop: px(1), marginLeft: px(93) },

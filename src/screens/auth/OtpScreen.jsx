@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, font } from '../../theme';
 import { api } from '../../api/client';
 import { toast } from '../../utils/toast';
-import { AuthHeader, AuthField, AuthButton, MAIL_SVG, LOCK_SVG, FIELD_W } from './authUi';
+import { AuthHeader, AuthField, AuthButton, MAIL_SVG, LOCK_SVG, FIELD_W, px } from './authUi';
 
 const LENGTH = 6;
 
@@ -101,7 +101,9 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FEFEFE' },
   middle: { flex: 1, justifyContent: 'center' },
   body: { alignItems: 'center' },
-  helper: { width: FIELD_W, fontSize: font.tiny, color: colors.inkFaint, marginTop: 6, lineHeight: 16 },
+  // Same spec as the email screen's helper: width 302, font-size 14, #1A1A2E —
+  // only the "Resend" word itself stays blue as a link.
+  helper: { width: FIELD_W, fontSize: px(14), color: '#1A1A2E', marginTop: 6, lineHeight: px(18) },
   resend: { color: '#2563EB', fontWeight: '700' },
   resendMuted: { color: colors.inkFaint },
   error: { width: FIELD_W, color: '#DC2626', fontSize: font.small, marginTop: 10 },
