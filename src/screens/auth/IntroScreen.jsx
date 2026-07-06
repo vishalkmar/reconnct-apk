@@ -3,16 +3,15 @@ import {
   View, Text, Image, TouchableOpacity, StyleSheet, FlatList, Dimensions, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radius, font } from '../../theme';
+import { colors, font } from '../../theme';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-// Stock travel photos stand in for the Figma illustrations (no exact source
-// art available). Swap the `image` urls for real assets whenever they're ready.
+// Real illustration assets supplied for the 3 slides.
 const SLIDES = [
-  { image: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=900&q=80', title: 'Lorem ipsum dolor sit amet', subtitle: 'Lorem ipsum dolor sit amet' },
-  { image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=900&q=80', title: 'Lorem ipsum dolor sit amet', subtitle: 'Lorem ipsum dolor sit amet' },
-  { image: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=900&q=80', title: 'Lorem ipsum dolor sit amet', subtitle: 'Lorem ipsum dolor sit amet' },
+  { image: require('../../assets/intro1.png'), title: 'Lorem ipsum dolor sit amet', subtitle: 'Lorem ipsum dolor sit amet' },
+  { image: require('../../assets/intro2.png'), title: 'Lorem ipsum dolor sit amet', subtitle: 'Lorem ipsum dolor sit amet' },
+  { image: require('../../assets/intro3.png'), title: 'Lorem ipsum dolor sit amet', subtitle: 'Lorem ipsum dolor sit amet' },
 ];
 
 /**
@@ -55,7 +54,7 @@ export default function IntroScreen({ onDone }) {
         onMomentumScrollEnd={onMomentumEnd}
         renderItem={({ item }) => (
           <View style={[styles.slide, { width: SCREEN_W }]}>
-            <Image source={{ uri: item.image }} style={styles.illustration} resizeMode="cover" />
+            <Image source={item.image} style={styles.illustration} resizeMode="contain" />
             <Text style={styles.title}>{item.title}</Text>
             <Text style={styles.subtitle}>{item.subtitle}</Text>
           </View>
@@ -85,7 +84,7 @@ const styles = StyleSheet.create({
   skip: { position: 'absolute', right: 20, zIndex: 5 },
   skipText: { color: colors.inkMuted, fontWeight: '700', fontSize: font.body },
   slide: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  illustration: { width: '100%', height: 260, borderRadius: radius.lg, backgroundColor: colors.brandSoft },
+  illustration: { width: '100%', height: 260 },
   title: { fontSize: 22, fontWeight: '800', color: colors.navy, marginTop: 28, textAlign: 'center' },
   subtitle: { fontSize: font.body, color: colors.inkMuted, marginTop: 8, textAlign: 'center' },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 32, paddingTop: 10 },
