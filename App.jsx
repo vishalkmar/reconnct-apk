@@ -4,7 +4,7 @@
  * (/api/public/*) which exposes the experiences admins publish from the website.
  */
 import React, { useState } from 'react';
-import { View, Text, ScrollView } from 'react-native';
+import { Text, ScrollView } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/store/AuthContext';
 import { WishlistProvider } from './src/store/WishlistContext';
@@ -15,17 +15,16 @@ import { NavProvider } from './src/navigation/NavContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import SplashScreen from './src/components/SplashScreen';
 
-// Splash plays its split/merge/zoom logo animation on cold start while
-// everything underneath mounts and starts loading, then calls onFinish itself
-// (no fixed timer) straight into whatever's ready (intro carousel or home).
+// Splash plays its split/merge/zoom logo animation on cold start, then calls
+// onFinish itself (no fixed timer). It is the ONLY thing mounted while active —
+// not an overlay sibling — so there's no elevation/zIndex stacking fight with
+// RootNavigator on Android (that was leaving only a sliver of it visible).
 function AppShell() {
   const [showSplash, setShowSplash] = useState(true);
-  return (
-    <View style={{ flex: 1 }}>
-      <RootNavigator />
-      {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
-    </View>
-  );
+  if (showSplash) {
+    return <SplashScreen onFinish={() => setShowSplash(false)} />;
+  }
+  return <RootNavigator />;
 }
 
 // Catches any render/runtime error so the app shows a message instead of
