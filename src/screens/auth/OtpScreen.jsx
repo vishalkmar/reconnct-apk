@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  KeyboardAvoidingView, Platform,
-} from 'react-native';
-import { colors, font, space } from '../../theme';
+import { View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, font } from '../../theme';
 import { api } from '../../api/client';
 import { toast } from '../../utils/toast';
-import { AuthHeader, AuthField, AuthButton, MAIL_SVG, LOCK_SVG } from './authUi';
+import { AuthHeader, AuthField, AuthButton, MAIL_SVG, LOCK_SVG, FIELD_W } from './authUi';
 
 const LENGTH = 6;
 
 export default function OtpScreen({ email, onBack, onVerified }) {
+  const insets = useSafeAreaInsets();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -57,52 +56,54 @@ export default function OtpScreen({ email, onBack, onVerified }) {
   };
 
   return (
-    <View style={styles.screen}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <AuthHeader />
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <AuthHeader />
 
-          <View style={styles.body}>
-            <AuthField icon={MAIL_SVG} value={email} editable={false} />
+      {/* Field block centred in the remaining space; button pinned near the
+          bottom, separate from it — matching the reference. */}
+      <View style={styles.middle}>
+        <View style={styles.body}>
+          <AuthField icon={MAIL_SVG} value={email} editable={false} />
 
-            <View style={{ height: 12 }} />
+          <View style={{ height: 12 }} />
 
-            <AuthField
-              icon={LOCK_SVG}
-              placeholder="OTP"
-              value={code}
-              onChangeText={onChange}
-              keyboardType="number-pad"
-              maxLength={LENGTH}
-              secureTextEntry={code.length === LENGTH}
-              autoFocus
-            />
-            <Text style={styles.helper}>
-              A one time password has been sent to the email address.{' '}
-              <Text style={[styles.resend, seconds > 0 && styles.resendMuted]} onPress={resend}>
-                {seconds > 0 ? `Resend (${seconds}s)` : 'Resend'}
-              </Text>
+          <AuthField
+            icon={LOCK_SVG}
+            placeholder="OTP"
+            value={code}
+            onChangeText={onChange}
+            keyboardType="number-pad"
+            maxLength={LENGTH}
+            secureTextEntry={code.length === LENGTH}
+            autoFocus
+          />
+          <Text style={styles.helper}>
+            A one time password has been sent to the email address.{' '}
+            <Text style={[styles.resend, seconds > 0 && styles.resendMuted]} onPress={resend}>
+              {seconds > 0 ? `Resend (${seconds}s)` : 'Resend'}
             </Text>
-            {!!error && <Text style={styles.error}>{error}</Text>}
+          </Text>
+          {!!error && <Text style={styles.error}>{error}</Text>}
+        </View>
+      </View>
 
-            <AuthButton label="Verify" active={code.length === LENGTH} loading={loading} onPress={() => verify()} />
-
-            <TouchableOpacity onPress={onBack} style={{ marginTop: 16 }}>
-              <Text style={styles.back}>‹ Change email</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+      <View style={{ alignItems: 'center', paddingBottom: insets.bottom + 24 }}>
+        <AuthButton label="Verify" active={code.length === LENGTH} loading={loading} onPress={() => verify()} />
+        <TouchableOpacity onPress={onBack} style={{ marginTop: 16 }}>
+          <Text style={styles.back}>‹ Change email</Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FEFEFE' },
-  body: { paddingHorizontal: space.xl, paddingTop: 8 },
-  helper: { fontSize: font.tiny, color: colors.inkFaint, marginTop: 6, lineHeight: 16 },
+  middle: { flex: 1, justifyContent: 'center' },
+  body: { alignItems: 'center' },
+  helper: { width: FIELD_W, fontSize: font.tiny, color: colors.inkFaint, marginTop: 6, lineHeight: 16 },
   resend: { color: '#2563EB', fontWeight: '700' },
   resendMuted: { color: colors.inkFaint },
-  error: { color: '#DC2626', fontSize: font.small, marginTop: 10 },
+  error: { width: FIELD_W, color: '#DC2626', fontSize: font.small, marginTop: 10 },
   back: { color: colors.inkMuted, fontWeight: '700', fontSize: font.small },
 });
