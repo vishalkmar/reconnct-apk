@@ -1,14 +1,11 @@
 import React from 'react';
-import { View, StyleSheet, FlatList, Dimensions } from 'react-native';
+import { View, FlatList } from 'react-native';
 import { colors, space } from '../../theme';
 import { useNav } from '../../navigation/NavContext';
 import { useWishlist } from '../../store/WishlistContext';
 import ScreenHeader from '../../components/ScreenHeader';
 import EmptyState from '../../components/EmptyState';
-import ExperienceCard from '../../components/ExperienceCard';
-
-const { width: SCREEN_W } = Dimensions.get('window');
-const COL_W = (SCREEN_W - space.lg * 2 - 12) / 2;
+import WishlistCard from '../../components/WishlistCard';
 
 // Normalise a stored wishlist entity into the card shape.
 const toCard = (e) => ({
@@ -38,12 +35,9 @@ export default function WishlistScreen() {
       <FlatList
         data={cards}
         keyExtractor={(it) => String(it.id)}
-        numColumns={2}
-        columnWrapperStyle={{ paddingHorizontal: space.lg, justifyContent: 'space-between' }}
-        contentContainerStyle={{ paddingTop: 12 }}
+        contentContainerStyle={{ padding: space.lg, paddingTop: 12 }}
         renderItem={({ item }) => (
-          <ExperienceCard item={item} style={{ width: COL_W, marginBottom: 12 }}
-            onPress={() => item.slug && push('detail', { idOrSlug: item.slug })} />
+          <WishlistCard item={item} onPress={() => item.slug && push('detail', { idOrSlug: item.slug })} />
         )}
         ListEmptyComponent={
           <EmptyState emoji="🤍" title="Your wishlist is empty"
@@ -54,5 +48,3 @@ export default function WishlistScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({});
