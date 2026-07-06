@@ -10,30 +10,37 @@ import { ICONS } from '../../icons';
 import ScreenHeader from '../../components/ScreenHeader';
 import EmptyState from '../../components/EmptyState';
 
-// status → the pill shown on the card image (top-right).
+// category → the pill shown on the card image (top-right).
 const PILL = {
-  confirmed: { label: 'Upcoming', bg: colors.brand, fg: '#101010' },
-  paid: { label: 'Upcoming', bg: colors.brand, fg: '#101010' },
+  upcoming: { label: 'Upcoming', bg: colors.brand, fg: '#101010' },
   completed: { label: 'Completed', bg: '#16A34A', fg: '#fff' },
-  pending_payment: { label: 'Pending', bg: '#D97706', fg: '#fff' },
-  pending: { label: 'Pending', bg: '#D97706', fg: '#fff' },
   cancelled: { label: 'Cancelled', bg: '#DC2626', fg: '#fff' },
-  refunded: { label: 'Refunded', bg: '#6B7280', fg: '#fff' },
 };
 
-// Status groups for the filter tabs (no "Upcoming", per spec).
-const GROUPS = {
-  pending: ['pending_payment', 'pending'],
-  completed: ['confirmed', 'paid', 'completed'],
-  cancelled: ['cancelled', 'refunded'],
-};
 const TABS = [
   { key: 'all', label: 'All' },
-  { key: 'pending', label: 'Pending payment' },
+  { key: 'upcoming', label: 'Upcoming' },
   { key: 'completed', label: 'Completed' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
-const inGroup = (status, key) => key === 'all' || (GROUPS[key] || []).includes(status);
+
+// A booking is Upcoming until its date passes. Once the date has passed, it's
+// Completed only if a payment actually went through for it; explicitly
+// cancelled/refunded bookings are always Cancelled regardless of date.
+function categorize(b) {
+  if (!b) return 'upcoming';
+  if (b.status === 'cancelled' || b.status === 'refunded') return 'cancelled';
+  if (b.status === 'completed') return 'completed';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const endIso = b.scheduledEndAt || b.scheduledFor || b.date;
+  const end = endIso ? new Date(endIso) : null;
+  if (end && end < today) {
+    const paid = !!(b.payment && b.payment.paidAt) || b.status === 'confirmed';
+    if (paid) return 'completed';
+  }
+  return 'upcoming';
+}
+const inGroup = (b, key) => key === 'all' || categorize(b) === key;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function prettyDate(v) {
@@ -45,7 +52,7 @@ function prettyDate(v) {
 
 export default function MyBookingsScreen() {
   const { token } = useAuth();
-  const { bookings: localBookings } = useBookings();
+  const { bookings: localBookings, hideBooking, isHidden } = useBookings();
   const { navigateTab, push } = useNav();
   const [fetched, setFetched] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -60,10 +67,11 @@ export default function MyBookingsScreen() {
     return () => { alive = false; };
   }, [token]);
 
-  // In-app confirmed bookings first, then any server bookings.
-  const items = [...localBookings, ...fetched];
-  const counts = TABS.reduce((acc, t) => { acc[t.key] = items.filter((b) => inGroup(b.status, t.key)).length; return acc; }, {});
-  const shown = items.filter((b) => inGroup(b.status, tab));
+  // In-app confirmed bookings first, then any server bookings — minus any the
+  // user has deleted (cancelled bookings only) from their visible list.
+  const items = [...localBookings, ...fetched].filter((b) => !isHidden(b.bookingCode));
+  const counts = TABS.reduce((acc, t) => { acc[t.key] = items.filter((b) => inGroup(b, t.key)).length; return acc; }, {});
+  const shown = items.filter((b) => inGroup(b, tab));
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -92,6 +100,12 @@ export default function MyBookingsScreen() {
               b={item}
               onOpen={(bk) => push('bookingDetail', { code: bk.bookingCode })}
               onCancel={(bk) => push('bookingDetail', { code: bk.bookingCode, startCancel: true })}
+              onRate={(bk) => Alert.alert('Rate Experience', 'Reviews are coming soon.')}
+              onDelete={(bk) => Alert.alert(
+                'Remove booking',
+                'This will remove it from your bookings list on this device.',
+                [{ text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => hideBooking(bk.bookingCode) }],
+              )}
             />
           )}
           ListEmptyComponent={
@@ -105,15 +119,15 @@ export default function MyBookingsScreen() {
   );
 }
 
-function BookingCard({ b, onOpen, onCancel }) {
+function BookingCard({ b, onOpen, onCancel, onRate, onDelete }) {
   const snap = b.item || {};
   const img = resolveImage(snap.image || snap.mainImage);
-  const pill = PILL[b.status] || PILL.pending_payment;
+  const category = categorize(b);
+  const pill = PILL[category];
   const city = snap.city || (snap.location && snap.location.city) || snap.location || '';
   const date = prettyDate(b.scheduledFor || b.date);
   const guests = b.guests || (b.guest && b.guest.count) || (b.pricing && b.pricing.guests) || 1;
   const total = b.pricing && b.pricing.total;
-  const cancelled = b.status === 'cancelled' || b.status === 'refunded';
 
   return (
     <View style={styles.card}>
@@ -153,14 +167,26 @@ function BookingCard({ b, onOpen, onCancel }) {
         {!!b.bookingCode && <Text style={styles.code}>{`#${b.bookingCode}`}</Text>}
 
         <View style={styles.btnRow}>
-          <TouchableOpacity
-            style={[styles.btn, styles.btnGhost]}
-            activeOpacity={0.85}
-            disabled={cancelled || !b.bookingCode}
-            onPress={() => onCancel && onCancel(b)}
-          >
-            <Text style={styles.btnGhostText}>{cancelled ? 'Cancelled' : 'Cancel'}</Text>
-          </TouchableOpacity>
+          {category === 'upcoming' && (
+            <TouchableOpacity
+              style={[styles.btn, styles.btnGhost]}
+              activeOpacity={0.85}
+              disabled={!b.bookingCode}
+              onPress={() => onCancel && onCancel(b)}
+            >
+              <Text style={styles.btnGhostText}>Cancel</Text>
+            </TouchableOpacity>
+          )}
+          {category === 'cancelled' && (
+            <TouchableOpacity
+              style={[styles.btn, styles.btnGhost]}
+              activeOpacity={0.85}
+              onPress={() => onDelete && onDelete(b)}
+            >
+              <Image source={ICONS.trash} style={[styles.btnIcon, { tintColor: '#D4183D' }]} />
+              <Text style={[styles.btnGhostText, { color: '#D4183D' }]}>Delete</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[styles.btn, styles.btnPrimary]}
             activeOpacity={0.9}
@@ -169,6 +195,15 @@ function BookingCard({ b, onOpen, onCancel }) {
             <Image source={ICONS.ticket} style={styles.btnIcon} />
             <Text style={styles.btnPrimaryText}>View Ticket</Text>
           </TouchableOpacity>
+          {category === 'completed' && (
+            <TouchableOpacity
+              style={[styles.btn, styles.btnGhost]}
+              activeOpacity={0.85}
+              onPress={() => onRate && onRate(b)}
+            >
+              <Text style={styles.btnGhostText}>Rate Experience</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </View>
