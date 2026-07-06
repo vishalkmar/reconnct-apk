@@ -4,7 +4,9 @@ import {
   ActivityIndicator, RefreshControl, FlatList, TextInput, Image, ImageBackground, Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SvgXml } from 'react-native-svg';
 import { colors, radius, font, space, shadow } from '../theme';
+import { AUD_META, AUD_DEFAULT } from '../components/connectWithIcons';
 import { api } from '../api/client';
 import { useAuth } from '../store/AuthContext';
 import { useLocation } from '../store/LocationContext';
@@ -218,29 +220,8 @@ export default function HomeScreen() {
           </>
         ) : (
           <>
-          {/* Two hero cards — pulled up so they overlap the yellow header */}
-          <View style={styles.heroRow}>
-            <TouchableOpacity activeOpacity={0.9} style={[styles.heroCard, { backgroundColor: colors.reconnectCard }]} onPress={() => push('reconnect')}>
-              <View style={[styles.heroIcon, { backgroundColor: colors.reconnectIcon }]}><Image source={ICONS.groups} style={[styles.heroGlyph, { tintColor: '#13402F' }]} /></View>
-              <Text style={styles.heroTitle}>Who do you want to reconnect with?</Text>
-              <Text style={styles.heroSub}>Find experiences for the people who matter most.</Text>
-              <View style={styles.heroChips}>
-                {['Partner', 'Family', 'Friends', 'Kids'].map((c) => (
-                  <View key={c} style={styles.heroChip}><Text style={styles.heroChipText}>{c}</Text></View>
-                ))}
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.9} style={[styles.heroCard, { backgroundColor: colors.experiencesCard }]} onPress={() => navigateTab('experiences')}>
-              <View style={[styles.heroIcon, { backgroundColor: colors.experiencesIcon }]}><Image source={ICONS.compass} style={[styles.heroGlyph, { tintColor: '#2A2A6B' }]} /></View>
-              <Text style={styles.heroTitle}>What do you want to experience?</Text>
-              <Text style={styles.heroSub}>Explore unforgettable activities worldwide.</Text>
-              <View style={styles.heroChips}>
-                {['Adventure', 'Cultural', 'Food', 'Nature'].map((c) => (
-                  <View key={c} style={styles.heroChip}><Text style={styles.heroChipText}>{c}</Text></View>
-                ))}
-              </View>
-            </TouchableOpacity>
-          </View>
+          {/* Connect With — audience taxonomy from the DB, tap opens that audience's experiences */}
+          <ConnectWithSection auds={auds} onPressAud={goAudience} onSeeAll={() => push('reconnect')} />
 
           {/* You're here — dismissible tooltip */}
           {!!detectedCity && !geoDismissed && (
@@ -401,6 +382,37 @@ export default function HomeScreen() {
 
       <LocationSheet visible={showLocation} onClose={() => setShowLocation(false)} />
     </View>
+  );
+}
+
+// "Connect With" — horizontal strip of audience icon-cards (Friends, Family,
+// Kids, Partner, …) sourced live from the taxonomy, replacing the old static
+// hero cards. Tapping a card opens that audience's experiences.
+function ConnectWithSection({ auds, onPressAud, onSeeAll }) {
+  if (!auds.length) return null;
+  return (
+    <>
+      <View style={styles.sectionHead}>
+        <SectionTitle icon={ICONS.sparkle} title="Connect With" />
+        <TouchableOpacity onPress={onSeeAll}><Text style={styles.seeAll}>See all ›</Text></TouchableOpacity>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.connectRow}>
+        {auds.map((a) => {
+          const meta = AUD_META[a.slug] || AUD_DEFAULT;
+          return (
+            <TouchableOpacity key={a.id} style={styles.connectCard} activeOpacity={0.85} onPress={() => onPressAud(a.slug)}>
+              <View style={[styles.connectIconWrap, { backgroundColor: meta.tint }]}>
+                {meta.svg
+                  ? <SvgXml xml={meta.svg} width={40} height={40} />
+                  : <Image source={ICONS.groups} style={styles.connectIconFallback} />}
+              </View>
+              <Text style={styles.connectTitle} numberOfLines={1}>{a.name}</Text>
+              <Text style={styles.connectSub} numberOfLines={2}>{meta.tagline}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </>
   );
 }
 
@@ -567,7 +579,7 @@ function CatTab({ label, icon, active, onPress }) {
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: colors.brand, paddingHorizontal: H_PAD, paddingBottom: 100,
+    backgroundColor: colors.brand, paddingHorizontal: H_PAD, paddingBottom: 22,
     borderBottomLeftRadius: 26, borderBottomRightRadius: 26,
   },
   sticky: {
@@ -617,15 +629,12 @@ const styles = StyleSheet.create({
   resultsHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: H_PAD, paddingTop: 14, paddingBottom: 8 },
   clearAll: { color: colors.brand, fontWeight: '700' },
 
-  heroRow: { flexDirection: 'row', gap: GRID_GAP, paddingHorizontal: H_PAD, marginTop: -38 },
-  heroCard: { flex: 1, borderRadius: radius.lg, padding: 16, minHeight: 215 },
-  heroIcon: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  heroGlyph: { width: 24, height: 24 },
-  heroTitle: { color: '#fff', fontSize: 18, fontWeight: '800', lineHeight: 23 },
-  heroSub: { color: 'rgba(255,255,255,0.82)', fontSize: 12.5, marginTop: 6, lineHeight: 17 },
-  heroChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
-  heroChip: { backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 9, paddingVertical: 4, borderRadius: radius.sm },
-  heroChipText: { color: '#fff', fontSize: font.tiny, fontWeight: '600' },
+  connectRow: { paddingHorizontal: H_PAD, gap: 14, paddingTop: 4 },
+  connectCard: { width: 80, alignItems: 'center' },
+  connectIconWrap: { width: 80, height: 80, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  connectIconFallback: { width: 32, height: 32, tintColor: colors.brandText },
+  connectTitle: { fontSize: 13, fontWeight: '800', color: colors.ink, marginTop: 8, textAlign: 'center' },
+  connectSub: { fontSize: 11, color: colors.inkMuted, marginTop: 2, textAlign: 'center', lineHeight: 14 },
 
   banner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FBD38D', marginHorizontal: H_PAD, marginTop: 16, borderRadius: radius.lg, padding: 16, overflow: 'hidden' },
   bannerTag: { backgroundColor: colors.brandDark, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.sm },
