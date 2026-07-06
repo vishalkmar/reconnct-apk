@@ -21,7 +21,7 @@ export function NavProvider({ children }) {
   // RootNavigator shows the main app without a signed-in session. Actions
   // that need an account (Book Now, etc.) go through requireAuth below.
   const [guestMode, setGuestMode] = useState(false);
-  const [pendingAuth, setPendingAuth] = useState(null); // { name, params } to resume after login
+  const [pendingAuth, setPendingAuth] = useState(null); // { name, params } OR { run } to resume after login
 
   const push = useCallback((name, params = {}) => {
     setStack((s) => [...s, { name, params }]);
@@ -58,7 +58,8 @@ export function NavProvider({ children }) {
   // (e.g. Book Now tapped as a guest) by pushing straight to it.
   useEffect(() => {
     if (isAuthed && pendingAuth) {
-      push(pendingAuth.name, pendingAuth.params);
+      if (pendingAuth.run) pendingAuth.run();
+      else push(pendingAuth.name, pendingAuth.params);
       setPendingAuth(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,11 +74,19 @@ export function NavProvider({ children }) {
     setGuestMode(false);
   }, [isAuthed, push]);
 
+  // Same gate, but for an arbitrary callback instead of a screen push — used
+  // by things like the wishlist heart (toggling isn't a navigation).
+  const requireAuthAction = useCallback((run) => {
+    if (isAuthed) { run(); return; }
+    setPendingAuth({ run });
+    setGuestMode(false);
+  }, [isAuthed]);
+
   const value = useMemo(() => ({
     mode, switchMode, tab, stack, push, pop, navigateTab, goBack,
     top: stack.length ? stack[stack.length - 1] : null,
-    guestMode, setGuestMode, requireAuth,
-  }), [mode, switchMode, tab, stack, push, pop, navigateTab, goBack, guestMode, requireAuth]);
+    guestMode, setGuestMode, requireAuth, requireAuthAction,
+  }), [mode, switchMode, tab, stack, push, pop, navigateTab, goBack, guestMode, requireAuth, requireAuthAction]);
 
   return <NavContext.Provider value={value}>{children}</NavContext.Provider>;
 }

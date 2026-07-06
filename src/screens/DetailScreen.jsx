@@ -23,7 +23,7 @@ const stripHtml = (s) => String(s || '')
 
 export default function DetailScreen({ idOrSlug }) {
   const insets = useSafeAreaInsets();
-  const { pop, requireAuth } = useNav();
+  const { pop, requireAuth, requireAuthAction } = useNav();
   const { isWished, toggle } = useWishlist();
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -73,7 +73,7 @@ export default function DetailScreen({ idOrSlug }) {
             <TouchableOpacity style={styles.circleBtn} onPress={pop}><Text style={styles.backIcon}>‹</Text></TouchableOpacity>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <TouchableOpacity style={styles.circleBtn} onPress={() => shareExperience(item)}><Image source={ICONS.share} style={styles.circleImg} /></TouchableOpacity>
-              <TouchableOpacity style={styles.circleBtn} onPress={() => toggle('experience', item.id, { ...item, type: 'experience' })}>
+              <TouchableOpacity style={styles.circleBtn} onPress={() => requireAuthAction(() => toggle('experience', item.id, { ...item, type: 'experience' }))}>
                 <Image source={wished ? ICONS.heartFill : ICONS.heart} style={[styles.circleImg, wished && { tintColor: colors.heart }]} />
               </TouchableOpacity>
             </View>

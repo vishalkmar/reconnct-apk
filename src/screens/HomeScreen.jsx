@@ -401,6 +401,7 @@ function ConnectWithSection({ auds, onPressAud, onSeeAll }) {
 const TNY_CARD_W = 152;
 function TrendingNearYouCard({ item, onPress }) {
   const { isWished, toggle } = useWishlist();
+  const { requireAuthAction } = useNav();
   const img = resolveImage(item.mainImage) || DUMMY_IMAGE;
   const wished = isWished('experience', item.id);
   return (
@@ -412,7 +413,7 @@ function TrendingNearYouCard({ item, onPress }) {
         )}
         <TouchableOpacity
           style={styles.tnyHeart}
-          onPress={() => toggle('experience', item.id, { ...item, type: 'experience' })}
+          onPress={() => requireAuthAction(() => toggle('experience', item.id, { ...item, type: 'experience' }))}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Image source={wished ? ICONS.heartFill : ICONS.heart} style={[styles.tnyHeartIcon, { tintColor: wished ? colors.heart : colors.inkMuted }]} resizeMode="contain" />

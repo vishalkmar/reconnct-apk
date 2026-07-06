@@ -4,6 +4,7 @@ import { colors, radius, font, shadow } from '../theme';
 import { resolveImage, DUMMY_IMAGE } from '../api/client';
 import { formatMoney } from '../utils/format';
 import { useWishlist } from '../store/WishlistContext';
+import { useNav } from '../navigation/NavContext';
 import { ICONS } from '../icons';
 
 /**
@@ -12,6 +13,7 @@ import { ICONS } from '../icons';
  */
 export default function ExperienceCard({ item, onPress, variant = 'grid', style }) {
   const { isWished, toggle } = useWishlist();
+  const { requireAuthAction } = useNav();
   const img = resolveImage(item.mainImage) || DUMMY_IMAGE;
   const wished = isWished('experience', item.id);
 
@@ -22,7 +24,7 @@ export default function ExperienceCard({ item, onPress, variant = 'grid', style 
         {/* Heart — its own hit target so tapping it never opens the card. */}
         <TouchableOpacity
           style={styles.heart}
-          onPress={() => toggle('experience', item.id, { ...item, type: 'experience' })}
+          onPress={() => requireAuthAction(() => toggle('experience', item.id, { ...item, type: 'experience' }))}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           activeOpacity={0.7}
         >

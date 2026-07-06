@@ -20,18 +20,45 @@ const MENU = [
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { user, token, signOut } = useAuth();
+  const { user, token, isAuthed, signOut } = useAuth();
   const { count: wishCount } = useWishlist();
-  const { push, switchMode } = useNav();
+  const { push, switchMode, setGuestMode } = useNav();
   const [trips, setTrips] = useState(0);
 
   const name = (user && user.name) || 'Guest';
 
   useEffect(() => {
+    if (!isAuthed) return;
     api.myBookings(token).then((d) => setTrips((d.bookings || []).length)).catch(() => {});
-  }, [token]);
+  }, [token, isAuthed]);
 
   const soon = (what) => Alert.alert(what, 'Coming soon.');
+
+  // Browsing as a guest (skipped login) — My Profile/Bookings/Transactions/
+  // Wishlist/Notifications and Switch-to-Hosting all need a real account, so
+  // none of that can be shown. Just offer Sign In instead.
+  if (!isAuthed) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+          <View style={styles.idRow}>
+            <View style={styles.avatar}><Text style={styles.avatarInit}>G</Text></View>
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={styles.name}>Guest</Text>
+              <Text style={styles.email}>You're browsing without an account</Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.guestBody}>
+          <Text style={styles.guestTitle}>Sign in to continue</Text>
+          <Text style={styles.guestSub}>Your profile, bookings, transactions, wishlist and notifications all need an account.</Text>
+          <TouchableOpacity style={styles.signInBtn} activeOpacity={0.9} onPress={() => setGuestMode(false)}>
+            <Text style={styles.signInText}>Sign In</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
@@ -132,4 +159,10 @@ const styles = StyleSheet.create({
   logout: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 18, marginHorizontal: space.lg, borderWidth: 1.5, borderColor: '#F4B0BA', borderRadius: radius.md, paddingVertical: 14 },
   logoutIcon: { width: 18, height: 18, tintColor: '#D4183D' },
   logoutText: { color: '#D4183D', fontWeight: '800', fontSize: font.h3 },
+
+  guestBody: { padding: space.lg, alignItems: 'center', marginTop: 40 },
+  guestTitle: { fontSize: font.h2, fontWeight: '800', color: colors.ink, textAlign: 'center' },
+  guestSub: { fontSize: font.body, color: colors.inkMuted, textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  signInBtn: { backgroundColor: colors.brand, height: 52, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: 22, alignSelf: 'stretch' },
+  signInText: { color: '#101010', fontWeight: '800', fontSize: font.h3 },
 });
