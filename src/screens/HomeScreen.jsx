@@ -220,8 +220,8 @@ export default function HomeScreen() {
           </>
         ) : (
           <>
-          {/* Connect With — audience taxonomy from the DB, tap opens that audience's experiences */}
-          <ConnectWithSection auds={auds} onPressAud={goAudience} onSeeAll={() => push('reconnect')} />
+          {/* Offer banners — auto-sliding carousel (admin-managed) */}
+          <View style={{ marginTop: 6 }}><OfferBannerCarousel /></View>
 
           {/* You're here — dismissible tooltip */}
           {!!detectedCity && !geoDismissed && (
@@ -237,8 +237,15 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {/* Offer banners — auto-sliding carousel (admin-managed) */}
-          <View style={{ marginTop: 6 }}><OfferBannerCarousel /></View>
+          {/* Connect With — audience taxonomy from the DB, tap opens that audience's experiences */}
+          <ConnectWithSection auds={auds} onPressAud={goAudience} onSeeAll={() => push('reconnect')} />
+
+          {/* Trending Near You */}
+          <TrendingNearbySection
+            data={items.slice(0, 12)}
+            onSeeAll={() => navigateTab('experiences')}
+            onPressItem={openDetail}
+          />
 
           <View style={styles.sectionHead}>
             <SectionTitle icon={ICONS.globe} title="Explore" />
@@ -339,11 +346,6 @@ export default function HomeScreen() {
                 cardW={270}
                 cardImageH={186}
                 cardGap={14}
-                onSeeAll={() => navigateTab('experiences')}
-                onPressItem={openDetail}
-              />
-              <TrendingNearbySection
-                data={items.slice(0, 12)}
                 onSeeAll={() => navigateTab('experiences')}
                 onPressItem={openDetail}
               />

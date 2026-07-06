@@ -1,32 +1,30 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { SvgXml } from 'react-native-svg';
 import { colors, radius, font, shadow } from '../theme';
 import { ICONS } from '../icons';
+import { AUD_META, AUD_DEFAULT } from './connectWithIcons';
 
 /**
- * Overlay-style "Reconnect" card (full-bleed image + text overlay) — the second
- * card pattern in the Explore grid. Tapping opens the Experiences page filtered
- * by that audience. A smooth bottom gradient (PNG) keeps text legible without a
- * hard band; the chip + title are centred, Explore sits bottom-left.
+ * Audience tile for the Explore grid — a full-bleed photo with a dark bottom
+ * gradient and a centred icon + label near the base (matches the "Experiences
+ * for every moment" reference design). Tapping opens that audience's
+ * experiences. Simpler than the old badge/heart/"Explore →" overlay.
  */
 export default function AudienceCard({ data, onPress, style }) {
+  const meta = AUD_META[data.slug] || AUD_DEFAULT;
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={[styles.card, style]}>
       <Image source={{ uri: data.image }} style={styles.bg} resizeMode="cover" />
       <Image source={ICONS.scrimGrad} style={styles.gradient} resizeMode="stretch" />
 
-      <View style={styles.top}>
-        <View style={styles.pill}>
-          <Image source={ICONS.heartFill} style={styles.pillHeart} />
-          <Text style={styles.pillText}>Reconnect</Text>
-        </View>
-        <View style={styles.heart}><Image source={ICONS.heart} style={styles.heartIcon} resizeMode="contain" /></View>
-      </View>
-
       <View style={styles.content}>
+        <View style={styles.iconWrap}>
+          {meta.svg
+            ? <SvgXml xml={meta.svg} width={28} height={28} />
+            : <Image source={ICONS.groups} style={styles.iconFallback} />}
+        </View>
         <Text style={styles.title}>{data.title}</Text>
-        <Text style={styles.subtitle}>{data.subtitle}</Text>
-        <Text style={styles.explore}>Explore  →</Text>
       </View>
     </TouchableOpacity>
   );
@@ -68,16 +66,8 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, overflow: 'hidden', height: 250, backgroundColor: '#2b3040', ...shadow.card },
   bg: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   gradient: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, width: '100%', height: '100%' },
-  top: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', padding: 10, zIndex: 2 },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
-  pillHeart: { width: 12, height: 12, tintColor: colors.brand },
-  pillText: { color: '#fff', fontSize: font.tiny, fontWeight: '700' },
-  heart: { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
-  heartIcon: { width: 14, height: 14, tintColor: colors.inkMuted },
-  content: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 12, paddingBottom: 12, alignItems: 'center', zIndex: 2 },
-  chip: { backgroundColor: 'rgba(255,255,255,0.94)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.pill, marginBottom: 8 },
-  chipText: { color: colors.heart, fontSize: font.tiny, fontWeight: '800' },
-  title: { color: '#fff', fontSize: 24, fontWeight: '800', fontStyle: 'italic', textAlign: 'center' },
-  subtitle: { color: 'rgba(255,255,255,0.92)', fontSize: font.small, marginTop: 2, textAlign: 'center' },
-  explore: { color: '#fff', fontWeight: '800', fontSize: font.small, marginTop: 10, alignSelf: 'flex-start' },
+  content: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: 18, alignItems: 'center', zIndex: 2 },
+  iconWrap: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  iconFallback: { width: 26, height: 26, tintColor: colors.brandText },
+  title: { color: '#fff', fontSize: 17, fontWeight: '800' },
 });

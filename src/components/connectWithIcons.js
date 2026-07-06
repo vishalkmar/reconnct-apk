@@ -42,6 +42,33 @@ const PARTNER_SVG = `<svg width="40" height="31" viewBox="0 0 40 31" fill="none"
 <path d="M25.3906 28.0469C27.1666 28.0469 28.125 26.5172 28.125 25.0781C28.125 23.639 27.1666 22.1093 25.3906 22.1093C23.741 22.1093 22.1442 23.5586 21.3392 24.4226C20.9935 24.7936 20.9915 25.3766 21.3349 25.7497C22.1242 26.6076 23.7007 28.0469 25.3906 28.0469ZM25.3906 23.2812C26.4641 23.2812 26.9531 24.2126 26.9531 25.0781C26.9531 25.9436 26.4641 26.875 25.3906 26.875C24.1927 26.875 22.9215 25.7158 22.3218 25.0891C23.4297 23.938 24.5418 23.2812 25.3906 23.2812Z" fill="#D50748"/>
 </svg>`;
 
+// Community & New Connections — overlapping trio of avatar dots.
+const COMMUNITY_SVG = `<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="15" cy="16" r="9.5" fill="#FF2056"/>
+<circle cx="26" cy="15" r="9.5" fill="#F9B402"/>
+<circle cx="20.5" cy="26.5" r="9.5" fill="#018474"/>
+</svg>`;
+
+// Elders & Active Seniors — two simple person silhouettes, warm tan tones.
+const ELDERS_SVG = `<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="14" cy="12" r="6" fill="#C68B59"/>
+<path d="M3 34c0-7.2 4.6-11.5 11-11.5S25 26.8 25 34" stroke="#C68B59" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+<circle cx="28" cy="14" r="5.5" fill="#E8B27D"/>
+<path d="M17 35c0-6.3 4.2-10 11-10s11 3.7 11 10" stroke="#E8B27D" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+</svg>`;
+
+// Corporate & Teams — flat briefcase glyph, navy with brand-orange strap.
+const CORPORATE_SVG = `<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect x="14" y="7" width="12" height="8" rx="2" stroke="#1A1A2E" stroke-width="3" fill="none"/>
+<rect x="5" y="14" width="30" height="19" rx="3.5" fill="#1A1A2E"/>
+<rect x="5" y="21" width="30" height="4.5" fill="#F9B402"/>
+</svg>`;
+
+// Self — a simple filled heart (self-care / me-time).
+const SELF_SVG = `<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M20 34.5C7.5 26.2 3.5 17.8 3.5 12 3.5 6.5 7.8 3 12.7 3c3.2 0 6.1 1.7 7.9 4.4C22.4 4.7 25.3 3 28.5 3c4.9 0 9.2 3.5 9.2 9 0 5.8-4 14.2-16.9 22.5z" fill="#FF5C8A"/>
+</svg>`;
+
 // slug → { svg, tint, tagline }. Kids alias covers both 'kids' and
 // 'kids-and-teens' since the DB has used either at different times.
 export const AUD_META = {
@@ -50,6 +77,11 @@ export const AUD_META = {
   kids: { svg: KIDS_SVG, tint: '#E1EEF4', tagline: 'The little ones are waiting!' },
   'kids-and-teens': { svg: KIDS_SVG, tint: '#E1EEF4', tagline: 'The little ones are waiting!' },
   partner: { svg: PARTNER_SVG, tint: '#FBE1E7', tagline: 'For the pillar of strength' },
+  self: { svg: SELF_SVG, tint: '#FFE3EC', tagline: 'Reconnect with yourself' },
+  yourself: { svg: SELF_SVG, tint: '#FFE3EC', tagline: 'Reconnect with yourself' },
+  'community-and-new-connections': { svg: COMMUNITY_SVG, tint: '#FFF1E0', tagline: 'Meet like-minded people' },
+  'elders-and-active-seniors': { svg: ELDERS_SVG, tint: '#F5E6D8', tagline: 'Engage, explore and enjoy' },
+  'corporate-and-teams': { svg: CORPORATE_SVG, tint: '#E7E8F0', tagline: 'Build stronger teams' },
 };
 
 // Fallback for any audience the DB adds that we don't have a bespoke icon for
