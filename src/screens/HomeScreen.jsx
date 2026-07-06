@@ -16,6 +16,7 @@ import CleanDealCard from '../components/deals/CleanDealCard';
 import OverlayDealCard from '../components/deals/OverlayDealCard';
 import TrendingNearbyCard from '../components/deals/TrendingNearbyCard';
 import OfferBannerCarousel from '../components/OfferBannerCarousel';
+import LocationSheet from '../components/LocationSheet';
 import FilterSheet, { draftToParams } from './FilterSheet';
 import { ICONS } from '../icons';
 
@@ -54,6 +55,7 @@ export default function HomeScreen() {
   const [searchingBusy, setSearchingBusy] = useState(false);
   const [geoDismissed, setGeoDismissed] = useState(false);
   const [compact, setCompact] = useState(false); // sticky mini-header on scroll
+  const [showLocation, setShowLocation] = useState(false); // Choose Location sheet
 
   const geoParams = coords ? { lat: coords.lat, lon: coords.lon } : {};
 
@@ -157,7 +159,7 @@ export default function HomeScreen() {
           <View style={styles.headerTop}>
             <Image source={ICONS.logoWhite} style={styles.logoImg} resizeMode="contain" />
             <View style={styles.headerRight}>
-              <TouchableOpacity style={styles.locPill} onPress={() => push('cityPicker')}>
+              <TouchableOpacity style={styles.locPill} onPress={() => setShowLocation(true)}>
                 <Image source={ICONS.locWhite} style={styles.locPinIcon} />
                 <Text style={styles.locText}>{city || 'Delhi'} ▾</Text>
               </TouchableOpacity>
@@ -375,7 +377,7 @@ export default function HomeScreen() {
         <View style={[styles.sticky, { paddingTop: insets.top + 6 }]}>
           <Image source={ICONS.logoWhite} style={styles.stickyLogo} resizeMode="contain" />
           <View style={{ flex: 1 }} />
-          <TouchableOpacity style={styles.stickyPill} onPress={() => push('cityPicker')}>
+          <TouchableOpacity style={styles.stickyPill} onPress={() => setShowLocation(true)}>
             <Image source={ICONS.locGray} style={styles.stickyPin} />
             <Text style={styles.stickyPillText}>{city || 'Delhi'}</Text>
           </TouchableOpacity>
@@ -396,6 +398,8 @@ export default function HomeScreen() {
         onClose={() => setShowFilter(false)}
         onApply={(draft) => { setFilters(draft); setShowFilter(false); }}
       />
+
+      <LocationSheet visible={showLocation} onClose={() => setShowLocation(false)} />
     </View>
   );
 }
