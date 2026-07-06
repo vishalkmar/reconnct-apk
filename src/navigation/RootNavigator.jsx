@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StatusBar, BackHandler, ActivityIndicator, Image } from 'react-native';
 import { useAuth } from '../store/AuthContext';
 import { ICONS } from '../icons';
@@ -6,6 +6,7 @@ import { useNav } from './NavContext';
 import { colors } from '../theme';
 
 import AuthNavigator from '../screens/auth/AuthNavigator';
+import IntroScreen from '../screens/auth/IntroScreen';
 import BottomNav from '../components/BottomNav';
 
 // Screens are loaded lazily (required when first shown) so a problem in any one
@@ -60,6 +61,7 @@ function StackScreen({ name, params }) {
 export default function RootNavigator() {
   const { isAuthed, booting } = useAuth();
   const { tab, top, navigateTab, goBack, mode } = useNav();
+  const [introDone, setIntroDone] = useState(false);
 
   // Android hardware/system back → one step back inside the app instead of
   // closing it. When goBack() can't go further (Home, nothing pushed) we
@@ -95,7 +97,7 @@ export default function RootNavigator() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.brandSoft }}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.brandSoft} />
-        <AuthNavigator />
+        {introDone ? <AuthNavigator /> : <IntroScreen onDone={() => setIntroDone(true)} />}
       </View>
     );
   }

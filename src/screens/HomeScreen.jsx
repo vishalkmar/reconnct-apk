@@ -14,7 +14,6 @@ import { useLocation } from '../store/LocationContext';
 import { useWishlist } from '../store/WishlistContext';
 import { useNav } from '../navigation/NavContext';
 import ExperienceCard from '../components/ExperienceCard';
-import AudienceCard, { themeForAudience } from '../components/AudienceCard';
 import FramedDealCard from '../components/deals/FramedDealCard';
 import CleanDealCard from '../components/deals/CleanDealCard';
 import OverlayDealCard from '../components/deals/OverlayDealCard';
@@ -123,6 +122,8 @@ export default function HomeScreen() {
     const match = auds.find((a) => a.slug === slug);
     push('experiences', { tagMode: 'audience', initialFilters: match ? { audienceId: match.id } : {} });
   };
+  // Tapping a category tile opens the Experiences page filtered by that category.
+  const goCategory = (cat) => push('experiences', { initialFilters: { categoryId: cat.id } });
 
   const renderExp = (it) => <ExperienceCard key={it.id} item={it} style={{ marginBottom: GRID_GAP }} onPress={() => openDetail(it)} />;
   // Split a list into two independent columns → masonry (no row-height gaps).
@@ -236,7 +237,7 @@ export default function HomeScreen() {
               <TrendingNearYouSection data={items} onSeeAll={() => navigateTab('experiences')} onPressItem={openDetail} />
 
               {/* Experiences for every moment — one tile per broad audience category */}
-              <ExperienceMomentsSection auds={auds} onPressAud={goAudience} />
+              <ExperienceMomentsSection cats={cats} onPressCat={goCategory} />
             </>
           )}
 
@@ -454,25 +455,45 @@ function TrendingNearYouSection({ data, onSeeAll, onPressItem }) {
   );
 }
 
-// "Experiences for every moment" — one tile per broad audience category (Self,
-// Partner, Family, Friends, Corporate, …), live from the taxonomy. Tapping a
-// tile opens that audience's experiences. Reuses the AudienceCard icon-tile
-// design at a compact size, 4 fitting comfortably per screen.
-function ExperienceMomentsSection({ auds, onPressAud }) {
-  if (!auds.length) return null;
+// Stock fallback photo per broad category slug (Adventure, Culture, Food,
+// Nature, …). Anything unmapped falls back to the app's generic DUMMY_IMAGE.
+const U = (id) => `https://images.unsplash.com/photo-${id}?w=600&q=80`;
+const CATEGORY_IMG = {
+  'adventure-outdoors': U('1533130061792-64b345e74a2c'),
+  adventure: U('1533130061792-64b345e74a2c'),
+  cultural: U('1493707553966-283afd1f8dc0'),
+  'heritage-culture': U('1493707553966-283afd1f8dc0'),
+  food: U('1414235077428-338989a2e8c0'),
+  'food-culinary': U('1414235077428-338989a2e8c0'),
+  nature: U('1441974231531-c6227db76b6e'),
+  'nature-wildlife': U('1441974231531-c6227db76b6e'),
+  wellness: U('1544367567-0f2fcb009e0b'),
+  'wellness-relaxation': U('1544367567-0f2fcb009e0b'),
+};
+
+// One tile per broad EXPERIENCE CATEGORY (Adventure, Culture, Food, Nature, …),
+// live from the taxonomy — just a background photo + title, no icon overlay.
+// Tapping a tile opens that category's experiences.
+function CategoryTile({ item, onPress }) {
+  const img = CATEGORY_IMG[item.slug] || DUMMY_IMAGE;
+  return (
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.momentCard}>
+      <Image source={{ uri: img }} style={styles.momentBg} resizeMode="cover" />
+      <Image source={ICONS.scrimGrad} style={styles.momentGrad} resizeMode="stretch" />
+      <Text style={styles.momentTitle} numberOfLines={2}>{item.name}</Text>
+    </TouchableOpacity>
+  );
+}
+function ExperienceMomentsSection({ cats, onPressCat }) {
+  if (!cats.length) return null;
   return (
     <>
       <View style={styles.sectionHead}>
         <SectionTitle icon={ICONS.globe} title="Experiences for every moment" />
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 10, paddingTop: 4 }}>
-        {auds.map((a) => (
-          <AudienceCard
-            key={a.id}
-            data={themeForAudience(a)}
-            style={styles.momentCard}
-            onPress={() => onPressAud(a.slug)}
-          />
+        {cats.map((c) => (
+          <CategoryTile key={c.id} item={c} onPress={() => onPressCat(c)} />
         ))}
       </ScrollView>
     </>
@@ -716,7 +737,10 @@ const styles = StyleSheet.create({
   tnyRating: { fontSize: 11, fontWeight: '700', color: colors.ink },
   tnyPrice: { fontSize: 13, fontWeight: '900', color: colors.price },
 
-  momentCard: { width: 92, height: 122, borderRadius: radius.md },
+  momentCard: { width: 100, height: 130, borderRadius: radius.md, overflow: 'hidden' },
+  momentBg: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', backgroundColor: '#DCE0E6' },
+  momentGrad: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, width: '100%', height: '100%' },
+  momentTitle: { position: 'absolute', left: 8, right: 8, bottom: 10, color: '#fff', fontSize: 14, fontWeight: '800' },
 
   banner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FBD38D', marginHorizontal: H_PAD, marginTop: 16, borderRadius: radius.lg, padding: 16, overflow: 'hidden' },
   bannerTag: { backgroundColor: colors.brandDark, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.sm },

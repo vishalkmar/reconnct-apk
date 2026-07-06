@@ -3,7 +3,7 @@
  * React Native (JavaScript only). Data is served by the backend public API
  * (/api/public/*) which exposes the experiences admins publish from the website.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/store/AuthContext';
@@ -15,19 +15,15 @@ import { NavProvider } from './src/navigation/NavContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import SplashScreen from './src/components/SplashScreen';
 
-// Splash stays up for a fixed ~1.2s on cold start (Figma "Login_Opening" frame)
-// while everything underneath mounts and starts loading, then disappears on its
-// own straight into whatever's ready (login or home) — no user action needed.
+// Splash plays its split/merge/zoom logo animation on cold start while
+// everything underneath mounts and starts loading, then calls onFinish itself
+// (no fixed timer) straight into whatever's ready (intro carousel or home).
 function AppShell() {
   const [showSplash, setShowSplash] = useState(true);
-  useEffect(() => {
-    const t = setTimeout(() => setShowSplash(false), 1200);
-    return () => clearTimeout(t);
-  }, []);
   return (
     <View style={{ flex: 1 }}>
       <RootNavigator />
-      {showSplash && <SplashScreen />}
+      {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
     </View>
   );
 }
