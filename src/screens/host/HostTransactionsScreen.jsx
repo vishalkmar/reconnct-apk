@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Modal, Pressable, ScrollView } from 'react-native';
 import { colors, radius, font, space, shadow } from '../../theme';
 import { useHost } from '../../store/HostContext';
+import { useNav } from '../../navigation/NavContext';
 import { initials, formatMoney } from '../../utils/format';
 import { ICONS } from '../../icons';
 import ScreenHeader from '../../components/ScreenHeader';
@@ -18,6 +19,7 @@ const monthLabel = (k) => { const [y, m] = k.split('-').map(Number); return `${M
 
 export default function HostTransactionsScreen() {
   const { transactions, listings } = useHost();
+  const { push } = useNav();
   const [status, setStatus] = useState('all');
   const [listingId, setListingId] = useState('all');
   const [month, setMonth] = useState('all');
@@ -78,7 +80,7 @@ export default function HostTransactionsScreen() {
         keyExtractor={(t) => String(t.id)}
         contentContainerStyle={{ padding: space.lg, paddingTop: 6, paddingBottom: 32 }}
         renderItem={({ item }) => (
-          <View style={styles.tx}>
+          <TouchableOpacity style={styles.tx} activeOpacity={0.8} onPress={() => push('hostBookingDetail', { id: item.id })}>
             <View style={styles.txAvatar}><Text style={styles.txAvatarText}>{initials(item.guest)}</Text></View>
             <View style={{ flex: 1 }}>
               <Text style={styles.txName}>{item.guest}</Text>
@@ -91,7 +93,7 @@ export default function HostTransactionsScreen() {
                 <Text style={[styles.pillText, { color: item.type === 'completed' ? '#16A34A' : colors.brandDark }]}>{item.type}</Text>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
         )}
         ListEmptyComponent={<Text style={styles.empty}>No transactions for this filter.</Text>}
       />

@@ -22,6 +22,7 @@ export function HostProvider({ children }) {
   const { token, user, isAuthed, patchUser } = useAuth();
   const [listings, setListings] = useState([]);
   const [stats, setStats] = useState(EMPTY_STATS);
+  const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Host profile is the user's profile (name/company/phone/address/photo) so it
@@ -39,19 +40,21 @@ export function HostProvider({ children }) {
     if (!token) return;
     setLoading(true);
     try {
-      const [l, s] = await Promise.all([
+      const [l, s, t] = await Promise.all([
         api.hostListings(token).catch(() => null),
         api.hostSummary(token).catch(() => null),
+        api.hostTransactions(token).catch(() => null),
       ]);
       if (l && Array.isArray(l.listings)) setListings(l.listings);
       if (s && s.stats) setStats(s.stats);
+      if (t && Array.isArray(t.transactions)) setTransactions(t.transactions);
     } finally {
       setLoading(false);
     }
   }, [token]);
 
   useEffect(() => {
-    if (!isAuthed) { setListings([]); setStats(EMPTY_STATS); return; }
+    if (!isAuthed) { setListings([]); setStats(EMPTY_STATS); setTransactions([]); return; }
     reload();
   }, [isAuthed, reload]);
 
@@ -91,17 +94,6 @@ export function HostProvider({ children }) {
   }, [token, patchUser]);
 
   const bookingsForListing = useCallback((id) => (listings.find((l) => l.id === id) || {}).bookings || [], [listings]);
-
-  // Real transactions feed (host bookings) lands in a later phase — derived
-  // from whatever bookings a listing carries (empty for now, never faked).
-  const transactions = useMemo(() => {
-    const out = [];
-    listings.forEach((l) => (l.bookings || []).forEach((b) => out.push({
-      ...b, listingId: l.id, listingTitle: l.title,
-      type: b.status === 'completed' ? 'completed' : 'pending',
-    })));
-    return out.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  }, [listings]);
 
   const value = useMemo(() => ({
     listings, loading, reload, addListing, removeListing, bookingsForListing,

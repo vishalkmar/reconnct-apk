@@ -96,6 +96,7 @@ export const api = {
   hostUpdateListing: (token, id, form, submit = false) => request(`/host/listings/${id}`, { method: 'PUT', token, body: { form, submit } }),
   hostDeleteListing: (token, id) => request(`/host/listings/${id}`, { method: 'DELETE', token }),
   hostBooking: (token, id) => request(`/host/bookings/${id}`, { token }),
+  hostTransactions: (token) => request('/host/transactions', { token }),
 
   // ── Support chat (party = user / host) ──────────────────────────────
   supportConversation: (token, queue = 'user') => request(`/support/me/conversation${qs({ queue })}`, { token }),
