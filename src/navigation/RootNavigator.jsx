@@ -52,6 +52,7 @@ function StackScreen({ name, params }) {
     case 'createListing': return lazy(() => require('../screens/host/CreateListingScreen'));
     case 'hostProfileDetail': return lazy(() => require('../screens/host/HostProfileDetailScreen'));
     case 'listingBookings': { const C = require('../screens/host/ListingBookingsScreen').default; return <C listing={params.listing} />; }
+    case 'hostBookingDetail': { const C = require('../screens/host/HostBookingDetailScreen').default; return <C id={params.id} />; }
     case 'hostNotifications': return lazy(() => require('../screens/host/HostNotificationsScreen'));
     case 'hostTransactions': return lazy(() => require('../screens/host/HostTransactionsScreen'));
     default: return null;

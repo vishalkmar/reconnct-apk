@@ -1,63 +1,88 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator } from 'react-native';
 import { colors, radius, font, space, shadow } from '../../theme';
+import { api } from '../../api/client';
+import { useAuth } from '../../store/AuthContext';
 import { ICONS } from '../../icons';
 import ScreenHeader from '../../components/ScreenHeader';
+import EmptyState from '../../components/EmptyState';
 
+// Only the host-relevant slice of the shared /api/notifications feed —
+// bookings on the host's own listings, plus same-day reminders. Real data
+// only; no placeholder rows.
 const TYPE = {
-  message: { icon: ICONS.navInbox, tint: '#2563EB', bg: '#DBEAFE' },
-  update: { icon: ICONS.sparkle, tint: '#16A34A', bg: '#DCFCE7' },
-  email: { icon: ICONS.bell, tint: colors.brand, bg: colors.brandSoft },
+  host_booking: { icon: ICONS.ticket, tint: colors.brand, bg: colors.brandSoft },
+  reminder: { icon: ICONS.bell, tint: '#2563EB', bg: '#DBEAFE' },
 };
-const DATA = [
-  { id: 1, type: 'message', title: 'New booking from Ravi Patel', body: 'Goa Coastal Kayaking · Jul 22, 2026 · 2 guests', time: '2h ago', unread: true },
-  { id: 2, type: 'update', title: 'Listing approved', body: '“Sunset Dolphin Boat Tour” is now live and bookable.', time: '5h ago', unread: true },
-  { id: 3, type: 'email', title: 'Payout processed', body: '₹8,800 has been sent to your linked account.', time: '1d ago', unread: false },
-  { id: 4, type: 'message', title: 'Aisha Khan sent a message', body: '“Is the tour suitable for kids?”', time: '1d ago', unread: false },
-  { id: 5, type: 'update', title: 'New review', body: 'Tom Williams rated you 5★ on Goa Coastal Kayaking.', time: '2d ago', unread: false },
-  { id: 6, type: 'email', title: 'Weekly summary', body: 'You earned ₹11,000 from 3 bookings this week.', time: '3d ago', unread: false },
-];
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function timeAgo(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+}
 
 export default function HostNotificationsScreen() {
+  const { token } = useAuth();
+  const [feed, setFeed] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    api.notifications(token)
+      .then((d) => {
+        if (!alive) return;
+        const all = (d && d.notifications) || [];
+        setFeed(all.filter((n) => n.kind === 'host_booking' || n.kind === 'reminder'));
+      })
+      .catch(() => {})
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [token]);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScreenHeader title="Notifications" />
-      <FlatList
-        data={DATA}
-        style={{ flex: 1 }}
-        keyExtractor={(n) => String(n.id)}
-        contentContainerStyle={{ padding: space.lg, paddingTop: 14, paddingBottom: 32 }}
-        renderItem={({ item }) => {
-          const ty = TYPE[item.type] || TYPE.update;
-          return (
-            <View style={[styles.row, item.unread && styles.rowUnread]}>
-              <View style={[styles.icon, { backgroundColor: ty.bg }]}><Image source={ty.icon} style={{ width: 18, height: 18, tintColor: ty.tint }} /></View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.body} numberOfLines={2}>{item.body}</Text>
-                <Text style={styles.time}>{item.time}</Text>
+      {loading ? (
+        <ActivityIndicator color={colors.brand} style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList
+          data={feed}
+          style={{ flex: 1 }}
+          keyExtractor={(n) => n.id}
+          contentContainerStyle={{ padding: space.lg, paddingTop: 14, paddingBottom: 32 }}
+          renderItem={({ item }) => {
+            const ty = TYPE[item.kind] || TYPE.host_booking;
+            return (
+              <View style={styles.row}>
+                <View style={[styles.icon, { backgroundColor: ty.bg }]}><Image source={ty.icon} style={{ width: 18, height: 18, tintColor: ty.tint }} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+                  <Text style={styles.body} numberOfLines={2}>{item.body}</Text>
+                  <Text style={styles.time}>{timeAgo(item.at)}</Text>
+                </View>
               </View>
-              {item.unread && <View style={styles.dot} />}
-            </View>
-          );
-        }}
-      />
+            );
+          }}
+          ListEmptyComponent={<EmptyState emoji="🔔" title="No notifications yet" sub="New bookings on your listings will show up here." />}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  tabs: { paddingHorizontal: space.lg, paddingVertical: 12, gap: 8 },
-  tab: { paddingHorizontal: 14, height: 36, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  tabActive: { backgroundColor: colors.brand, borderColor: colors.brand },
-  tabText: { color: colors.ink, fontWeight: '700', fontSize: font.small },
-  tabTextActive: { color: '#101010' },
-
   row: { flexDirection: 'row', gap: 12, backgroundColor: colors.surface, borderRadius: radius.lg, padding: 14, marginBottom: 10, alignItems: 'center', ...shadow.card },
-  rowUnread: { borderLeftWidth: 3, borderLeftColor: colors.brand },
   icon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: font.body, fontWeight: '800', color: colors.ink },
   body: { fontSize: font.small, color: colors.inkMuted, marginTop: 2, lineHeight: 17 },
   time: { fontSize: font.tiny, color: colors.inkFaint, marginTop: 4 },
-  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.brand },
 });

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndi
 import { colors, radius, font, space, shadow } from '../../theme';
 import { useHost } from '../../store/HostContext';
 import { useAuth } from '../../store/AuthContext';
+import { useNav } from '../../navigation/NavContext';
 import { api, resolveImage } from '../../api/client';
 import { initials, formatMoney } from '../../utils/format';
 import ScreenHeader from '../../components/ScreenHeader';
@@ -22,6 +23,7 @@ const pretty = (s) => { const [y, m, d] = String(s).split('-').map(Number); retu
 
 export default function ListingBookingsScreen({ listing }) {
   const { token } = useAuth();
+  const { push } = useNav();
   const { bookingsForListing } = useHost();
   const [tab, setTab] = useState('all');
   // Fetch the listing detail so we get the REAL bookings feed for this
@@ -79,7 +81,7 @@ export default function ListingBookingsScreen({ listing }) {
         renderItem={({ item }) => {
           const pill = PILL[item.status] || PILL.upcoming;
           return (
-            <View style={styles.bk}>
+            <TouchableOpacity style={styles.bk} activeOpacity={0.8} onPress={() => push('hostBookingDetail', { id: item.id, listingTitle: listing && listing.title })}>
               <View style={styles.bkAvatar}><Text style={styles.bkAvatarText}>{initials(item.guest)}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.bkName}>{item.guest}</Text>
@@ -89,7 +91,7 @@ export default function ListingBookingsScreen({ listing }) {
                 <Text style={styles.bkAmount}>{formatMoney(item.amount)}</Text>
                 <View style={[styles.pill, { backgroundColor: pill.bg }]}><Text style={[styles.pillText, { color: pill.fg }]}>{pill.label}</Text></View>
               </View>
-            </View>
+            </TouchableOpacity>
           );
         }}
         ListEmptyComponent={loading
