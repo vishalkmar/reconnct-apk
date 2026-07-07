@@ -6,7 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../theme';
 import { resolveImage, DUMMY_IMAGE, api } from '../api/client';
 import { formatMoney, initials } from '../utils/format';
-import { bookableDateSet, priceBreakdown, MONTHS_FULL } from '../utils/booking';
+import {
+  bookableDateSet, slotsForDate, priceBreakdown, MONTHS_FULL,
+} from '../utils/booking';
 import { useAuth } from '../store/AuthContext';
 import { useNav } from '../navigation/NavContext';
 import { shareExperience } from '../utils/share';
@@ -29,7 +31,6 @@ export default function BookingScreen({ item }) {
   const [step, setStep] = useState(1); // 1 plan · 2 review · 3 pay · 4 done
   const today = new Date();
   const schedule = useMemo(() => item.schedule || {}, [item.schedule]);
-  const slots = schedule.timeSlots || [];
   const bookable = useMemo(() => bookableDateSet(schedule), [schedule]);
   // Open the calendar on the first month that actually has availability.
   const firstAvail = useMemo(() => {
@@ -41,6 +42,9 @@ export default function BookingScreen({ item }) {
   const [view, setView] = useState({ y: initMonth.getFullYear(), m: initMonth.getMonth() });
   const [dateKey, setDateKey] = useState(null);
   const [slot, setSlot] = useState(null);
+  // Real slots for the selected date only — schedule.dates[].slots, same
+  // source the admin/host "Manage dates & slots" screen writes to.
+  const slots = useMemo(() => slotsForDate(schedule, dateKey), [schedule, dateKey]);
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [showGuest, setShowGuest] = useState(false);
@@ -75,7 +79,7 @@ export default function BookingScreen({ item }) {
         guestName: primaryName,
         guestEmail: (guest.email || '').trim() || (user && user.email) || '',
         guestPhone: (guest.phone || '').trim() || (user && user.phone) || '',
-        specialRequests: slot ? `Preferred time: ${slot}` : undefined,
+        specialRequests: slot ? `Preferred time: ${slot.label}` : undefined,
       });
       const bk = res.booking;
       setDbBooking(bk);
@@ -239,12 +243,15 @@ export default function BookingScreen({ item }) {
             <>
               <Text style={styles.label}>Available time slots</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.slotRow}>
-                {slots.map((t) => (
-                  <TouchableOpacity key={t} onPress={() => setSlot(t)} style={[styles.slotChip, slot === t && styles.slotChipOn]}>
-                    <Image source={ICONS.clock} style={[styles.slotIcon, slot === t && { tintColor: colors.brandText }]} />
-                    <Text style={[styles.slotTxt, slot === t && styles.slotTxtOn]}>{t}</Text>
-                  </TouchableOpacity>
-                ))}
+                {slots.map((t) => {
+                  const on = slot && slot.start === t.start && slot.end === t.end;
+                  return (
+                    <TouchableOpacity key={`${t.start}-${t.end}`} onPress={() => setSlot(t)} style={[styles.slotChip, on && styles.slotChipOn]}>
+                      <Image source={ICONS.clock} style={[styles.slotIcon, on && { tintColor: colors.brandText }]} />
+                      <Text style={[styles.slotTxt, on && styles.slotTxtOn]}>{t.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </ScrollView>
             </>
           )}
@@ -291,7 +298,7 @@ export default function BookingScreen({ item }) {
 
           <Section title="Your trip">
             <KV k="Date" v={fmtDate(dateKey)} />
-            {!!slot && <KV k="Time" v={slot} />}
+            {!!slot && <KV k="Time" v={slot.label} />}
             <KV k="Guests" v={`${guests} guest${guests > 1 ? 's' : ''}`} />
             {!!item.durationLabel && <KV k="Duration" v={item.durationLabel} />}
             <KV k="Language" v="English" />

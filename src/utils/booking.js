@@ -2,24 +2,38 @@
 export const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export const MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-// Set of bookable date-keys (YYYY-MM-DD) from a schedule: within its date range
-// and on an allowed weekday.
-export function bookableDateSet(schedule = {}, monthsAhead = 6) {
-  const allowed = (schedule.availableDays || []).map((d) => d.slice(0, 3));
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const start = schedule.startDate ? new Date(schedule.startDate) : today;
-  const end = schedule.endDate ? new Date(schedule.endDate) : new Date(today.getTime() + monthsAhead * 31 * 86400000);
-  const from = start > today ? start : today;
+export const ymd = (date) => date.toISOString().slice(0, 10);
+
+// "09:00" → "9:00 AM" — same formatting the admin scheduling UI uses, so the
+// slot shown in the app matches exactly what the host configured.
+export const to12h = (hhmm) => {
+  const [h, m] = String(hhmm).split(':').map(Number);
+  const ap = h < 12 ? 'AM' : 'PM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${ap}`;
+};
+
+// Set of bookable date-keys (YYYY-MM-DD): exactly the dates the host picked in
+// "Manage dates & slots" on the admin/host side — schedule.dates[].date —
+// so the app never shows availability that isn't actually configured.
+export function bookableDateSet(schedule = {}) {
+  const dates = Array.isArray(schedule.dates) ? schedule.dates : [];
+  const todayKey = ymd(new Date());
   const set = new Set();
-  const d = new Date(from);
-  while (d <= end) {
-    if (allowed.length === 0 || allowed.includes(DOW[d.getDay()])) set.add(d.toISOString().slice(0, 10));
-    d.setDate(d.getDate() + 1);
+  for (const d of dates) {
+    if (d && d.date && d.date >= todayKey) set.add(d.date);
   }
   return set;
 }
 
-export const ymd = (date) => date.toISOString().slice(0, 10);
+// The real slots configured for one specific date (schedule.dates[].slots),
+// formatted for display. Empty if the host hasn't added slots for that date.
+export function slotsForDate(schedule = {}, dateKey) {
+  const dates = Array.isArray(schedule.dates) ? schedule.dates : [];
+  const row = dateKey ? dates.find((d) => d.date === dateKey) : null;
+  const slots = (row && row.slots) || [];
+  return slots.map((s) => ({ ...s, label: `${to12h(s.start)} – ${to12h(s.end)}` }));
+}
 
 // Full price breakdown for the chosen guests.
 export function priceBreakdown(item, adults, children) {
