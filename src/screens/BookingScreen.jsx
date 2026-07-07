@@ -50,6 +50,11 @@ export default function BookingScreen({ item }) {
   const [showPayWeb, setShowPayWeb] = useState(false);
   const [bookingCode, setBookingCode] = useState(null);
   const [dbBooking, setDbBooking] = useState(null);
+  // True once a status check has come back and the booking is still NOT paid
+  // (link closed/backed-out/failed/pending-and-abandoned) — lets the pay step
+  // show a clear "try again" state instead of an eternal "waiting…" spinner
+  // that never actually reflected what happened.
+  const [checkedOnce, setCheckedOnce] = useState(false);
 
   const b = priceBreakdown(item, adults, children);
   const guests = adults + children;
@@ -60,7 +65,7 @@ export default function BookingScreen({ item }) {
   // Create the REAL booking in the DB, then a Cashfree hosted payment link and
   // open it. The booking + transaction now live server-side (original data).
   const startPayment = async () => {
-    setStep(3); setPaying(true); setPayLink(null); setDbBooking(null); setBookingCode(null);
+    setStep(3); setPaying(true); setPayLink(null); setDbBooking(null); setBookingCode(null); setCheckedOnce(false);
     try {
       const res = await api.createBooking(token, {
         itemType: 'experience',
@@ -130,9 +135,18 @@ export default function BookingScreen({ item }) {
         if (res.booking) setDbBooking(res.booking);
         setShowPayWeb(false);
         setStep(4);
+        return;
       }
-    } catch { /* keep waiting */ }
+      // Definitively not paid yet (link closed/backed-out/failed/still-pending)
+      // — the pay step switches from "waiting" to a "try again" state instead
+      // of implying nothing happened.
+      setCheckedOnce(true);
+    } catch { setCheckedOnce(true); }
   };
+
+  // Reopen the SAME Cashfree link (it stays valid until paid or expired) for
+  // a fresh attempt after a failed/abandoned one.
+  const retryPayment = () => { setCheckedOnce(false); setShowPayWeb(true); };
 
   // Auto-detect payment: poll every 4s while on the pay step and immediately
   // when the user returns to the app (from the Cashfree browser). No manual
@@ -312,6 +326,18 @@ export default function BookingScreen({ item }) {
           <View style={styles.cashfreeCard}>
             {paying ? (
               <><ActivityIndicator color={colors.brand} /><Text style={styles.cashfreeWait}>Opening secure Cashfree checkout…</Text></>
+            ) : checkedOnce ? (
+              <>
+                <View style={styles.notPaidIcon}><Text style={styles.notPaidIconTxt}>!</Text></View>
+                <Text style={styles.cashfreeTitle}>Payment not completed</Text>
+                <Text style={styles.cashfreeSub}>We couldn't confirm your payment. If money was deducted it'll reflect automatically in a few minutes — otherwise nothing was charged and you can try again.</Text>
+                {!!payLink && (
+                  <TouchableOpacity style={[styles.cashfreeReopen, styles.cashfreeRetry]} onPress={retryPayment}>
+                    <Image source={ICONS.card} style={styles.cashfreeReopenIcon} />
+                    <Text style={styles.cashfreeReopenTxt}>Pay Again</Text>
+                  </TouchableOpacity>
+                )}
+              </>
             ) : (
               <>
                 <ActivityIndicator color={colors.brand} />
@@ -604,6 +630,9 @@ const styles = StyleSheet.create({
   cashfreeReopenTxt: { color: colors.brandText, fontWeight: '800', fontSize: font.body },
   cashfreeBrowser: { marginTop: 10 },
   cashfreeBrowserTxt: { color: colors.inkMuted, fontWeight: '700', fontSize: font.small },
+  notPaidIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
+  notPaidIconTxt: { color: '#DC2626', fontSize: 26, fontWeight: '900' },
+  cashfreeRetry: { backgroundColor: colors.brand },
 
   doneHero: { backgroundColor: colors.brand, alignItems: 'center', paddingBottom: 40, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   doneCheck: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadow.card },
