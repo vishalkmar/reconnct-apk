@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../../theme';
 import { useNav } from '../../navigation/NavContext';
@@ -27,11 +27,22 @@ export default function MyListingsScreen() {
   const { push } = useNav();
   const { listings, removeListing } = useHost();
   const [tab, setTab] = useState('all');
+  const [query, setQuery] = useState('');
   const soon = (w) => Alert.alert(w, 'Coming soon.');
 
   const countFor = (t) => (t.key === 'all' ? listings.length : listings.filter((l) => t.statuses.includes(l.status)).length);
   const active = TABS.find((t) => t.key === tab);
-  const shown = tab === 'all' ? listings : listings.filter((l) => active.statuses.includes(l.status));
+  const byTab = tab === 'all' ? listings : listings.filter((l) => active.statuses.includes(l.status));
+  // Search by name, city or price.
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return byTab;
+    return byTab.filter((l) => (
+      (l.title || '').toLowerCase().includes(q)
+      || (l.city || '').toLowerCase().includes(q)
+      || String(l.price || '').includes(q)
+    ));
+  }, [byTab, query]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -41,6 +52,22 @@ export default function MyListingsScreen() {
           <Image source={ICONS.plus} style={styles.addIcon} />
           <Text style={styles.addText}>Add</Text>
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.searchWrap}>
+        <Image source={ICONS.searchMuted} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by name, location or price…"
+          placeholderTextColor={colors.inkFaint}
+          value={query}
+          onChangeText={setQuery}
+        />
+        {!!query && (
+          <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={styles.searchClear}>✕</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.tabs}>
@@ -61,7 +88,7 @@ export default function MyListingsScreen() {
         keyExtractor={(l) => String(l.id)}
         contentContainerStyle={{ padding: space.lg, paddingTop: 8, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={<Text style={styles.empty}>No {tab === 'all' ? '' : tab} listings yet.</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>{query.trim() ? `No listings match "${query.trim()}".` : `No ${tab === 'all' ? '' : tab} listings yet.`}</Text>}
         renderItem={({ item }) => {
           const st = STATUS[item.status] || STATUS.draft;
           const img = resolveImage(item.image);
@@ -106,6 +133,11 @@ const styles = StyleSheet.create({
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.brand, paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill },
   addIcon: { width: 16, height: 16, tintColor: '#101010' },
   addText: { color: '#101010', fontWeight: '900', fontSize: font.small },
+
+  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, marginHorizontal: space.lg, marginTop: 12, paddingHorizontal: 14, height: 42 },
+  searchIcon: { width: 15, height: 15, tintColor: colors.inkFaint },
+  searchInput: { flex: 1, fontSize: font.small, color: colors.ink, paddingVertical: 0 },
+  searchClear: { color: colors.inkFaint, fontSize: 13, fontWeight: '700' },
 
   tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: space.lg, paddingTop: 12 },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, height: 36, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
