@@ -10,13 +10,12 @@ import { ICONS } from '../../icons';
 
 const NAVY = '#15233F';
 
-const RECENT = [
-  { id: 1, name: 'Ravi Patel', exp: 'Goa Coastal Kayaking', date: 'Jun 22, 2026', amount: 4400, status: 'upcoming' },
-  { id: 2, name: 'Aisha Khan', exp: 'Sunset Dolphin Tour', date: 'Jun 20, 2026', amount: 4400, status: 'upcoming' },
-  { id: 3, name: 'Tom Williams', exp: 'Goa Coastal Kayaking', date: 'Jun 15, 2026', amount: 3300, status: 'completed' },
-];
-const BARS = [38, 60, 45, 80, 55, 95]; // earnings sparkline heights (%)
-const MONTHS = ['J', 'F', 'M', 'A', 'M', 'J'];
+const DATE_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const prettyDate = (s) => {
+  if (!s) return '';
+  const [y, m, d] = String(s).split('-').map(Number);
+  return `${DATE_MONTHS[(m || 1) - 1]} ${d}, ${y}`;
+};
 
 export default function HostDashboardScreen() {
   const insets = useSafeAreaInsets();
@@ -70,30 +69,35 @@ export default function HostDashboardScreen() {
       <View style={styles.card}>
         <View style={styles.cardHead}>
           <Text style={styles.cardTitle}>Earnings</Text>
-          <Text style={styles.cardSub}>Last 6 months</Text>
         </View>
-        <View style={styles.chart}>
-          {BARS.map((h, i) => (
-            <View key={i} style={styles.chartCol}>
-              <View style={styles.chartTrack}><View style={[styles.chartBar, { height: `${h}%` }]} /></View>
-              <Text style={styles.chartLabel}>{MONTHS[i]}</Text>
-            </View>
-          ))}
+        <View style={styles.earnRow}>
+          <View style={styles.earnCell}>
+            <Text style={styles.earnValue}>{formatMoney(stats.earnedMonth)}</Text>
+            <Text style={styles.earnLabel}>This month</Text>
+          </View>
+          <View style={styles.earnDiv} />
+          <View style={styles.earnCell}>
+            <Text style={styles.earnValue}>{formatMoney(stats.earnedTotal)}</Text>
+            <Text style={styles.earnLabel}>All time</Text>
+          </View>
         </View>
       </View>
 
       {/* Recent bookings */}
       <View style={styles.recentHead}>
         <Text style={styles.recentTitle}>Recent Bookings</Text>
-        <TouchableOpacity onPress={() => navigateTab('inbox')}><Text style={styles.viewAll}>View all</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => navigateTab('listings')}><Text style={styles.viewAll}>View all</Text></TouchableOpacity>
       </View>
       <View style={{ marginHorizontal: space.lg }}>
-        {RECENT.map((r) => (
+        {!stats.recentBookings.length && (
+          <Text style={styles.empty}>No bookings yet on your listings.</Text>
+        )}
+        {stats.recentBookings.map((r) => (
           <View key={r.id} style={styles.bk}>
-            <View style={styles.bkAvatar}><Text style={styles.bkAvatarText}>{initials(r.name)}</Text></View>
+            <View style={styles.bkAvatar}><Text style={styles.bkAvatarText}>{initials(r.guest)}</Text></View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.bkName}>{r.name}</Text>
-              <Text style={styles.bkMeta} numberOfLines={1}>{r.exp} · {r.date}</Text>
+              <Text style={styles.bkName}>{r.guest}</Text>
+              <Text style={styles.bkMeta} numberOfLines={1}>{r.experience} · {prettyDate(r.date)}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={styles.bkAmount}>{formatMoney(r.amount)}</Text>
@@ -153,11 +157,11 @@ const styles = StyleSheet.create({
   cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardTitle: { fontSize: font.h3, fontWeight: '900', color: colors.ink },
   cardSub: { fontSize: font.small, color: colors.inkMuted },
-  chart: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 120, marginTop: 16 },
-  chartCol: { flex: 1, alignItems: 'center' },
-  chartTrack: { width: 18, height: 96, borderRadius: 9, backgroundColor: '#F1F2F4', justifyContent: 'flex-end', overflow: 'hidden' },
-  chartBar: { width: '100%', borderRadius: 9, backgroundColor: colors.brand },
-  chartLabel: { fontSize: font.tiny, color: colors.inkFaint, marginTop: 6 },
+  earnRow: { flexDirection: 'row', alignItems: 'center', marginTop: 14 },
+  earnCell: { flex: 1, alignItems: 'center' },
+  earnValue: { fontSize: font.h2, fontWeight: '900', color: colors.brandDark },
+  earnLabel: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 3 },
+  earnDiv: { width: 1, height: 34, backgroundColor: colors.border },
 
   recentHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.lg, marginTop: 22, marginBottom: 12 },
   recentTitle: { fontSize: font.h3, fontWeight: '900', color: colors.ink },
@@ -174,4 +178,5 @@ const styles = StyleSheet.create({
   bkPillText: { fontSize: 10, fontWeight: '800' },
   bkPillTextUp: { color: colors.brandDark },
   bkPillTextDone: { color: colors.inkMuted },
+  empty: { textAlign: 'center', color: colors.inkMuted, fontSize: font.body, paddingVertical: 20 },
 });

@@ -10,8 +10,8 @@ import EmptyState from '../components/EmptyState';
 
 // Icon + tint per notification kind. The feed itself comes from the backend
 // (/api/notifications) so the app and website always show the same list.
-const ICON_FOR = { booking: ICONS.ticket, wallet: ICONS.card, welcome: ICONS.bell };
-const TINT_FOR = { booking: colors.brand, wallet: '#2563EB', welcome: '#16A34A' };
+const ICON_FOR = { booking: ICONS.ticket, wallet: ICONS.card, welcome: ICONS.bell, host_booking: ICONS.ticket };
+const TINT_FOR = { booking: colors.brand, wallet: '#2563EB', welcome: '#16A34A', host_booking: '#8E51FF' };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function dayLabel(iso) {

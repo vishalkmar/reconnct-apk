@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, Image, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { Svg, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { colors, font } from '../../theme';
 import { api } from '../../api/client';
 import { toast } from '../../utils/toast';
-import { AuthHeader, AuthField, AuthButton, MAIL_SVG, LOCK_SVG, FIELD_W, px } from './authUi';
+import { AuthHeader, AuthCard, AuthField, AuthButton, MAIL_SVG, LOCK_SVG, FIELD_W, px } from './authUi';
 
 const LENGTH = 6;
 
 export default function OtpScreen({ email, onBack, onVerified }) {
-  const insets = useSafeAreaInsets();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -56,13 +55,27 @@ export default function OtpScreen({ email, onBack, onVerified }) {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <AuthHeader />
+    <View style={styles.screen}>
+      {/* Same bottom illustration + top-edge fade as the login screen. */}
+      <View style={styles.bgWrap} pointerEvents="none">
+        <Image source={require('../../assets/loginimage.png')} style={styles.bgImage} resizeMode="cover" />
+        <Svg style={styles.bgFade} width="100%" height={px(90)}>
+          <Defs>
+            <LinearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#FEFEFE" stopOpacity="1" />
+              <Stop offset="1" stopColor="#FEFEFE" stopOpacity="0" />
+            </LinearGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#fade)" />
+        </Svg>
+      </View>
 
-      {/* Field block centred in the remaining space; button pinned near the
-          bottom, separate from it — matching the reference. */}
-      <View style={styles.middle}>
-        <View style={styles.body}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <AuthHeader />
+
+        {/* Card right under the header, button right under the card — both in
+            normal flow (not centred/bottom-pinned) so the gap stays tight. */}
+        <AuthCard>
           <AuthField icon={MAIL_SVG} value={email} editable={false} />
 
           <View style={{ height: 12 }} />
@@ -84,23 +97,24 @@ export default function OtpScreen({ email, onBack, onVerified }) {
             </Text>
           </Text>
           {!!error && <Text style={styles.error}>{error}</Text>}
-        </View>
-      </View>
+        </AuthCard>
 
-      <View style={{ alignItems: 'center', paddingBottom: insets.bottom + 24 }}>
-        <AuthButton label="Verify" active={code.length === LENGTH} loading={loading} onPress={() => verify()} />
-        <TouchableOpacity onPress={onBack} style={{ marginTop: 16 }}>
-          <Text style={styles.back}>‹ Change email</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+        <View style={{ alignItems: 'center' }}>
+          <AuthButton label="Verify" active={code.length === LENGTH} loading={loading} onPress={() => verify()} />
+          <TouchableOpacity onPress={onBack} style={{ marginTop: 16 }}>
+            <Text style={styles.back}>‹ Change email</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FEFEFE' },
-  middle: { flex: 1, justifyContent: 'center' },
-  body: { alignItems: 'center' },
+  bgWrap: { position: 'absolute', left: 0, right: 0, bottom: 0, height: px(230) },
+  bgImage: { width: '100%', height: '100%' },
+  bgFade: { position: 'absolute', top: 0, left: 0, right: 0 },
   // Same spec as the email screen's helper: width 302, font-size 14, #1A1A2E —
   // only the "Resend" word itself stays blue as a link.
   helper: { width: FIELD_W, fontSize: px(14), color: '#1A1A2E', marginTop: 6, lineHeight: px(18) },

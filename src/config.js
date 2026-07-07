@@ -14,6 +14,12 @@ export const API_BASE = 'https://reconnct-again-backend.onrender.com/api';
 // Origin (no /api) used to resolve relative /uploads/... image paths.
 export const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '');
 
+// Web frontend origin — used as the Cashfree payment link's return_url so the
+// in-app WebView has something containing "/booking-success" to detect and
+// auto-close on (see utils/cashfree.js). Without this Cashfree just shows its
+// own generic "Payment Success" page and the app never knows to redirect.
+export const WEB_BASE = 'https://reconnct.app';
+
 // Phase-1 demo sign-in (handled by the backend's userAuth backdoor).
 export const DEMO_EMAIL = 'demo@reconnct.app';
 export const DEMO_OTP = '123456';

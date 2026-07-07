@@ -80,6 +80,8 @@ export default function BookingScreen({ item }) {
       // phones), then register its id with our backend so the booking still
       // auto-confirms when the link is paid. Backend-created link is a fallback.
       let linkUrl = null;
+      let directErr = null;
+      let fallbackErr = null;
       try {
         const linkId = `${bk.bookingCode}-${Date.now().toString(36)}`;
         const direct = await createDirectPaymentLink({
@@ -89,19 +91,26 @@ export default function BookingScreen({ item }) {
           email: (guest.email || '').trim() || (user && user.email) || '',
           purpose: item.name,
           linkId,
+          bookingCode: bk.bookingCode,
         });
         linkUrl = direct.linkUrl;
         try { await api.bookingLink(token, bk.bookingCode, { linkId: direct.linkId, linkUrl: direct.linkUrl }); } catch (_) { /* registration is best-effort */ }
-      } catch (directErr) {
+      } catch (e) {
+        directErr = e;
         // Fallback: let the backend create the link (retry for free-host cold starts).
         let lk = null;
         for (let attempt = 0; attempt < 2; attempt++) {
-          try { lk = await api.bookingLink(token, bk.bookingCode); if (lk && lk.linkUrl) break; } catch (_) { /* retry */ }
+          try { lk = await api.bookingLink(token, bk.bookingCode); if (lk && lk.linkUrl) break; } catch (e2) { fallbackErr = e2; }
           await new Promise((r) => setTimeout(r, 1500));
         }
         linkUrl = lk && lk.linkUrl;
       }
-      if (!linkUrl) throw new Error('Could not start the payment. Please try again.');
+      // Surface the REAL reason (Cashfree/network error) instead of a generic
+      // message — both the direct-from-app and backend-fallback paths failed.
+      if (!linkUrl) {
+        const reason = (directErr && directErr.message) || (fallbackErr && fallbackErr.message);
+        throw new Error(reason ? `Could not start the payment: ${reason}` : 'Could not start the payment. Please try again.');
+      }
       setPayLink(linkUrl);
       // Open the Cashfree checkout INSIDE the app (WebView).
       setShowPayWeb(true);

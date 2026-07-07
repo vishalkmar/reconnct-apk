@@ -52,6 +52,10 @@ export default function PaymentWebView({ visible, url, onClose, onReturn }) {
             startInLoadingState
             javaScriptEnabled
             domStorageEnabled
+            thirdPartyCookiesEnabled
+            sharedCookiesEnabled
+            mixedContentMode="always"
+            originWhitelist={['*']}
             setSupportMultipleWindows={false}
           />
           {loading && (

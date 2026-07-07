@@ -1,5 +1,5 @@
 import { api } from '../api/client';
-import { CASHFREE } from '../config';
+import { CASHFREE, WEB_BASE } from '../config';
 
 /**
  * Backend-created payment link (preferred — keeps the flow server-authoritative).
@@ -31,7 +31,7 @@ function normalizePhone(raw) {
  * This exists because the server-side link call was failing to open the checkout
  * on some devices — talking to Cashfree directly is reliable on-device.
  */
-export async function createDirectPaymentLink({ amount, name, phone, email, purpose, linkId }) {
+export async function createDirectPaymentLink({ amount, name, phone, email, purpose, linkId, bookingCode }) {
   const id = linkId || `rc_${Date.now()}_${Math.floor(1000 + Math.random() * 8999)}`;
   const body = {
     link_id: String(id),
@@ -44,6 +44,10 @@ export async function createDirectPaymentLink({ amount, name, phone, email, purp
       customer_email: email || 'guest@reconnct.app',
     },
     link_notify: { send_sms: false, send_email: false },
+    // Without this Cashfree shows its OWN generic "Payment Success" page and
+    // never navigates anywhere the WebView can detect — the in-app checkout
+    // was getting stuck there instead of returning to My Bookings.
+    ...(bookingCode ? { link_meta: { return_url: `${WEB_BASE}/booking-success/${bookingCode}` } } : {}),
   };
   const res = await fetch(`${CASHFREE.API_BASE}/links`, {
     method: 'POST',

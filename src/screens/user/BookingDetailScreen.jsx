@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, TextInput, Alert,
+  View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, TextInput, Alert, Linking,
 } from 'react-native';
 import { colors, radius, font, space, shadow } from '../../theme';
 import { api, resolveImage, DUMMY_IMAGE } from '../../api/client';
+import { API_BASE } from '../../config';
 import { formatMoney } from '../../utils/format';
 import { useAuth } from '../../store/AuthContext';
 import { useNav } from '../../navigation/NavContext';
@@ -109,6 +110,11 @@ export default function BookingDetailScreen({ code, startCancel }) {
     }
   };
 
+  const downloadVoucher = () => {
+    const url = `${API_BASE}/bookings/me/${encodeURIComponent(code)}/voucher.pdf?token=${encodeURIComponent(token)}`;
+    Linking.openURL(url).catch(() => Alert.alert('Voucher', 'Could not open the voucher. Please try again.'));
+  };
+
   const confirmCancel = async () => {
     setCancelling(true);
     try {
@@ -170,6 +176,12 @@ export default function BookingDetailScreen({ code, startCancel }) {
             {!!pay.paidAt && <Text style={styles.ribbonPaidAt}>{fmtDateTime(pay.paidAt)}</Text>}
           </View>
         </View>
+
+        {/* Voucher download */}
+        <TouchableOpacity style={styles.downloadBtn} activeOpacity={0.9} onPress={downloadVoucher}>
+          <Image source={ICONS.ticket} style={styles.downloadIcon} />
+          <Text style={styles.downloadText}>Download Voucher (PDF)</Text>
+        </TouchableOpacity>
 
         {/* Item snapshot */}
         <View style={styles.card}>
@@ -416,6 +428,10 @@ const styles = StyleSheet.create({
   ribbonPaidAt: { color: 'rgba(255,255,255,0.85)', fontSize: 10, marginTop: 4 },
   badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, marginTop: 8 },
   badgeText: { fontSize: 11, fontWeight: '800' },
+
+  downloadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.brand, borderRadius: radius.lg, marginHorizontal: space.lg, marginTop: 4, paddingVertical: 13, ...shadow.card },
+  downloadIcon: { width: 16, height: 16, tintColor: colors.brandDark },
+  downloadText: { color: colors.brandDark, fontWeight: '800', fontSize: font.body },
 
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, marginHorizontal: space.lg, marginTop: 12, padding: 16, ...shadow.card },
   itemRow: { flexDirection: 'row', gap: 12 },

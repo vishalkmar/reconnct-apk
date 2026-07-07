@@ -81,7 +81,7 @@ export default function IntroScreen({ onDone }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface },
-  skip: { position: 'absolute', right: 20, zIndex: 5 },
+  skip: { position: 'absolute', left: 20, zIndex: 5 },
   skipText: { color: colors.inkMuted, fontWeight: '700', fontSize: font.body },
   slide: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   illustration: { width: '100%', height: 260 },

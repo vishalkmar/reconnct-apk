@@ -15,6 +15,7 @@ const HostContext = createContext(null);
 const EMPTY_STATS = {
   listingCount: 0, activeCount: 0, pendingCount: 0, draftCount: 0,
   bookings: 0, earnedTotal: 0, earnedMonth: 0, pendingTotal: 0, rating: 0,
+  recentBookings: [],
 };
 
 export function HostProvider({ children }) {

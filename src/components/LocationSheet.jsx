@@ -8,7 +8,7 @@ import { colors, radius, font, space } from '../theme';
 import { api } from '../api/client';
 import { useLocation } from '../store/LocationContext';
 import {
-  SEARCH_SVG, LOCATE_SVG, OTHER_CITIES_SVG, cityMonumentSvg, POPULAR_CITIES,
+  SEARCH_SVG, LOCATE_SVG, OTHER_CITIES_SVG, HEART_SVG, cityMonumentSvg, POPULAR_CITIES,
 } from './cityIcons';
 
 /**
@@ -98,7 +98,7 @@ export default function LocationSheet({ visible, onClose }) {
               <>
                 {/* Popular cities */}
                 <View style={styles.labelRow}>
-                  <Text style={styles.heart}>♥</Text>
+                  <SvgXml xml={HEART_SVG} width={14} height={14} />
                   <Text style={styles.label}>Popular Cities</Text>
                 </View>
                 <View style={styles.grid}>
@@ -176,7 +176,6 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, color: '#1A1A2E', fontSize: font.body, paddingVertical: 0 },
 
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 18, marginBottom: 12 },
-  heart: { fontSize: 14, color: '#FE9A00' },
   label: { fontSize: 15, fontWeight: '800', color: '#1A1A2E' },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
