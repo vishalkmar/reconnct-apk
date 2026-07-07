@@ -1,3 +1,5 @@
+import { CASHFREE_APP_ID, CASHFREE_APP_SECRET } from '@env';
+
 /**
  * App configuration.
  *
@@ -31,13 +33,17 @@ export const DEMO_OTP = '123456';
  * trip was failing for some phones), then registers the link id with our backend
  * so the booking still auto-confirms on payment.
  *
+ * Actual values live in the local, untracked `.env` file (see `.env.example`
+ * for the keys needed) — never hardcoded here, so they can't end up in git
+ * history.
+ *
  * ⚠️ NEVER put a production/live Cashfree secret in the app — it ships inside the
  * APK and can be extracted. Live keys must stay on the backend only.
  */
 export const CASHFREE = {
   MODE: 'TEST',
-  APP_ID: '__CASHFREE_APP_ID_REDACTED__',
-  APP_SECRET: '__CASHFREE_APP_SECRET_REDACTED__',
+  APP_ID: CASHFREE_APP_ID,
+  APP_SECRET: CASHFREE_APP_SECRET,
   API_BASE: 'https://sandbox.cashfree.com/pg',
   API_VERSION: '2025-01-01',
 };
