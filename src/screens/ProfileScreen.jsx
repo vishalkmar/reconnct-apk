@@ -11,6 +11,7 @@ import { ICONS } from '../icons';
 
 const MENU = [
   { label: 'My Profile', icon: ICONS.navProfile, screen: 'myProfile' },
+  { label: 'Messages', icon: ICONS.navInbox, screen: 'support', params: { queue: 'user' }, dot: true },
   { label: 'My Bookings', icon: ICONS.ticket, screen: 'bookings' },
   { label: 'Transactions', icon: ICONS.card, screen: 'transactions' },
   { label: 'Wishlist', icon: ICONS.heart, screen: 'wishlist' },
@@ -101,7 +102,10 @@ export default function ProfileScreen() {
             activeOpacity={0.7}
             onPress={() => (m.screen ? push(m.screen, m.params) : soon(m.label))}
           >
-            <Image source={m.icon} style={styles.rowIconImg} />
+            <View>
+              <Image source={m.icon} style={styles.rowIconImg} />
+              {m.dot && <View style={styles.rowDot} />}
+            </View>
             <Text style={styles.rowText}>{m.label}</Text>
             <Text style={styles.chev}>›</Text>
           </TouchableOpacity>
@@ -151,6 +155,7 @@ const styles = StyleSheet.create({
   rowLast: { borderBottomWidth: 0 },
   rowIcon: { fontSize: 17, width: 24, textAlign: 'center' },
   rowIconImg: { width: 20, height: 20, tintColor: colors.brand },
+  rowDot: { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brand },
   rowText: { flex: 1, fontSize: font.body, color: colors.ink, fontWeight: '600' },
   chev: { fontSize: 20, color: colors.inkFaint },
   unreadPill: { minWidth: 20, height: 20, paddingHorizontal: 6, borderRadius: 10, backgroundColor: '#D4183D', alignItems: 'center', justifyContent: 'center', marginRight: 6 },

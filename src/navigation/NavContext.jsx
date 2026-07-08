@@ -8,7 +8,7 @@ import { useAuth } from '../store/AuthContext';
  */
 const NavContext = createContext(null);
 
-export const TABS = ['home', 'search', 'experiences', 'inbox', 'profile'];
+export const TABS = ['home', 'search', 'reconnect', 'experiences', 'profile'];
 export const HOST_TABS = ['dashboard', 'listings', 'inbox', 'profile'];
 const HOME_TAB = { traveller: 'home', host: 'dashboard' };
 

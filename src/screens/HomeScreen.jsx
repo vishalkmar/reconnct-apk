@@ -222,7 +222,7 @@ export default function HomeScreen() {
           )}
 
           {/* Connect With — audience taxonomy from the DB, tap opens that audience's experiences */}
-          <ConnectWithSection auds={auds} onPressAud={goAudience} onSeeAll={() => push('reconnect')} />
+          <ConnectWithSection auds={auds} onPressAud={goAudience} onSeeAll={() => navigateTab('reconnect')} />
 
           {loading ? (
             <ActivityIndicator color={colors.brand} style={{ marginTop: 24 }} />

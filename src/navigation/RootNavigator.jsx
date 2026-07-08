@@ -27,8 +27,8 @@ function TabScreen({ tab, mode }) {
   switch (tab) {
     case 'home': return lazy(() => require('../screens/HomeScreen'));
     case 'search': return lazy(() => require('../screens/SearchScreen'));
+    case 'reconnect': return lazy(() => require('../screens/ReconnectScreen'));
     case 'experiences': return lazy(() => require('../screens/ExperiencesScreen'));
-    case 'inbox': { const C = require('../screens/SupportScreen').default; return <C queue="user" embedded />; }
     case 'profile': return lazy(() => require('../screens/ProfileScreen'));
     default: return lazy(() => require('../screens/HomeScreen'));
   }
@@ -38,7 +38,6 @@ function TabScreen({ tab, mode }) {
 function StackScreen({ name, params }) {
   switch (name) {
     case 'detail': { const C = require('../screens/DetailScreen').default; return <C idOrSlug={params.idOrSlug} />; }
-    case 'reconnect': return lazy(() => require('../screens/ReconnectScreen'));
     case 'booking': { const C = require('../screens/BookingScreen').default; return <C item={params.item} />; }
     case 'experiences': { const C = require('../screens/ExperiencesScreen').default; return <C initialFilters={params.initialFilters} tagMode={params.tagMode} />; }
     case 'myProfile': return lazy(() => require('../screens/user/MyProfileScreen'));

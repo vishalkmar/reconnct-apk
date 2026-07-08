@@ -7,8 +7,8 @@ import { ICONS } from '../icons';
 const TRAVELLER_ITEMS = [
   { key: 'home', label: 'Home', icon: ICONS.navHome },
   { key: 'search', label: 'Search', icon: ICONS.navSearch },
+  { key: 'reconnect', label: 'Reconnect', icon: ICONS.groups },
   { key: 'experiences', label: 'Experiences', icon: ICONS.navExp },
-  { key: 'inbox', label: 'Inbox', icon: ICONS.navInbox, dot: true },
   { key: 'profile', label: 'Profile', icon: ICONS.navProfile },
 ];
 const HOST_ITEMS = [
