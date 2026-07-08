@@ -39,7 +39,7 @@ const blank = {
   termsConditions: '', privacyPolicy: '', refundCancellationPolicy: '',
   priceMethod: 'per_person', adultPrice: '', childrenEnabled: false, childBands: [],
   capacity: 8, durationHours: 0, durationMinutes: 0,
-  dateRows: [], // [{ date:'YYYY-MM-DD', slots:[{start,end}] }]
+  schedule: { dates: [] }, // { dates:[{date:'YYYY-MM-DD', slots:[{start,end}]}], slotMode }
   photos: [], videos: [],
 };
 
@@ -442,17 +442,23 @@ const fmtDateShort = (s) => { const [y, m, d] = s.split('-').map(Number); return
 function Availability({ form, patch }) {
   const [calOpen, setCalOpen] = useState(false);
   const [slotDate, setSlotDate] = useState(null); // date string we're editing slots for
-  const rows = form.dateRows;
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const schedule = form.schedule || { dates: [] };
+  const rows = schedule.dates || [];
+  const slotMode = schedule.slotMode || 'manual';
   const dur = (Number(form.durationHours) || 0) * 60 + (Number(form.durationMinutes) || 0) || 60;
 
+  const setRows = (next) => patch({ schedule: { ...schedule, dates: next } });
+
   // Merge calendar selection: keep slots for surviving dates, drop removed ones.
-  const saveDates = (dates) => {
+  const saveDates = (dates, mode) => {
     const existing = new Map(rows.map((r) => [r.date, r.slots]));
-    patch({ dateRows: dates.sort().map((d) => ({ date: d, slots: existing.get(d) || [] })) });
+    patch({ schedule: { dates: dates.sort().map((d) => ({ date: d, slots: existing.get(d) || [] })), slotMode: mode } });
     setCalOpen(false);
   };
-  const removeDate = (d) => patch({ dateRows: rows.filter((r) => r.date !== d) });
-  const saveSlots = (d, slots) => { patch({ dateRows: rows.map((r) => (r.date === d ? { ...r, slots } : r)) }); setSlotDate(null); };
+  const removeDate = (d) => setRows(rows.filter((r) => r.date !== d));
+  const saveSlots = (d, slots) => { setRows(rows.map((r) => (r.date === d ? { ...r, slots } : r))); setSlotDate(null); };
+  const applyToAll = (slots) => { setRows(rows.map((r) => ({ ...r, slots }))); setBulkOpen(false); };
   const editing = slotDate ? rows.find((r) => r.date === slotDate) : null;
   const totalSlots = rows.reduce((n, r) => n + r.slots.length, 0);
 
@@ -465,8 +471,17 @@ function Availability({ form, patch }) {
           <Image source={ICONS.calendar} style={styles.datesIcon} />
           <Text style={styles.datesText}>Manage dates{rows.length ? ` (${rows.length})` : ''}</Text>
         </TouchableOpacity>
+        {rows.length > 0 && slotMode === 'dynamic' && (
+          <TouchableOpacity style={styles.manageAllBtn} onPress={() => setBulkOpen(true)} activeOpacity={0.9}>
+            <Image source={ICONS.clock} style={styles.manageAllIcon} />
+            <Text style={styles.manageAllText}>Manage Slots</Text>
+          </TouchableOpacity>
+        )}
         {rows.length > 0 && <Text style={styles.hint}>{rows.length} date{rows.length > 1 ? 's' : ''} · {totalSlots} slot{totalSlots !== 1 ? 's' : ''}</Text>}
       </View>
+      {rows.length > 0 && slotMode === 'dynamic' && (
+        <Text style={styles.hint}>Dynamic mode — use “Manage Slots” to apply a slot set to every date at once, or edit a single date below.</Text>
+      )}
 
       {rows.length === 0 ? (
         <Text style={styles.hint}>No dates yet. Tap “Manage dates” to pick available dates.</Text>
@@ -492,59 +507,52 @@ function Availability({ form, patch }) {
 
       <Modal visible={calOpen} transparent animationType="slide" onRequestClose={() => setCalOpen(false)}>
         <View style={styles.calBackdrop}>
-          <DatesCalendar selected={rows.map((r) => r.date)} onClose={() => setCalOpen(false)} onSave={saveDates} />
+          <DatesCalendar selected={rows.map((r) => r.date)} initialMode={rows.length ? slotMode : null} onClose={() => setCalOpen(false)} onSave={saveDates} />
         </View>
       </Modal>
 
       <Modal visible={!!editing} transparent animationType="slide" onRequestClose={() => setSlotDate(null)}>
         <View style={styles.calBackdrop}>
-          {editing && <SlotsModal date={editing.date} slots={editing.slots} durationMinutes={dur} onClose={() => setSlotDate(null)} onSave={(s) => saveSlots(editing.date, s)} />}
+          {editing && <SlotsModal title={`Slots · ${fmtDateShort(editing.date)}`} slots={editing.slots} durationMinutes={dur} onClose={() => setSlotDate(null)} onSave={(s) => saveSlots(editing.date, s)} />}
+        </View>
+      </Modal>
+
+      <Modal visible={bulkOpen} transparent animationType="slide" onRequestClose={() => setBulkOpen(false)}>
+        <View style={styles.calBackdrop}>
+          <SlotsModal title="Manage Slots · applies to every date" slots={[]} durationMinutes={dur} requireApplyAll onClose={() => setBulkOpen(false)} onSave={applyToAll} />
         </View>
       </Modal>
     </View>
   );
 }
 
-// Per-date slot editor — build slots of the activity's duration.
-function SlotsModal({ date, slots, durationMinutes, onSave, onClose }) {
+// Slot editor — build slots manually. Used both for one date and, with
+// requireApplyAll, the dynamic-mode bulk editor that applies its result to
+// every date at once.
+function SlotsModal({ title, slots, durationMinutes, requireApplyAll, onSave, onClose }) {
   const dur = durationMinutes > 0 ? durationMinutes : 60;
   const [list, setList] = useState(slots.map((s) => ({ ...s })));
   const [start, setStart] = useState('09:00');
-  const [winStart, setWinStart] = useState('09:00');
-  const [winEnd, setWinEnd] = useState('17:00');
+  const [applyAll, setApplyAll] = useState(false);
 
   const add = (s) => {
     const end = toHHMM(toMin(s) + dur);
-    if (list.some((x) => x.start === s)) return;
+    if (list.some((x) => x.start === s)) { Alert.alert('Slot', 'That slot is already added.'); return; }
     setList((p) => [...p, { start: s, end }].sort((a, b) => toMin(a.start) - toMin(b.start)));
-  };
-  const generate = () => {
-    const ws = toMin(winStart); const we = toMin(winEnd);
-    if (we <= ws) return Alert.alert('Window', 'End time must be after start.');
-    const merged = [...list];
-    for (let t = ws; t + dur <= we; t += dur) { const s = toHHMM(t); if (!merged.some((x) => x.start === s)) merged.push({ start: s, end: toHHMM(t + dur) }); }
-    if (merged.length === list.length) return Alert.alert('Window', 'Too small for one slot.');
-    setList(merged.sort((a, b) => toMin(a.start) - toMin(b.start)));
+    // Advance the start picker to the next back-to-back slot so tapping
+    // "Add slot" repeatedly builds a sequence without retyping times.
+    setStart(end);
   };
   const remove = (i) => setList(list.filter((_, idx) => idx !== i));
+  const canSave = requireApplyAll ? (list.length > 0 && applyAll) : true;
 
   return (
     <View style={styles.calCard}>
       <View style={styles.calHeadRow}>
-        <Text style={styles.modalTitle}>Slots · {fmtDateShort(date)}</Text>
+        <Text style={styles.modalTitle}>{title}</Text>
         <TouchableOpacity onPress={onClose}><Text style={styles.modalClose}>✕</Text></TouchableOpacity>
       </View>
       <Text style={styles.hint}>Each slot is {Math.floor(dur / 60)}h{dur % 60 ? ` ${dur % 60}m` : ''} long.</Text>
-
-      {/* Auto-generate window */}
-      <View style={styles.genBox}>
-        <Text style={styles.genTitle}>Auto-generate</Text>
-        <View style={styles.durRow}>
-          <View><Text style={styles.smallNumLabel}>From</Text><TextInput value={winStart} onChangeText={setWinStart} placeholder="09:00" placeholderTextColor={colors.inkFaint} style={styles.smallInput} /></View>
-          <View><Text style={styles.smallNumLabel}>To</Text><TextInput value={winEnd} onChangeText={setWinEnd} placeholder="17:00" placeholderTextColor={colors.inkFaint} style={styles.smallInput} /></View>
-          <TouchableOpacity style={[styles.addBtn, { alignSelf: 'flex-end' }]} onPress={generate}><Text style={styles.addBtnText}>Generate</Text></TouchableOpacity>
-        </View>
-      </View>
 
       {/* Manual single slot */}
       <View style={[styles.durRow, { marginTop: 12 }]}>
@@ -562,24 +570,43 @@ function SlotsModal({ date, slots, durationMinutes, onSave, onClose }) {
         </View>
       )}
 
+      {requireApplyAll && (
+        <TouchableOpacity style={styles.checkRow2} onPress={() => setApplyAll((v) => !v)} activeOpacity={0.8}>
+          <View style={[styles.checkbox, applyAll && styles.checkboxOn]}>{applyAll && <Text style={styles.checkboxTick}>✓</Text>}</View>
+          <Text style={styles.checkLabel}>Apply to all dates</Text>
+        </TouchableOpacity>
+      )}
+
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
         <TouchableOpacity style={styles.ghost} onPress={onClose}><Text style={styles.ghostText}>Cancel</Text></TouchableOpacity>
-        <TouchableOpacity style={[styles.primary, { flex: 1.4 }]} onPress={() => onSave(list)}><Text style={styles.primaryText}>Save {list.length} slot{list.length !== 1 ? 's' : ''}</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.primary, { flex: 1.4 }, !canSave && styles.primaryOff]} disabled={!canSave} onPress={() => onSave(list)}>
+          <Text style={styles.primaryText}>Save {list.length} slot{list.length !== 1 ? 's' : ''}</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-function DatesCalendar({ selected, onSave, onClose }) {
+// Current month + next 11 (never past months, never bound to a calendar year).
+const MONTHS_WINDOW = 12;
+function DatesCalendar({ selected, initialMode, onSave, onClose }) {
   const today = new Date();
-  const [view, setView] = useState({ y: today.getFullYear(), m: today.getMonth() });
+  const startY = today.getFullYear(); const startM = today.getMonth();
+  const [offset, setOffset] = useState(0); // 0..11 months ahead of the current month
   const [sel, setSel] = useState(new Set(selected));
+  const [mode, setMode] = useState(initialMode);
+  const view = useMemo(() => {
+    const d = new Date(startY, startM + offset, 1);
+    return { y: d.getFullYear(), m: d.getMonth() };
+  }, [offset, startY, startM]);
   const todayKey = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
   const firstDow = new Date(view.y, view.m, 1).getDay();
   const days = new Date(view.y, view.m + 1, 0).getDate();
   const cells = [...Array(firstDow).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
-  const stepMonth = (d) => { const nd = new Date(view.y, view.m + d, 1); setView({ y: nd.getFullYear(), m: nd.getMonth() }); };
   const toggle = (key) => { const n = new Set(sel); n.has(key) ? n.delete(key) : n.add(key); setSel(n); };
+
+  const modeRequired = sel.size > 0;
+  const canSave = !modeRequired || !!mode;
 
   return (
     <View style={styles.calCard}>
@@ -588,9 +615,9 @@ function DatesCalendar({ selected, onSave, onClose }) {
         <TouchableOpacity onPress={onClose}><Text style={styles.modalClose}>✕</Text></TouchableOpacity>
       </View>
       <View style={styles.calNavRow}>
-        <TouchableOpacity onPress={() => stepMonth(-1)} style={styles.calNav}><Text style={styles.calNavTxt}>‹</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => setOffset((o) => Math.max(0, o - 1))} disabled={offset === 0} style={[styles.calNav, offset === 0 && styles.calNavOff]}><Text style={styles.calNavTxt}>‹</Text></TouchableOpacity>
         <Text style={styles.calMonth}>{MONTHS_FULL[view.m]} {view.y}</Text>
-        <TouchableOpacity onPress={() => stepMonth(1)} style={styles.calNav}><Text style={styles.calNavTxt}>›</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => setOffset((o) => Math.min(MONTHS_WINDOW - 1, o + 1))} disabled={offset === MONTHS_WINDOW - 1} style={[styles.calNav, offset === MONTHS_WINDOW - 1 && styles.calNavOff]}><Text style={styles.calNavTxt}>›</Text></TouchableOpacity>
       </View>
       <View style={styles.calDows}>{['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <Text key={i} style={styles.calDow}>{d}</Text>)}</View>
       <View style={styles.calGrid}>
@@ -608,11 +635,34 @@ function DatesCalendar({ selected, onSave, onClose }) {
           );
         })}
       </View>
+
+      {modeRequired && (
+        <View style={styles.modeBox}>
+          <Text style={styles.modeTitle}>How will slots be managed for these dates?</Text>
+          <View style={{ gap: 8, marginTop: 8 }}>
+            <ModeOption active={mode === 'manual'} title="Manual slots for each date" sub="Set slots one date at a time." onPress={() => setMode('manual')} />
+            <ModeOption active={mode === 'dynamic'} title="Dynamic management" sub="Build one slot set, apply it to every date at once." onPress={() => setMode('dynamic')} />
+          </View>
+          {!mode && <Text style={styles.modeWarn}>Pick one to continue.</Text>}
+        </View>
+      )}
+
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
         <TouchableOpacity style={styles.ghost} onPress={onClose}><Text style={styles.ghostText}>Cancel</Text></TouchableOpacity>
-        <TouchableOpacity style={[styles.primary, { flex: 1.4 }]} onPress={() => onSave([...sel].sort())}><Text style={styles.primaryText}>Save {sel.size} date{sel.size !== 1 ? 's' : ''}</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.primary, { flex: 1.4 }, !canSave && styles.primaryOff]} disabled={!canSave} onPress={() => onSave([...sel].sort(), mode)}>
+          <Text style={styles.primaryText}>Save {sel.size} date{sel.size !== 1 ? 's' : ''}</Text>
+        </TouchableOpacity>
       </View>
     </View>
+  );
+}
+
+function ModeOption({ active, title, sub, onPress }) {
+  return (
+    <TouchableOpacity style={[styles.modeOption, active && styles.modeOptionOn]} onPress={onPress} activeOpacity={0.85}>
+      <Text style={[styles.modeOptionTitle, active && styles.modeOptionTitleOn]}>{active ? '✓ ' : ''}{title}</Text>
+      <Text style={styles.modeOptionSub}>{sub}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -829,12 +879,25 @@ const styles = StyleSheet.create({
   datesBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.brand, alignSelf: 'flex-start', paddingHorizontal: 16, height: 46, borderRadius: radius.md },
   datesIcon: { width: 18, height: 18, tintColor: '#101010' },
   datesText: { color: '#101010', fontWeight: '800', fontSize: font.body },
+  manageAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderColor: colors.brand, alignSelf: 'flex-start', paddingHorizontal: 16, height: 46, borderRadius: radius.md },
+  manageAllIcon: { width: 16, height: 16, tintColor: colors.brandText },
+  manageAllText: { color: colors.brandText, fontWeight: '800', fontSize: font.body },
   dateChip: { backgroundColor: colors.brandSoft, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill },
   dateChipText: { color: colors.brandText, fontWeight: '700', fontSize: font.tiny },
   addSlotBtn: { backgroundColor: colors.brandSoft, height: 44, paddingHorizontal: 14, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   addSlotText: { color: colors.brandText, fontWeight: '800', fontSize: font.small },
   slotChip: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill },
   slotChipText: { fontSize: font.tiny, fontWeight: '700', color: colors.ink },
+  checkRow2: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14 },
+  calNavOff: { opacity: 0.35 },
+  modeBox: { backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 12, marginTop: 14 },
+  modeTitle: { fontSize: font.tiny, fontWeight: '800', color: colors.inkMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  modeWarn: { fontSize: font.tiny, color: '#DC2626', marginTop: 8 },
+  modeOption: { borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radius.md, padding: 12 },
+  modeOptionOn: { borderColor: colors.brand, backgroundColor: colors.brandSoft },
+  modeOptionTitle: { fontSize: font.small, fontWeight: '800', color: colors.ink },
+  modeOptionTitleOn: { color: colors.brandText },
+  modeOptionSub: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 2 },
 
   // per-date rows
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, paddingVertical: 10, paddingHorizontal: 12 },
@@ -844,8 +907,6 @@ const styles = StyleSheet.create({
   manageSlotsIcon: { width: 14, height: 14, tintColor: colors.brandText },
   manageSlotsText: { color: colors.brandText, fontWeight: '800', fontSize: font.small },
   dateRowTrash: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
-  genBox: { backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 12, marginTop: 12 },
-  genTitle: { fontSize: font.tiny, fontWeight: '800', color: colors.inkMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
 
   // photos & videos
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
