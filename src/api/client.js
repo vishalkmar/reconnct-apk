@@ -49,7 +49,9 @@ export const api = {
   listExperiences: (filters = {}) => request(`/public/experiences${qs(filters)}`),
   getExperience: (idOrSlug) => request(`/public/experiences/${idOrSlug}`),
   taxonomy: () => request('/public/taxonomy'),
-  types: (categoryId) => request(`/public/types${qs({ categoryId })}`),
+  // Accepts a single id or an array — the union of types across every
+  // selected category (host wizard's multi-select "broad category").
+  types: (categoryIds) => request(`/public/types${qs({ categoryIds: Array.isArray(categoryIds) ? categoryIds.join(',') : categoryIds })}`),
   cashfreeLink: (body) => request('/public/payments/cashfree-link', { method: 'POST', body }),
   cities: () => request('/public/cities'),
   appScreen: (key) => request(`/public/app-screen/${key}`),

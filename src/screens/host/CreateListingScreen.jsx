@@ -30,7 +30,7 @@ const PRICE_METHODS = [
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&q=80';
 
 const blank = {
-  audiences: [], categoryId: null, typeId: null, typeName: '',
+  audiences: [], categoryIds: [], typeIds: [],
   name: '', location: '', city: '', nearbyLocation: '', durationLabel: '',
   about: '', mode: 'offline',
   // One empty row open by default so the "What's included" / "Nearby" editors
@@ -63,15 +63,15 @@ export default function CreateListingScreen() {
   }, [step]);
 
   const canNext = useMemo(() => {
-    if (step === 1) return !!form.name.trim() && !!form.categoryId && !!form.typeId;
+    if (step === 1) return !!form.name.trim() && !!form.categoryIds?.length && !!form.typeIds?.length;
     return true;
   }, [step, form]);
 
   const goNext = () => {
     if (step === 1 && !canNext) {
       if (!form.name.trim()) return Alert.alert('Name required', 'Give your experience a name.');
-      if (!form.categoryId) return Alert.alert('Pick a category', 'Choose a broad category.');
-      if (!form.typeId) return Alert.alert('Pick a type', 'Choose a type of activity / event.');
+      if (!form.categoryIds?.length) return Alert.alert('Pick a category', 'Choose at least one broad category.');
+      if (!form.typeIds?.length) return Alert.alert('Pick a type', 'Choose at least one type of activity / event.');
     }
     setStep((s) => Math.min(4, s + 1));
   };
