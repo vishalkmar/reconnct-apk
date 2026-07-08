@@ -14,16 +14,14 @@ import EmptyState from '../../components/EmptyState';
 // app and web show the exact same underlying rows for the same signed-in user.
 const isTransaction = (b) => ['confirmed', 'completed', 'refunded'].includes(b?.status);
 
-// A confirmed booking is "Pending" until its experience date has passed, at
-// which point it's effectively "Completed" — same upcoming/completed split
-// host.controller.js already uses for the host side.
+// This is the PAYMENT's status, not the experience's — a transaction is
+// "Completed" the moment money is actually paid, regardless of whether the
+// experience itself has happened yet (that's what the My Bookings/Upcoming
+// tab is for). "Pending" is reserved for a payment that hasn't gone through.
 const derivedStatus = (b) => {
   if (b.status === 'refunded') return 'refunded';
-  if (b.status === 'completed') return 'completed';
-  const end = b.scheduledEndAt || b.scheduledFor;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const past = end ? new Date(end) < today : false;
-  return past ? 'completed' : 'pending';
+  if (b.status === 'confirmed' || b.status === 'completed') return 'completed';
+  return 'pending';
 };
 
 const STATUS_COLOR = { pending: '#FE9A00', completed: '#009966', refunded: '#E11D48' };
