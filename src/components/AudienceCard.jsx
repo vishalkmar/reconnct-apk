@@ -59,8 +59,8 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, overflow: 'hidden', height: 250, backgroundColor: '#2b3040', ...shadow.card },
   bg: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   gradient: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, width: '100%', height: '100%' },
-  content: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 14, alignItems: 'flex-start', zIndex: 2 },
-  title: { color: '#fff', fontSize: 17, fontWeight: '800' },
-  subtitle: { color: 'rgba(255,255,255,0.85)', fontSize: font.small, marginTop: 2 },
-  explore: { color: '#fff', fontSize: font.small, fontWeight: '800', marginTop: 8 },
+  content: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 14, zIndex: 2 },
+  title: { color: '#fff', fontSize: 17, fontWeight: '800', textAlign: 'center' },
+  subtitle: { color: 'rgba(255,255,255,0.85)', fontSize: font.small, marginTop: 2, textAlign: 'center' },
+  explore: { color: '#fff', fontSize: font.small, fontWeight: '800', marginTop: 8, textAlign: 'left' },
 });
