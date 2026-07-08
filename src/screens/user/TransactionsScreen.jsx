@@ -1,42 +1,50 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, ScrollView, TouchableOpacity, TextInput, Image } from 'react-native';
-import { colors, radius, font, space, shadow } from '../../theme';
-import { api } from '../../api/client';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
+import { colors, radius, space } from '../../theme';
+import { api, resolveImage, DUMMY_IMAGE } from '../../api/client';
 import { formatMoney } from '../../utils/format';
+import { MONTHS_FULL } from '../../utils/booking';
 import { useAuth } from '../../store/AuthContext';
 import { useNav } from '../../navigation/NavContext';
-import { ICONS } from '../../icons';
 import ScreenHeader from '../../components/ScreenHeader';
 import EmptyState from '../../components/EmptyState';
 
 // Mirrors the website (UserTransactionsPage): a "transaction" is a booking on
-// which money actually moved. We derive everything from /bookings/me so the app
-// and web show the exact same rows for the same signed-in user.
-const TYPE_LABEL = {
-  package: 'Retreat', room: 'Hotel Room', event: 'Event',
-  addon: 'Add-on Activity', experience: 'Experience', event_activity: 'Activity',
+// which money actually moved. We derive everything from /bookings/me so the
+// app and web show the exact same underlying rows for the same signed-in user.
+const isTransaction = (b) => ['confirmed', 'completed', 'refunded'].includes(b?.status);
+
+// A confirmed booking is "Pending" until its experience date has passed, at
+// which point it's effectively "Completed" — same upcoming/completed split
+// host.controller.js already uses for the host side.
+const derivedStatus = (b) => {
+  if (b.status === 'refunded') return 'refunded';
+  if (b.status === 'completed') return 'completed';
+  const end = b.scheduledEndAt || b.scheduledFor;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const past = end ? new Date(end) < today : false;
+  return past ? 'completed' : 'pending';
 };
 
-const isPaid = (b) => !!b?.payment?.paidAt || ['confirmed', 'completed', 'refunded'].includes(b?.status);
-const isRefunded = (b) => b?.status === 'refunded';
+const STATUS_COLOR = { pending: '#FE9A00', completed: '#009966', refunded: '#E11D48' };
+const STATUS_LABEL = { pending: 'Pending', completed: 'Completed', refunded: 'Refunded' };
 
 const TABS = [
   { key: 'all', label: 'All', match: () => true },
-  { key: 'paid', label: 'Payments', match: (b) => b.status === 'confirmed' || b.status === 'completed' },
-  { key: 'refunded', label: 'Refunds', match: (b) => b.status === 'refunded' },
+  { key: 'pending', label: 'Pending', match: (b) => derivedStatus(b) === 'pending' },
+  { key: 'completed', label: 'Completed', match: (b) => derivedStatus(b) === 'completed' },
+  { key: 'refunded', label: 'Refunds', match: (b) => derivedStatus(b) === 'refunded' },
 ];
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-function fmtDateTime(iso) {
-  if (!iso) return '—';
+const ordinal = (n) => {
+  const s = ['th', 'st', 'nd', 'rd']; const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+};
+const dateOf = (b) => b.payment?.paidAt || b.updatedAt || b.createdAt;
+const rowDateLabel = (iso) => {
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return String(iso);
-  let h = d.getHours();
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  const ap = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}, ${h}:${mm} ${ap}`;
-}
+  return `${ordinal(d.getDate())} ${MONTHS_FULL[d.getMonth()]}`;
+};
 
 export default function TransactionsScreen() {
   const { token } = useAuth();
@@ -44,49 +52,37 @@ export default function TransactionsScreen() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all');
-  const [query, setQuery] = useState('');
 
   useEffect(() => {
     let alive = true;
     api.myBookings(token)
-      .then((d) => { if (alive) setBookings((d.bookings || []).filter(isPaid)); })
+      .then((d) => { if (alive) setBookings((d.bookings || []).filter(isTransaction)); })
       .catch(() => {})
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [token]);
 
-  const stats = useMemo(() => {
-    let paid = 0; let refunded = 0;
-    for (const b of bookings) {
-      const t = Number(b.pricing?.total || 0);
-      if (b.status === 'refunded') refunded += t;
-      else if (b.status === 'confirmed' || b.status === 'completed') paid += t;
-    }
-    return { paid, refunded, net: paid - refunded };
-  }, [bookings]);
-
-  const counts = useMemo(
-    () => TABS.reduce((acc, t) => { acc[t.key] = bookings.filter(t.match).length; return acc; }, {}),
-    [bookings],
-  );
-
-  const shown = useMemo(() => {
+  // Filter by tab, then group into month sections (newest first), matching
+  // the "This Month" / "June 2026" layout.
+  const groups = useMemo(() => {
     const activeTab = TABS.find((t) => t.key === tab) || TABS[0];
-    let rows = bookings.filter(activeTab.match);
-    const q = query.trim().toLowerCase();
-    if (q) {
-      rows = rows.filter((b) =>
-        (b.bookingCode || '').toLowerCase().includes(q) ||
-        (b.item?.name || '').toLowerCase().includes(q) ||
-        (b.payment?.paymentId || '').toLowerCase().includes(q) ||
-        (b.payment?.orderId || '').toLowerCase().includes(q));
+    const rows = bookings.filter(activeTab.match)
+      .sort((a, b) => new Date(dateOf(b)).getTime() - new Date(dateOf(a)).getTime());
+
+    const now = new Date();
+    const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const map = new Map();
+    for (const b of rows) {
+      const d = new Date(dateOf(b));
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(b);
     }
-    return rows.sort((a, b) => {
-      const ta = new Date(a.payment?.paidAt || a.updatedAt || a.createdAt || 0).getTime();
-      const tb = new Date(b.payment?.paidAt || b.updatedAt || b.createdAt || 0).getTime();
-      return tb - ta;
+    return Array.from(map.entries()).map(([key, data]) => {
+      const [y, m] = key.split('-').map(Number);
+      return { key, title: key === curKey ? 'This Month' : `${MONTHS_FULL[m - 1]} ${y}`, data };
     });
-  }, [bookings, tab, query]);
+  }, [bookings, tab]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -95,67 +91,55 @@ export default function TransactionsScreen() {
         <ActivityIndicator color={colors.brand} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
-          data={shown}
-          keyExtractor={(b, i) => String(b.bookingCode || b.id || i)}
-          contentContainerStyle={{ padding: space.lg, paddingBottom: 32 }}
+          data={groups}
+          keyExtractor={(g) => g.key}
+          contentContainerStyle={{ paddingBottom: 32 }}
           ListHeaderComponent={
-            <View>
-              <Text style={styles.sub}>Every payment and refund, with the linked booking attached.</Text>
-              <View style={styles.statsRow}>
-                <StatCard label="Total paid" value={formatMoney(stats.paid, 'INR')} tint="#DCFCE7" fg="#059669" arrow="↑" />
-                <StatCard label="Refunded" value={formatMoney(stats.refunded, 'INR')} tint="#FEE2E2" fg="#E11D48" arrow="↓" />
-                <StatCard label="Net spend" value={formatMoney(stats.net, 'INR')} tint={colors.brandSoft} fg={colors.brandText} arrow="₹" />
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-                {TABS.map((t) => {
-                  const active = tab === t.key;
+            <View style={styles.tabs}>
+              {TABS.map((t) => {
+                const active = tab === t.key;
+                return (
+                  <TouchableOpacity key={t.key} onPress={() => setTab(t.key)} style={styles.tab} activeOpacity={0.7}>
+                    <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
+                    <View style={[styles.tabUnderline, active && styles.tabUnderlineActive]} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          }
+          renderItem={({ item: group }) => (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{group.title}</Text>
+              <View style={styles.card}>
+                {group.data.map((b, i) => {
+                  const st = derivedStatus(b);
+                  const color = STATUS_COLOR[st];
+                  const img = resolveImage(b.item?.image);
                   return (
-                    <TouchableOpacity key={t.key} onPress={() => setTab(t.key)} style={[styles.tab, active && styles.tabActive]} activeOpacity={0.8}>
-                      <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
-                      <View style={[styles.badge, active && styles.badgeActive]}><Text style={[styles.badgeText, active && styles.badgeTextActive]}>{counts[t.key] || 0}</Text></View>
+                    <TouchableOpacity
+                      key={b.bookingCode || b.id}
+                      activeOpacity={0.8}
+                      onPress={() => push('bookingDetail', { code: b.bookingCode })}
+                      style={[styles.row, i < group.data.length - 1 && styles.rowBorder]}
+                    >
+                      <Image source={{ uri: img || DUMMY_IMAGE }} style={styles.thumb} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.title} numberOfLines={1}>{b.item?.name || 'Booking'}</Text>
+                        <Text style={styles.subtitle}>Paid by you on {rowDateLabel(dateOf(b))}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[styles.price, { color }]}>{formatMoney(b.pricing?.total, b.currency)}</Text>
+                        <Text style={[styles.statusLabel, { color }]}>{STATUS_LABEL[st]}</Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
-              </ScrollView>
-              <View style={styles.searchWrap}>
-                <Image source={ICONS.searchMuted} style={styles.searchIcon} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search code, item, payment id…"
-                  placeholderTextColor={colors.inkFaint}
-                  value={query}
-                  onChangeText={setQuery}
-                />
               </View>
             </View>
-          }
-          renderItem={({ item }) => {
-            const refunded = isRefunded(item);
-            return (
-              <TouchableOpacity style={styles.row} activeOpacity={0.85} onPress={() => push('bookingDetail', { code: item.bookingCode })}>
-                <View style={[styles.dot, { backgroundColor: refunded ? '#FEE2E2' : '#DCFCE7' }]}>
-                  <Text style={{ color: refunded ? '#E11D48' : '#059669', fontWeight: '900' }}>{refunded ? '↓' : '↑'}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.desc} numberOfLines={1}>{item.item?.name || 'Booking'}</Text>
-                  <Text style={styles.date}>{fmtDateTime(item.payment?.paidAt || item.updatedAt || item.createdAt)}</Text>
-                  <Text style={styles.metaLine} numberOfLines={1}>
-                    <Text style={styles.code}>{item.bookingCode}</Text>
-                    {item.item?.type ? `  ·  ${TYPE_LABEL[item.item.type] || item.item.type}` : ''}
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[styles.amt, { color: refunded ? '#E11D48' : '#059669' }]}>
-                    {refunded ? '− ' : ''}{formatMoney(item.pricing?.total, item.currency)}
-                  </Text>
-                  <Text style={styles.detailsLink}>Details ›</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          }}
+          )}
           ListEmptyComponent={
             <EmptyState emoji="💳" title={bookings.length ? 'Nothing matches that filter' : 'No transactions yet'}
-              sub={bookings.length ? 'Try a different tab or clear the search.' : 'Your payment receipts appear here the moment your first booking is paid.'} />
+              sub={bookings.length ? 'Try a different tab.' : 'Your payment receipts appear here the moment your first booking is paid.'} />
           }
         />
       )}
@@ -163,44 +147,23 @@ export default function TransactionsScreen() {
   );
 }
 
-function StatCard({ label, value, tint, fg, arrow }) {
-  return (
-    <View style={styles.statCard}>
-      <View style={[styles.statIcon, { backgroundColor: tint }]}><Text style={{ color: fg, fontWeight: '900' }}>{arrow}</Text></View>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue} numberOfLines={1}>{value}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  sub: { color: colors.inkMuted, fontSize: font.small, marginBottom: 14 },
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 4 },
-  statCard: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.md, padding: 12, ...shadow.card },
-  statIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  statLabel: { fontSize: 10, color: colors.inkMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
-  statValue: { fontSize: 15, fontWeight: '900', color: colors.ink, marginTop: 2 },
+  tabs: { flexDirection: 'row', paddingHorizontal: space.lg, paddingTop: 14, gap: 20, borderBottomWidth: 1, borderBottomColor: colors.border },
+  tab: { alignItems: 'center', paddingBottom: 10 },
+  tabText: { fontSize: 14, fontWeight: '600', color: colors.inkMuted },
+  tabTextActive: { color: '#FE9A00' },
+  tabUnderline: { height: 2, marginTop: 8, width: '100%', backgroundColor: 'transparent' },
+  tabUnderlineActive: { backgroundColor: '#FE9A00' },
 
-  tabs: { paddingVertical: 12, gap: 8 },
-  tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 38, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  tabActive: { backgroundColor: colors.brand, borderColor: colors.brand },
-  tabText: { color: colors.ink, fontWeight: '700', fontSize: font.small },
-  tabTextActive: { color: '#fff' },
-  badge: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
-  badgeActive: { backgroundColor: 'rgba(255,255,255,0.3)' },
-  badgeText: { fontSize: font.tiny, fontWeight: '800', color: colors.inkMuted },
-  badgeTextActive: { color: '#fff' },
+  section: { paddingHorizontal: space.lg, marginTop: 18 },
+  sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.ink, marginBottom: 8 },
+  card: { backgroundColor: colors.surface, borderRadius: radius.lg, overflow: 'hidden' },
 
-  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: 14, height: 44, borderWidth: 1, borderColor: colors.border, marginBottom: 6 },
-  searchIcon: { width: 15, height: 15, tintColor: colors.inkFaint, marginRight: 8 },
-  searchInput: { flex: 1, color: colors.ink, fontSize: font.body, paddingVertical: 0 },
-
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: radius.md, padding: 14, marginTop: 10, ...shadow.card },
-  dot: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  desc: { fontSize: font.body, color: colors.ink, fontWeight: '700' },
-  date: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 2 },
-  metaLine: { fontSize: font.tiny, color: colors.inkFaint, marginTop: 1 },
-  code: { fontWeight: '700', color: colors.inkMuted },
-  amt: { fontSize: font.body, fontWeight: '900' },
-  detailsLink: { fontSize: font.tiny, color: colors.brandText, fontWeight: '800', marginTop: 3 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 10, paddingVertical: 10, minHeight: 70 },
+  rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  thumb: { width: 50, height: 50, borderRadius: 16, backgroundColor: colors.surfaceAlt },
+  title: { fontSize: 14, fontWeight: '600', lineHeight: 16.5, color: colors.ink },
+  subtitle: { fontSize: 12, fontWeight: '400', color: colors.inkMuted, marginTop: 3 },
+  price: { fontSize: 14, fontWeight: '700', textAlign: 'right' },
+  statusLabel: { fontSize: 11, fontWeight: '600', textAlign: 'right', marginTop: 3 },
 });
