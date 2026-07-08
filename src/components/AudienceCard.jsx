@@ -1,30 +1,23 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { SvgXml } from 'react-native-svg';
-import { colors, radius, font, shadow } from '../theme';
+import { radius, font, shadow } from '../theme';
 import { ICONS } from '../icons';
-import { AUD_META, AUD_DEFAULT } from './connectWithIcons';
 
 /**
- * Audience tile for the Explore grid — a full-bleed photo with a dark bottom
- * gradient and a centred icon + label near the base (matches the "Experiences
- * for every moment" reference design). Tapping opens that audience's
- * experiences. Simpler than the old badge/heart/"Explore →" overlay.
+ * Audience tile for the Explore/Reconnect grid — a full-bleed photo with a
+ * dark bottom gradient, the audience title, its tagline, and an "Explore"
+ * link. No badge/heart/chip overlay on the image itself.
  */
 export default function AudienceCard({ data, onPress, style }) {
-  const meta = AUD_META[data.slug] || AUD_DEFAULT;
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={[styles.card, style]}>
       <Image source={{ uri: data.image }} style={styles.bg} resizeMode="cover" />
       <Image source={ICONS.scrimGrad} style={styles.gradient} resizeMode="stretch" />
 
       <View style={styles.content}>
-        <View style={styles.iconWrap}>
-          {meta.svg
-            ? <SvgXml xml={meta.svg} width={28} height={28} />
-            : <Image source={ICONS.groups} style={styles.iconFallback} />}
-        </View>
         <Text style={styles.title}>{data.title}</Text>
+        {!!data.subtitle && <Text style={styles.subtitle}>{data.subtitle}</Text>}
+        <Text style={styles.explore}>Explore ›</Text>
       </View>
     </TouchableOpacity>
   );
@@ -66,8 +59,8 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, overflow: 'hidden', height: 250, backgroundColor: '#2b3040', ...shadow.card },
   bg: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   gradient: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, width: '100%', height: '100%' },
-  content: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: 18, alignItems: 'center', zIndex: 2 },
-  iconWrap: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  iconFallback: { width: 26, height: 26, tintColor: colors.brandText },
+  content: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 14, alignItems: 'flex-start', zIndex: 2 },
   title: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  subtitle: { color: 'rgba(255,255,255,0.85)', fontSize: font.small, marginTop: 2 },
+  explore: { color: '#fff', fontSize: font.small, fontWeight: '800', marginTop: 8 },
 });
