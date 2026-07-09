@@ -21,6 +21,7 @@ import TrendingNearbyCard from '../components/deals/TrendingNearbyCard';
 import OfferBannerCarousel from '../components/OfferBannerCarousel';
 import LocationSheet from '../components/LocationSheet';
 import FilterSheet, { draftToParams } from './FilterSheet';
+import RatingModal from '../components/RatingModal';
 import { ICONS } from '../icons';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -37,7 +38,7 @@ const greeting = () => {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { city, selectedCity, coords, detectedCity, fullAddress } = useLocation();
   const { push, navigateTab } = useNav();
 
@@ -59,6 +60,20 @@ export default function HomeScreen() {
   const [geoDismissed, setGeoDismissed] = useState(false);
   const [compact, setCompact] = useState(false); // sticky mini-header on scroll
   const [showLocation, setShowLocation] = useState(false); // Choose Location sheet
+
+  // Auto "rate and review" popup — fires once per newly-completed, not-yet-
+  // reviewed, not-permanently-dismissed booking. The X just closes it for this
+  // app session (comes back next visit); "Stop showing" calls the server so it
+  // never auto-shows again for that one booking (matches the web portal).
+  const [pendingReview, setPendingReview] = useState(null);
+  const [reviewPopupClosed, setReviewPopupClosed] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    let alive = true;
+    api.pendingReview(token).then((d) => { if (alive) setPendingReview((d && d.booking) || null); }).catch(() => {});
+    return () => { alive = false; };
+  }, [token]);
 
   const geoParams = coords ? { lat: coords.lat, lon: coords.lon } : {};
 
@@ -359,6 +374,15 @@ export default function HomeScreen() {
       />
 
       <LocationSheet visible={showLocation} onClose={() => setShowLocation(false)} />
+
+      <RatingModal
+        visible={!!pendingReview && !reviewPopupClosed}
+        variant="auto"
+        booking={pendingReview}
+        onClose={() => setReviewPopupClosed(true)}
+        onDismissForever={() => { setReviewPopupClosed(true); setPendingReview(null); }}
+        onSubmitted={() => setPendingReview(null)}
+      />
     </View>
   );
 }

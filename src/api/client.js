@@ -79,6 +79,11 @@ export const api = {
   bookingLinkStatus: (token, code) => request(`/payments/link-status/${encodeURIComponent(code)}`, { token }),
   wallet: (token) => request('/refer-earn/wallet', { token }),
 
+  // ── Reviews (auth required) ─────────────────────────────────────────
+  pendingReview: (token) => request('/bookings/me/pending-review', { token }),
+  submitReview: (token, code, body) => request(`/bookings/${encodeURIComponent(code)}/review`, { method: 'POST', token, body }),
+  dismissReviewPrompt: (token, code) => request(`/bookings/${encodeURIComponent(code)}/review/dismiss`, { method: 'POST', token }),
+
   // ── Notifications (auth required) ───────────────────────────────────
   notifications: (token) => request('/notifications', { token }),
 

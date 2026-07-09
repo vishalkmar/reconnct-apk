@@ -117,6 +117,7 @@ export default function LocationSheet({ visible, onClose }) {
                     );
                   })}
                 </View>
+                
 
                 {/* Other cities */}
                 <View style={[styles.labelRow, { marginTop: 20 }]}>

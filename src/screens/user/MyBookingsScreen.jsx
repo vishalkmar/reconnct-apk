@@ -10,6 +10,7 @@ import { useNav } from '../../navigation/NavContext';
 import { ICONS } from '../../icons';
 import ScreenHeader from '../../components/ScreenHeader';
 import EmptyState from '../../components/EmptyState';
+import RatingModal from '../../components/RatingModal';
 
 // category → the pill shown on the card image (top-right).
 const PILL = {
@@ -58,6 +59,7 @@ export default function MyBookingsScreen() {
   const [fetched, setFetched] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all');
+  const [rateBooking, setRateBooking] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -101,7 +103,7 @@ export default function MyBookingsScreen() {
               b={item}
               onOpen={(bk) => push('bookingDetail', { code: bk.bookingCode })}
               onCancel={(bk) => push('bookingDetail', { code: bk.bookingCode, startCancel: true })}
-              onRate={(bk) => Alert.alert('Rate Experience', 'Reviews are coming soon.')}
+              onRate={(bk) => setRateBooking(bk)}
               onDelete={(bk) => Alert.alert(
                 'Remove booking',
                 'This will remove it from your bookings list on this device.',
@@ -116,6 +118,15 @@ export default function MyBookingsScreen() {
           }
         />
       )}
+      <RatingModal
+        visible={!!rateBooking}
+        variant="manual"
+        booking={rateBooking ? { bookingCode: rateBooking.bookingCode, itemName: (rateBooking.item || {}).name || (rateBooking.item || {}).title, itemImage: (rateBooking.item || {}).image || (rateBooking.item || {}).mainImage } : null}
+        onClose={() => setRateBooking(null)}
+        onSubmitted={() => {
+          setFetched((list) => list.map((b) => (b.bookingCode === rateBooking.bookingCode ? { ...b, review: { rating: 1 } } : b)));
+        }}
+      />
     </View>
   );
 }
@@ -204,7 +215,7 @@ function BookingCard({ b, onOpen, onCancel, onRate, onDelete }) {
             <Image source={ICONS.ticket} style={styles.btnIcon} />
             <Text style={styles.btnPrimaryText}>View Ticket</Text>
           </TouchableOpacity>
-          {category === 'completed' && (
+          {category === 'completed' && !b.review && (
             <TouchableOpacity
               style={[styles.btn, styles.btnGhost]}
               activeOpacity={0.85}
@@ -212,6 +223,11 @@ function BookingCard({ b, onOpen, onCancel, onRate, onDelete }) {
             >
               <Text style={styles.btnGhostText}>Rate Experience</Text>
             </TouchableOpacity>
+          )}
+          {category === 'completed' && !!b.review && (
+            <View style={[styles.btn, styles.btnRated]}>
+              <Text style={styles.btnRatedText}>{'★'.repeat(b.review.rating || 0)} Rated</Text>
+            </View>
           )}
         </View>
       </View>
@@ -261,6 +277,8 @@ const styles = StyleSheet.create({
   btn: { flex: 1, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
   btnGhost: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border },
   btnGhostText: { color: colors.ink, fontWeight: '800', fontSize: 14 },
+  btnRated: { backgroundColor: colors.brandSoft, flex: 1 },
+  btnRatedText: { color: colors.brandText, fontWeight: '800', fontSize: 13, textAlign: 'center' },
   btnPrimary: { backgroundColor: colors.brand },
   btnPrimaryText: { color: '#101010', fontWeight: '900', fontSize: 14 },
   btnIcon: { width: 16, height: 16, marginRight: 7, tintColor: '#101010' },
