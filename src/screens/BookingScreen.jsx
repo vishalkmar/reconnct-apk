@@ -5,7 +5,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../theme';
 import { resolveImage, DUMMY_IMAGE, api } from '../api/client';
-import { formatMoney, initials } from '../utils/format';
+import { formatMoney } from '../utils/format';
 import {
   bookableDateSet, slotsForDate, priceBreakdown, MONTHS_FULL,
 } from '../utils/booking';
@@ -408,16 +408,6 @@ export default function BookingScreen({ item }) {
             </View>
           </View>
 
-          {!!item.supplier && (
-            <View style={styles.hostNote}>
-              <View style={styles.hostAvatar}><Text style={styles.hostAvatarTxt}>{initials(item.supplier.name)}</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.hostNoteTitle}>{item.supplier.name} will be in touch</Text>
-                <Text style={styles.hostNoteSub}>Your host typically responds within 24 hours with meeting point details.</Text>
-              </View>
-            </View>
-          )}
-
           <View style={styles.doneBtns}>
             <TouchableOpacity style={styles.doneBtnPrimary} onPress={() => { navigateTab('profile'); push('bookings'); }}>
               <Text style={styles.doneBtnPrimaryTxt}>View trips</Text>
@@ -654,11 +644,6 @@ const styles = StyleSheet.create({
   doneImgName: { color: '#fff', fontSize: font.h3, fontWeight: '800' },
   doneImgLoc: { color: 'rgba(255,255,255,0.92)', fontSize: font.small, marginTop: 1 },
   doneRows: { padding: 14 },
-  hostNote: { flexDirection: 'row', gap: 12, alignItems: 'center', backgroundColor: colors.surfaceAlt, borderRadius: radius.lg, marginHorizontal: space.lg, marginTop: 14, padding: 14 },
-  hostAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
-  hostAvatarTxt: { color: '#fff', fontWeight: '800' },
-  hostNoteTitle: { fontSize: font.body, fontWeight: '800', color: colors.ink },
-  hostNoteSub: { fontSize: font.small, color: colors.inkMuted, marginTop: 2, lineHeight: 17 },
   doneBtns: { flexDirection: 'row', gap: 12, marginHorizontal: space.lg, marginTop: 18 },
   doneBtnPrimary: { flex: 1, backgroundColor: colors.brand, height: 52, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   doneBtnPrimaryTxt: { color: '#fff', fontWeight: '800', fontSize: font.h3 },
