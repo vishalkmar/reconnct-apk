@@ -1,13 +1,25 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, font } from '../theme';
 import { ICONS } from '../icons';
 
+// Chain-link glyph (Reconnect tab) — drawn as SVG since it isn't one of the
+// generated PNG icons; same stroke treatment as the other nav icons.
+function LinkIcon({ size = 22, color = '#1A1A2E' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 const TRAVELLER_ITEMS = [
   { key: 'home', label: 'Home', icon: ICONS.navHome },
   { key: 'search', label: 'Search', icon: ICONS.navSearch },
-  { key: 'reconnect', label: 'Reconnect', icon: ICONS.groups },
+  { key: 'reconnect', label: 'Reconnect', svgIcon: LinkIcon },
   { key: 'experiences', label: 'Experiences', icon: ICONS.navExp },
   { key: 'profile', label: 'Profile', icon: ICONS.navProfile },
 ];
@@ -20,8 +32,8 @@ const HOST_ITEMS = [
 
 /**
  * Floating, frosted bottom navigation with standard (SVG-style) icons. The
- * active tab gets a soft rounded pill and a darker icon/label. The tab set
- * swaps when the app is in host mode.
+ * active tab gets a soft rounded pill, a darker/bold label, and a small
+ * notch-and-dot indicator poking above it. The tab set swaps in host mode.
  */
 export default function BottomNav({ current, onChange, mode = 'traveller' }) {
   const insets = useSafeAreaInsets();
@@ -31,10 +43,17 @@ export default function BottomNav({ current, onChange, mode = 'traveller' }) {
       <View style={styles.bar}>
         {items.map((it) => {
           const active = current === it.key;
+          const Icon = it.svgIcon;
           return (
             <TouchableOpacity key={it.key} style={[styles.item, active && styles.itemActive]} onPress={() => onChange(it.key)} activeOpacity={0.7}>
+              {active && (
+                <View style={styles.notchWrap} pointerEvents="none">
+                  <View style={styles.notchCutout} />
+                  <View style={styles.notchDot} />
+                </View>
+              )}
               <View>
-                <Image source={it.icon} style={[styles.icon, { tintColor: '#1A1A2E' }]} />
+                {Icon ? <Icon size={22} color="#1A1A2E" /> : <Image source={it.icon} style={[styles.icon, { tintColor: '#1A1A2E' }]} />}
                 {it.dot && <View style={styles.dot} />}
               </View>
               <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>{it.label}</Text>
@@ -61,4 +80,14 @@ const styles = StyleSheet.create({
   dot: { position: 'absolute', top: -2, right: -4, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brand },
   label: { fontSize: font.tiny, color: '#1A1A2E', marginTop: 4 },
   labelActive: { color: '#1A1A2E', fontWeight: '700' },
+
+  // Notch + dot poking above the active tab — a circle the page-background
+  // color "bites into" the pill's top edge, with a small amber dot (shadowed)
+  // sitting in the notch.
+  notchWrap: { position: 'absolute', top: -16, alignSelf: 'center', width: 30, height: 30, alignItems: 'center' },
+  notchCutout: { position: 'absolute', top: 0, width: 30, height: 30, borderRadius: 15, backgroundColor: colors.bg },
+  notchDot: {
+    position: 'absolute', top: 9, width: 11, height: 11, borderRadius: 6, backgroundColor: colors.brand,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 6,
+  },
 });
