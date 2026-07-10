@@ -26,17 +26,20 @@ const TABS = [
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
-// A booking is Upcoming until its date passes. Once the date has passed, it's
-// Completed only if a payment actually went through for it; explicitly
+// A booking is Upcoming until its scheduled date/time passes. Same rule the
+// backend's isCompletedNow (experienceReview.controller.js) uses for the
+// rate/review prompts, so "completed" never disagrees between this list, the
+// review popup, and the web portal. Prefer scheduledEndAt (full duration),
+// then the exact scheduledAt timestamp, falling back to the date-only
+// scheduledFor for older bookings that predate that column. Explicitly
 // cancelled/refunded bookings are always Cancelled regardless of date.
 function categorize(b) {
   if (!b) return 'upcoming';
   if (b.status === 'cancelled' || b.status === 'refunded') return 'cancelled';
   if (b.status === 'completed') return 'completed';
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const endIso = b.scheduledEndAt || b.scheduledFor || b.date;
+  const endIso = b.scheduledEndAt || b.scheduledAt || b.scheduledFor || b.date;
   const end = endIso ? new Date(endIso) : null;
-  if (end && end < today) {
+  if (end && end.getTime() <= Date.now()) {
     const paid = !!(b.payment && b.payment.paidAt) || b.status === 'confirmed';
     if (paid) return 'completed';
   }
