@@ -123,7 +123,7 @@ export default function TransactionsScreen() {
                     <TouchableOpacity
                       key={b.bookingCode || b.id}
                       activeOpacity={0.8}
-                      onPress={() => push('bookingDetail', { code: b.bookingCode })}
+                      onPress={() => push('paymentDetail', { code: b.bookingCode })}
                       style={[styles.row, i < group.data.length - 1 && styles.rowBorder]}
                     >
                       <Image source={{ uri: img || DUMMY_IMAGE }} style={styles.thumb} />
