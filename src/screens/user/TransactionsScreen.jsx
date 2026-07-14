@@ -10,28 +10,34 @@ import ScreenHeader from '../../components/ScreenHeader';
 import EmptyState from '../../components/EmptyState';
 
 // Mirrors the website (UserTransactionsPage): a "transaction" is a booking on
-// which money actually moved. We derive everything from /bookings/me so the
-// app and web show the exact same underlying rows for the same signed-in user.
-const isTransaction = (b) => ['confirmed', 'completed', 'refunded'].includes(b?.status);
+// which money actually moved, OR one still mid-payment (Pending) or that gave
+// up (Failed). We derive everything from /bookings/me so the app and web show
+// the exact same underlying rows for the same signed-in user.
+const isTransaction = (b) => !!b?.payment?.paidAt || b?.status === 'pending_payment' || b?.status === 'refunded';
 
 // This is the PAYMENT's status, not the experience's — a transaction is
 // "Completed" the moment money is actually paid, regardless of whether the
 // experience itself has happened yet (that's what the My Bookings/Upcoming
-// tab is for). "Pending" is reserved for a payment that hasn't gone through.
+// tab is for). "Failed" is a pending_payment booking whose last Cashfree
+// attempt is authoritatively dead (payment.failedAt, set by the backend on a
+// webhook FAIL/USER_DROPPED or an EXPIRED/TERMINATED/CANCELLED order/link) —
+// `status` itself stays pending_payment so the same booking can be retried.
 const derivedStatus = (b) => {
   if (b.status === 'refunded') return 'refunded';
   if (b.status === 'confirmed' || b.status === 'completed') return 'completed';
+  if (b.status === 'pending_payment') return b.payment?.failedAt ? 'failed' : 'pending';
   return 'pending';
 };
 
-const STATUS_COLOR = { pending: '#FE9A00', completed: '#009966', refunded: '#E11D48' };
-const STATUS_LABEL = { pending: 'Pending', completed: 'Completed', refunded: 'Refunded' };
+const STATUS_COLOR = { pending: '#FE9A00', completed: '#009966', refunded: '#E11D48', failed: '#D50707' };
+const STATUS_LABEL = { pending: 'Pending', completed: 'Completed', refunded: 'Refunded', failed: 'Failed' };
 
 const TABS = [
   { key: 'all', label: 'All', match: () => true },
   { key: 'pending', label: 'Pending', match: (b) => derivedStatus(b) === 'pending' },
   { key: 'completed', label: 'Completed', match: (b) => derivedStatus(b) === 'completed' },
   { key: 'refunded', label: 'Refunds', match: (b) => derivedStatus(b) === 'refunded' },
+  { key: 'failed', label: 'Failed', match: (b) => derivedStatus(b) === 'failed' },
 ];
 
 const ordinal = (n) => {
@@ -126,7 +132,9 @@ export default function TransactionsScreen() {
                         <Text style={styles.subtitle}>Paid by you on {rowDateLabel(dateOf(b))}</Text>
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={[styles.price, { color }]}>{formatMoney(b.pricing?.total, b.currency)}</Text>
+                        <Text style={[styles.price, { color }, st === 'failed' && styles.priceStrike]}>
+                          {formatMoney(b.pricing?.total, b.currency)}
+                        </Text>
                         <Text style={[styles.statusLabel, { color }]}>{STATUS_LABEL[st]}</Text>
                       </View>
                     </TouchableOpacity>
@@ -163,5 +171,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 14, fontWeight: '600', lineHeight: 16.5, color: colors.ink },
   subtitle: { fontSize: 12, fontWeight: '400', color: colors.inkMuted, marginTop: 3 },
   price: { fontSize: 14, fontWeight: '700', textAlign: 'right' },
+  priceStrike: { textDecorationLine: 'line-through', opacity: 0.75 },
   statusLabel: { fontSize: 11, fontWeight: '600', textAlign: 'right', marginTop: 3 },
 });

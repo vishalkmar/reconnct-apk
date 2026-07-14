@@ -59,6 +59,10 @@ export default function BookingScreen({ item }) {
   // show a clear "try again" state instead of an eternal "waiting…" spinner
   // that never actually reflected what happened.
   const [checkedOnce, setCheckedOnce] = useState(false);
+  // True when the backend's authoritative Cashfree check says this attempt is
+  // dead (EXPIRED/CANCELLED link) rather than just "not paid yet" — lets the
+  // banner say "Payment failed" instead of the softer generic copy.
+  const [payFailed, setPayFailed] = useState(false);
 
   const b = priceBreakdown(item, adults, children);
   const guests = adults + children;
@@ -69,7 +73,7 @@ export default function BookingScreen({ item }) {
   // Create the REAL booking in the DB, then a Cashfree hosted payment link and
   // open it. The booking + transaction now live server-side (original data).
   const startPayment = async () => {
-    setStep(3); setPaying(true); setPayLink(null); setDbBooking(null); setBookingCode(null); setCheckedOnce(false);
+    setStep(3); setPaying(true); setPayLink(null); setDbBooking(null); setBookingCode(null); setCheckedOnce(false); setPayFailed(false);
     try {
       const res = await api.createBooking(token, {
         itemType: 'experience',
@@ -143,14 +147,17 @@ export default function BookingScreen({ item }) {
       }
       // Definitively not paid yet (link closed/backed-out/failed/still-pending)
       // — the pay step switches from "waiting" to a "try again" state instead
-      // of implying nothing happened.
+      // of implying nothing happened. `failed` (set by the backend once the
+      // Cashfree link is authoritatively EXPIRED/CANCELLED) picks the exact
+      // copy — "failed" vs a softer "still pending".
+      setPayFailed(!!(res && res.failed));
       setCheckedOnce(true);
     } catch { setCheckedOnce(true); }
   };
 
   // Reopen the SAME Cashfree link (it stays valid until paid or expired) for
   // a fresh attempt after a failed/abandoned one.
-  const retryPayment = () => { setCheckedOnce(false); setShowPayWeb(true); };
+  const retryPayment = () => { setCheckedOnce(false); setPayFailed(false); setShowPayWeb(true); };
 
   // Auto-detect payment: poll every 4s while on the pay step and immediately
   // when the user returns to the app (from the Cashfree browser). No manual
@@ -335,9 +342,17 @@ export default function BookingScreen({ item }) {
               <><ActivityIndicator color={colors.brand} /><Text style={styles.cashfreeWait}>Opening secure Cashfree checkout…</Text></>
             ) : checkedOnce ? (
               <>
-                <View style={styles.notPaidIcon}><Text style={styles.notPaidIconTxt}>!</Text></View>
-                <Text style={styles.cashfreeTitle}>Payment not completed</Text>
-                <Text style={styles.cashfreeSub}>We couldn't confirm your payment. If money was deducted it'll reflect automatically in a few minutes — otherwise nothing was charged and you can try again.</Text>
+                <View style={[styles.notPaidIcon, payFailed && styles.failedIcon]}>
+                  <Text style={[styles.notPaidIconTxt, payFailed && styles.failedIconTxt]}>{payFailed ? '✕' : '!'}</Text>
+                </View>
+                <Text style={[styles.cashfreeTitle, payFailed && styles.failedTitle]}>
+                  {payFailed ? 'Payment failed' : 'Payment still pending'}
+                </Text>
+                <Text style={styles.cashfreeSub}>
+                  {payFailed
+                    ? "Cashfree couldn't complete this payment. If money was deducted it'll be refunded automatically within a few days — nothing else was charged."
+                    : "We couldn't confirm your payment yet. If money was deducted it'll reflect automatically in a few minutes — otherwise nothing was charged."}
+                </Text>
                 {!!payLink && (
                   <TouchableOpacity style={[styles.cashfreeReopen, styles.cashfreeRetry]} onPress={retryPayment}>
                     <Image source={ICONS.card} style={styles.cashfreeReopenIcon} />
@@ -627,8 +642,11 @@ const styles = StyleSheet.create({
   cashfreeReopenTxt: { color: colors.brandText, fontWeight: '800', fontSize: font.body },
   cashfreeBrowser: { marginTop: 10 },
   cashfreeBrowserTxt: { color: colors.inkMuted, fontWeight: '700', fontSize: font.small },
-  notPaidIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
-  notPaidIconTxt: { color: '#DC2626', fontSize: 26, fontWeight: '900' },
+  notPaidIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' },
+  notPaidIconTxt: { color: '#D97706', fontSize: 26, fontWeight: '900' },
+  failedIcon: { backgroundColor: '#FEE2E2' },
+  failedIconTxt: { color: '#DC2626' },
+  failedTitle: { color: '#DC2626' },
   cashfreeRetry: { backgroundColor: colors.brand },
 
   doneHero: { backgroundColor: colors.brand, alignItems: 'center', paddingBottom: 40, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
