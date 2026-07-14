@@ -23,11 +23,14 @@ const paymentStatus = (b) => {
   return 'pending';
 };
 
+// `color` is the status LABEL's text colour (Figma dev-mode: #009966 for
+// Completed) — deliberately a different, darker shade than the icon's own
+// fill (#02BC7D on the check asset itself); the two are not the same colour.
 const STATUS_META = {
   completed: {
     svg: PAYMENT_CHECK_SVG,
     label: 'Completed',
-    color: '#02BC7D',
+    color: '#009966',
     desc: "Payment should now reflect in the receiver's bank account.",
   },
   failed: {
@@ -116,18 +119,21 @@ export default function PaymentDetailScreen({ code }) {
           </TouchableOpacity>
         </View>
       ) : (
-        <PaymentDetailBody booking={booking} onSupport={() => push('support', { queue: 'user' })} />
+        <PaymentDetailBody
+          booking={booking}
+          onSupport={() => push('support', { queue: 'user' })}
+          onFullDetails={() => push('bookingFullDetail', { code: booking.bookingCode })}
+        />
       )}
     </View>
   );
 }
 
-function PaymentDetailBody({ booking, onSupport }) {
+function PaymentDetailBody({ booking, onSupport, onFullDetails }) {
   const st = paymentStatus(booking);
   const meta = STATUS_META[st];
   const item = booking.item || {};
   const img = resolveImage(item.image || item.mainImage);
-  const failed = st === 'failed';
   const dateIso = st === 'failed' ? (booking.payment?.failedAt || booking.updatedAt)
     : st === 'refunded' ? (booking.refundedAt || booking.updatedAt)
       : st === 'completed' ? (booking.payment?.paidAt || booking.updatedAt)
@@ -137,23 +143,23 @@ function PaymentDetailBody({ booking, onSupport }) {
   return (
     <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
       <View style={styles.card}>
-        <Text style={[styles.amount, failed && styles.amountStrike]}>
+        <Text style={styles.amount}>
           {formatMoney(booking.pricing?.total, booking.currency)}
         </Text>
 
         <View style={styles.statusBlock}>
-          <SvgXml xml={meta.svg} width={44} height={44} />
-          <View style={{ flex: 1, marginLeft: 12 }}>
+          <SvgXml xml={meta.svg} width={52} height={52} />
+          <View style={styles.statusText}>
             <Text style={[styles.statusLabel, { color: meta.color }]}>{meta.label}</Text>
             <Text style={styles.statusDesc}>{meta.desc}</Text>
             {!!dateIso && <Text style={styles.statusDate}>{fmtDateTime(dateIso)}</Text>}
           </View>
         </View>
 
-        <View style={styles.itemRow}>
+        <TouchableOpacity style={styles.itemRow} activeOpacity={0.8} onPress={onFullDetails}>
           <Image source={{ uri: img || DUMMY_IMAGE }} style={styles.itemImg} />
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.itemName} numberOfLines={1}>{item.name || 'Booking'}</Text>
+            <Text style={styles.itemName} numberOfLines={2}>{item.name || 'Booking'}</Text>
             {!!(item.location || item.city) && (
               <View style={styles.locRow}>
                 <Image source={ICONS.locGray} style={styles.locIcon} />
@@ -161,7 +167,8 @@ function PaymentDetailBody({ booking, onSupport }) {
               </View>
             )}
           </View>
-        </View>
+          <Text style={styles.itemChevron}>›</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.infoCard}>
@@ -187,24 +194,38 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', fontSize: font.h2, fontWeight: '800', color: colors.ink },
   shareIcon: { width: 18, height: 18, tintColor: colors.ink },
 
-  card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: 20, paddingVertical: 26, ...shadow.card },
-  amount: { fontSize: 34, fontWeight: '900', color: colors.ink, textAlign: 'center' },
-  amountStrike: { textDecorationLine: 'line-through', color: colors.inkMuted },
+  // Figma spec: Fill(358) x Hug(356), radius 16, padding top30/right20/
+  // bottom30/left20, gap 40 between the amount / status / item blocks.
+  card: { backgroundColor: '#FFFFFF', borderRadius: 16, paddingTop: 30, paddingRight: 20, paddingBottom: 30, paddingLeft: 20, ...shadow.card },
+  // Bold 62px in Figma; every reference render (Completed AND Failed alike)
+  // shows this amount muted-gray + struck-through — the icon/label below is
+  // what actually conveys success vs failure, this is just "the amount that
+  // was charged/attempted".
+  amount: { fontSize: 44, fontWeight: '700', color: '#888899', textAlign: 'center', textDecorationLine: 'line-through' },
 
-  statusBlock: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 24 },
+  // Figma "Frame 78" spec: icon top-aligned with the label line (not
+  // centered against the whole 3-line block); text column Width Fill(248),
+  // Height Hug(64), Gap 5 between label/description/date.
+  statusBlock: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 40 },
+  statusText: { flex: 1, marginLeft: 14 },
   statusLabel: { fontSize: font.body, fontWeight: '900' },
-  statusDesc: { fontSize: font.small, color: colors.inkMuted, marginTop: 3, lineHeight: 18 },
-  statusDate: { fontSize: font.tiny, color: colors.inkFaint, marginTop: 6 },
+  statusDesc: { fontSize: font.small, color: colors.inkMuted, marginTop: 5, lineHeight: 18 },
+  statusDate: { fontSize: font.tiny, color: colors.inkFaint, marginTop: 5 },
 
-  itemRow: { flexDirection: 'row', alignItems: 'center', marginTop: 24, paddingTop: 20, borderTopWidth: 1, borderTopColor: colors.border },
-  itemImg: { width: 64, height: 48, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
-  itemName: { fontSize: font.body, fontWeight: '800', color: colors.ink },
+  // Text sits at the TOP of the row (image is taller than the 2-line name +
+  // location), not vertically centered against the image.
+  itemRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 40, paddingTop: 20, borderTopWidth: 1, borderTopColor: colors.border },
+  itemChevron: { fontSize: 22, color: colors.inkFaint, marginLeft: 6, alignSelf: 'center' },
+  // Figma spec: image 120 x 90, radius 14.
+  itemImg: { width: 120, height: 90, borderRadius: 14, backgroundColor: colors.surfaceAlt },
+  // Roboto Medium (weight 500), bumped to 16px per feedback.
+  itemName: { fontSize: 16, fontWeight: '500', color: '#1A1A2E' },
   locRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   locIcon: { width: 11, height: 11 },
   locText: { fontSize: font.tiny, color: colors.inkMuted, flex: 1 },
 
-  infoCard: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: 16, marginTop: 12, ...shadow.card },
+  infoCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginTop: 12, ...shadow.card },
   infoLabel: { fontSize: font.tiny, fontWeight: '700', color: colors.inkMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
-  infoValue: { fontSize: font.body, fontWeight: '700', color: colors.ink, marginTop: 4, fontFamily: 'monospace' },
-  helpLink: { fontSize: font.body, fontWeight: '800', color: colors.brandDark, marginTop: 4 },
+  infoValue: { fontSize: font.body, fontWeight: '700', color: '#1A1A2E', marginTop: 4, fontFamily: 'monospace' },
+  helpLink: { fontSize: font.body, fontWeight: '800', color: colors.brand, marginTop: 4 },
 });
