@@ -143,7 +143,10 @@ function PaymentDetailBody({ booking, onSupport, onFullDetails }) {
   return (
     <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
       <View style={styles.card}>
-        <Text style={styles.amount}>
+        {/* Only a failed/refunded charge is "crossed out" — Completed and
+            Pending both show the plain amount, since money did (or still
+            might) actually move for those. */}
+        <Text style={[styles.amount, (st === 'failed' || st === 'refunded') && styles.amountStrike]}>
           {formatMoney(booking.pricing?.total, booking.currency)}
         </Text>
 
@@ -197,11 +200,10 @@ const styles = StyleSheet.create({
   // Figma spec: Fill(358) x Hug(356), radius 16, padding top30/right20/
   // bottom30/left20, gap 40 between the amount / status / item blocks.
   card: { backgroundColor: '#FFFFFF', borderRadius: 16, paddingTop: 30, paddingRight: 20, paddingBottom: 30, paddingLeft: 20, ...shadow.card },
-  // Bold 62px in Figma; every reference render (Completed AND Failed alike)
-  // shows this amount muted-gray + struck-through — the icon/label below is
-  // what actually conveys success vs failure, this is just "the amount that
-  // was charged/attempted".
-  amount: { fontSize: 44, fontWeight: '700', color: '#888899', textAlign: 'center', textDecorationLine: 'line-through' },
+  // Bold 62px in Figma; muted gray always, but only struck-through for a
+  // failed/refunded charge (see amountStrike) — Completed/Pending stay plain.
+  amount: { fontSize: 44, fontWeight: '700', color: '#888899', textAlign: 'center' },
+  amountStrike: { textDecorationLine: 'line-through' },
 
   // Figma "Frame 78" spec: icon top-aligned with the label line (not
   // centered against the whole 3-line block); text column Width Fill(248),

@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Share, Linking, Clipboard, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SvgXml } from 'react-native-svg';
 import { colors, radius, font, space, shadow } from '../../theme';
 import { api, resolveImage, DUMMY_IMAGE } from '../../api/client';
 import { API_BASE } from '../../config';
@@ -12,6 +13,7 @@ import { useAuth } from '../../store/AuthContext';
 import { useNav } from '../../navigation/NavContext';
 import { ICONS } from '../../icons';
 import PaymentWebView from '../../components/PaymentWebView';
+import { DOWNLOAD_VOUCHER_SVG } from '../../components/bookingDetailIcons';
 
 // Same payment-status bucket as PaymentDetailScreen — kept identical so the
 // two screens never disagree about what "Completed"/"Failed"/"Pending" means
@@ -52,6 +54,11 @@ export default function BookingFullDetailScreen({ code }) {
   const [booking, setBooking] = useState(null);
   const [host, setHost] = useState(null);
   const [expMeta, setExpMeta] = useState(null);
+  // Full experience record (schedule/pricing included) — fetched so a
+  // Pending booking's "Modify" can drop the user straight back into the
+  // booking flow to re-pick date/time/slot, same shape DetailScreen already
+  // passes to BookingScreen.
+  const [expFull, setExpFull] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -68,8 +75,10 @@ export default function BookingFullDetailScreen({ code }) {
       if (d.booking && d.booking.item?.type === 'experience' && itemId) {
         api.getExperience(itemId)
           .then((ed) => {
-            setHost((ed && ed.item && ed.item.supplier) || null);
-            setExpMeta(ed && ed.item ? { rating: ed.item.rating, reviewsCount: ed.item.reviewsCount } : null);
+            const full = (ed && ed.item) || null;
+            setExpFull(full);
+            setHost((full && full.supplier) || null);
+            setExpMeta(full ? { rating: full.rating, reviewsCount: full.reviewsCount } : null);
           })
           .catch(() => {});
       }
@@ -148,7 +157,18 @@ export default function BookingFullDetailScreen({ code }) {
           onCopy={copyCode}
           onShare={onShare}
           onVoucher={downloadVoucher}
-          onModify={() => push('bookingDetail', { code: booking.bookingCode, startCancel: true })}
+          onModify={() => {
+            // Pending (incl. failed-attempt) — no booking to cancel yet, take
+            // them back to the activity so they can re-pick date/time/slot.
+            // Confirmed/completed/refunded — the only "modify" that exists is
+            // cancelling, so drop straight into that flow.
+            if (booking.status === 'pending_payment') {
+              if (expFull) push('booking', { item: expFull });
+              else push('detail', { idOrSlug: booking.item?.slug || booking.itemId });
+            } else {
+              push('bookingDetail', { code: booking.bookingCode, startCancel: true });
+            }
+          }}
           onSupport={() => push('support', { queue: 'user' })}
           onPayAgain={startPayAgain}
           paying={paying}
@@ -169,15 +189,28 @@ function BodyContent({ insets, booking, host, expMeta, onBack, onCopy, onShare, 
   const guest = booking.guest || {};
   const img = resolveImage(item.image || item.mainImage);
   const rating = expMeta && Number(expMeta.rating) > 0 ? expMeta.rating : null;
+  const scheduledIso = booking.scheduledEndAt || booking.scheduledAt || booking.scheduledFor;
+  const cancelCutoff = scheduledIso ? new Date(new Date(scheduledIso).getTime() - 24 * 3600 * 1000) : null;
+  // Same paid bucket (green) covers both an upcoming, already-paid booking
+  // AND one whose activity date has already passed — the copy differs
+  // between the two, everything else (colour, actions, review/rating) stays
+  // exactly the same.
+  const activityDone = st === 'completed' && scheduledIso && new Date(scheduledIso).getTime() <= Date.now();
+  const bandSubtitle = activityDone ? 'Congrats! Your experience is complete.' : meta.subtitle;
+  const paymentBadgeText = activityDone ? 'Paid'
+    : st === 'completed' ? 'Payment successfully processed'
+      : st === 'refunded' ? 'Payment refunded'
+        : st === 'failed' ? 'Payment failed'
+          : 'Payment pending';
 
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-      <View style={[styles.band, { backgroundColor: meta.band, paddingTop: insets.top + 12 }]}>
+      <View style={[styles.band, { backgroundColor: meta.band, paddingTop: insets.top + 25 }]}>
         <TouchableOpacity onPress={onBack} style={styles.bandBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Text style={styles.bandBackIcon}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.bandTitle}>Booking Details</Text>
-        <Text style={styles.bandSubtitle}>{meta.subtitle}</Text>
+        <Text style={styles.bandSubtitle}>{bandSubtitle}</Text>
         <TouchableOpacity style={styles.refPill} onPress={onCopy} activeOpacity={0.85}>
           <Text style={styles.refLabel}>Ref</Text>
           <Text style={styles.refCode}>{booking.bookingCode}</Text>
@@ -186,8 +219,11 @@ function BodyContent({ insets, booking, host, expMeta, onBack, onCopy, onShare, 
       </View>
 
       <View style={styles.actionsRow}>
-        {paid && <ActionBtn icon={ICONS.ticket} label="Voucher" onPress={onVoucher} />}
-        <ActionBtn icon={ICONS.edit} label="Modify" onPress={onModify} />
+        {/* Voucher only once paid; Modify only while pending (nothing to
+            "modify" on a confirmed booking except cancel, which lives on
+            the booking-detail screen itself, not as a quick action here). */}
+        {paid && <ActionBtn svg={DOWNLOAD_VOUCHER_SVG} label="Voucher" onPress={onVoucher} />}
+        {!paid && <ActionBtn icon={ICONS.edit} label="Modify" onPress={onModify} />}
         <ActionBtn icon={ICONS.navInbox} label="Support" onPress={onSupport} />
         <ActionBtn icon={ICONS.share} label="Share" onPress={onShare} />
       </View>
@@ -229,18 +265,6 @@ function BodyContent({ insets, booking, host, expMeta, onBack, onCopy, onShare, 
           <KV k="Duration" v={`${booking.units || 1} ${item.type === 'room' ? 'night(s)' : 'day(s)'}`} last />
         </SectionCard>
 
-        {/* Meeting point — same location/image as the experience itself */}
-        {!!(item.location || item.city) && (
-          <SectionCard title="Meeting Point">
-            <View style={styles.meetingRow}>
-              <Image source={{ uri: img || DUMMY_IMAGE }} style={styles.meetingImg} />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.meetingLoc}>{item.location || item.city}</Text>
-              </View>
-            </View>
-          </SectionCard>
-        )}
-
         {/* Host */}
         {!!host && (
           <SectionCard title="Your Host">
@@ -271,20 +295,30 @@ function BodyContent({ insets, booking, host, expMeta, onBack, onCopy, onShare, 
             <Text style={styles.totalVal}>{formatMoney(pricing.total, booking.currency)}</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: meta.band + '1A' }]}>
-            <Text style={[styles.statusBadgeText, { color: meta.band }]}>
-              {st === 'completed' ? 'Payment successfully processed'
-                : st === 'refunded' ? 'Payment refunded'
-                  : st === 'failed' ? 'Payment failed'
-                    : 'Payment pending'}
-            </Text>
+            <Text style={[styles.statusBadgeText, { color: meta.band }]}>{paymentBadgeText}</Text>
           </View>
         </SectionCard>
+
+        {/* Free cancellation — only while still upcoming (paid, activity
+            hasn't happened yet); doesn't make sense once the trip is done,
+            or before it's even confirmed. */}
+        {st === 'completed' && !activityDone && (
+          <View style={styles.cancelNote}>
+            <Image source={ICONS.shield} style={styles.cancelNoteIcon} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cancelNoteTitle}>Free cancellation · up to 24 hrs before</Text>
+              <Text style={styles.cancelNoteSub}>
+                Cancel before {fmtFullDateTime(cancelCutoff)} for a full refund.
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Bottom CTA */}
       {paid ? (
         <TouchableOpacity style={styles.cta} activeOpacity={0.9} onPress={onVoucher}>
-          <Image source={ICONS.ticket} style={styles.ctaIcon} />
+          <SvgXml xml={DOWNLOAD_VOUCHER_SVG} width={18} height={18} />
           <Text style={styles.ctaText}>Download e-Voucher</Text>
         </TouchableOpacity>
       ) : (
@@ -301,10 +335,12 @@ function BodyContent({ insets, booking, host, expMeta, onBack, onCopy, onShare, 
   );
 }
 
-function ActionBtn({ icon, label, onPress }) {
+function ActionBtn({ icon, svg, label, onPress }) {
   return (
     <TouchableOpacity style={styles.actionBtn} activeOpacity={0.8} onPress={onPress}>
-      <View style={styles.actionCircle}><Image source={icon} style={styles.actionIcon} /></View>
+      <View style={styles.actionCircle}>
+        {svg ? <SvgXml xml={svg} width={20} height={20} /> : <Image source={icon} style={styles.actionIcon} />}
+      </View>
       <Text style={styles.actionLabel}>{label}</Text>
     </TouchableOpacity>
   );
@@ -335,7 +371,8 @@ function Row({ k, v, green }) {
 }
 
 const styles = StyleSheet.create({
-  band: { paddingBottom: 22, paddingHorizontal: space.lg, alignItems: 'center' },
+  // At least 25 top (+ safe-area inset, applied inline) / 25 bottom, consistent.
+  band: { paddingBottom: 25, paddingHorizontal: space.lg, alignItems: 'center' },
   bandBack: { position: 'absolute', left: 8, top: 8, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   bandBackIcon: { fontSize: 28, color: '#fff', marginTop: -4 },
   bandTitle: { color: '#fff', fontSize: font.h2, fontWeight: '900', marginTop: 6 },
@@ -347,8 +384,8 @@ const styles = StyleSheet.create({
 
   actionsRow: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: colors.surface, paddingVertical: 16, marginTop: -1, borderBottomWidth: 1, borderBottomColor: colors.border },
   actionBtn: { alignItems: 'center', gap: 6 },
-  actionCircle: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
-  actionIcon: { width: 20, height: 20, tintColor: colors.brandText },
+  actionCircle: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center' },
+  actionIcon: { width: 20, height: 20, tintColor: colors.inkMuted },
   actionLabel: { fontSize: font.tiny, fontWeight: '700', color: colors.inkMuted },
 
   px: { paddingHorizontal: space.lg },
@@ -370,10 +407,6 @@ const styles = StyleSheet.create({
   kvK: { fontSize: font.small, color: colors.inkMuted },
   kvV: { fontSize: font.small, color: '#1A1A2E', fontWeight: '700', flexShrink: 1, textAlign: 'right' },
 
-  meetingRow: { flexDirection: 'row', alignItems: 'center' },
-  meetingImg: { width: 64, height: 64, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
-  meetingLoc: { fontSize: font.small, color: '#1A1A2E', fontWeight: '700' },
-
   hostRow: { flexDirection: 'row', alignItems: 'center' },
   hostAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.surfaceAlt },
   hostName: { fontSize: font.body, fontWeight: '800', color: '#1A1A2E' },
@@ -389,6 +422,11 @@ const styles = StyleSheet.create({
   totalVal: { fontSize: font.body, fontWeight: '900', color: colors.brandDark },
   statusBadge: { borderRadius: radius.md, paddingVertical: 10, alignItems: 'center', marginTop: 12 },
   statusBadgeText: { fontSize: font.small, fontWeight: '800' },
+
+  cancelNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: colors.surfaceAlt, borderRadius: radius.lg, padding: 14, marginTop: 12 },
+  cancelNoteIcon: { width: 18, height: 18, tintColor: '#16A34A', marginTop: 1 },
+  cancelNoteTitle: { fontSize: font.small, fontWeight: '800', color: '#1A1A2E' },
+  cancelNoteSub: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 3, lineHeight: 16 },
 
   cta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#101010', borderRadius: radius.lg, marginHorizontal: space.lg, marginTop: 20, paddingVertical: 16 },
   ctaPay: { backgroundColor: colors.brand },

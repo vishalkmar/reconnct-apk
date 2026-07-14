@@ -17,6 +17,9 @@ const PILL = {
   upcoming: { label: 'Upcoming', bg: colors.brand, fg: '#101010' },
   completed: { label: 'Completed', bg: '#16A34A', fg: '#fff' },
   cancelled: { label: 'Cancelled', bg: '#DC2626', fg: '#fff' },
+  // Only ever visible under the "All" tab (pending_payment has no tab of its
+  // own here — see categorize() below).
+  pending: { label: 'Payment pending', bg: '#FFB900', fg: '#101010' },
 };
 
 const TABS = [
@@ -33,16 +36,19 @@ const TABS = [
 // then the exact scheduledAt timestamp, falling back to the date-only
 // scheduledFor for older bookings that predate that column. Explicitly
 // cancelled/refunded bookings are always Cancelled regardless of date.
+//
+// pending_payment never lands in Upcoming/Completed/Cancelled — that's the
+// Transactions tab's job now (Pending/Failed live there). It still shows up
+// under "All" (inGroup below matches everything for that tab) but has no
+// home tab of its own here.
 function categorize(b) {
   if (!b) return 'upcoming';
   if (b.status === 'cancelled' || b.status === 'refunded') return 'cancelled';
   if (b.status === 'completed') return 'completed';
+  if (b.status === 'pending_payment') return 'pending';
   const endIso = b.scheduledEndAt || b.scheduledAt || b.scheduledFor || b.date;
   const end = endIso ? new Date(endIso) : null;
-  if (end && end.getTime() <= Date.now()) {
-    const paid = !!(b.payment && b.payment.paidAt) || b.status === 'confirmed';
-    if (paid) return 'completed';
-  }
+  if (end && end.getTime() <= Date.now()) return 'completed';
   return 'upcoming';
 }
 const inGroup = (b, key) => key === 'all' || categorize(b) === key;
@@ -104,7 +110,7 @@ export default function MyBookingsScreen() {
           renderItem={({ item }) => (
             <BookingCard
               b={item}
-              onOpen={(bk) => push('bookingDetail', { code: bk.bookingCode })}
+              onOpen={(bk) => push('bookingFullDetail', { code: bk.bookingCode })}
               onCancel={(bk) => push('bookingDetail', { code: bk.bookingCode, startCancel: true })}
               onRate={(bk) => setRateBooking(bk)}
               onDelete={(bk) => Alert.alert(
