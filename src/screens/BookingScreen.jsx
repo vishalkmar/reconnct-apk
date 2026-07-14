@@ -48,7 +48,8 @@ export default function BookingScreen({ item }) {
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [showGuest, setShowGuest] = useState(false);
-  const [guest, setGuest] = useState({ name: '', phone: '', email: '' });
+  const [guest, setGuest] = useState({ firstName: '', lastName: '', country: '', phoneCode: '+91', phone: '', email: '' });
+  const [guestTouched, setGuestTouched] = useState({});
   const [paying, setPaying] = useState(false);
   const [payLink, setPayLink] = useState(null);
   const [showPayWeb, setShowPayWeb] = useState(false);
@@ -66,7 +67,9 @@ export default function BookingScreen({ item }) {
 
   const b = priceBreakdown(item, adults, children);
   const guests = adults + children;
-  const primaryName = guest.name.trim() || (user && user.name) || 'You';
+  const guestFullName = [guest.firstName, guest.lastName].filter((s) => s && s.trim()).join(' ').trim();
+  const guestFullPhone = (guest.phone || '').trim() ? `${guest.phoneCode || ''}${guest.phone.trim()}` : '';
+  const primaryName = guestFullName || (user && user.name) || 'You';
   // The amount actually charged comes from the DB booking once created.
   const payTotal = (dbBooking && dbBooking.pricing && dbBooking.pricing.total) || b.total;
 
@@ -82,7 +85,7 @@ export default function BookingScreen({ item }) {
         guestCount: adults + children,
         guestName: primaryName,
         guestEmail: (guest.email || '').trim() || (user && user.email) || '',
-        guestPhone: (guest.phone || '').trim() || (user && user.phone) || '',
+        guestPhone: guestFullPhone || (user && user.phone) || '',
         specialRequests: slot ? `Preferred time: ${slot.label}` : undefined,
       });
       const bk = res.booking;
@@ -100,7 +103,7 @@ export default function BookingScreen({ item }) {
         const direct = await createDirectPaymentLink({
           amount: (bk.pricing && bk.pricing.total) || b.total,
           name: primaryName,
-          phone: (guest.phone || '').trim() || (user && user.phone) || '',
+          phone: guestFullPhone || (user && user.phone) || '',
           email: (guest.email || '').trim() || (user && user.email) || '',
           purpose: item.name,
           linkId,
@@ -278,10 +281,10 @@ export default function BookingScreen({ item }) {
                 </View>
               </View>
 
-              {/* Primary guest (optional) — opens a center popup */}
+              {/* Primary guest (optional) — opens the bottom sheet */}
               <TouchableOpacity style={styles.guestToggle} onPress={() => setShowGuest(true)}>
                 <Image source={ICONS.people} style={styles.guestToggleIcon} />
-                <Text style={styles.guestToggleTxt}>{guest.name.trim() ? `Primary guest: ${guest.name.trim()}` : 'Add primary guest details (optional)'}</Text>
+                <Text style={styles.guestToggleTxt}>{guestFullName ? `Primary guest: ${guestFullName}` : 'Add primary guest details (optional)'}</Text>
                 <Text style={styles.guestToggleChev}>›</Text>
               </TouchableOpacity>
             </>
@@ -458,23 +461,73 @@ export default function BookingScreen({ item }) {
         onReturn={() => { setShowPayWeb(false); checkStatus(); }}
       />
 
-      {/* Primary guest popup */}
-      <Modal visible={showGuest} transparent animationType="fade" onRequestClose={() => setShowGuest(false)}>
-        <View style={styles.modalBackdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowGuest(false)} />
-          <View style={styles.modalCard}>
+      {/* Primary guest — bottom sheet (slides up), same pattern as the Filter sheet. */}
+      <Modal visible={showGuest} animationType="slide" transparent onRequestClose={() => setShowGuest(false)}>
+        <View style={styles.sheetBackdrop}>
+          <Pressable style={{ flex: 1 }} onPress={() => setShowGuest(false)} />
+          <View style={[styles.sheet, styles.guestSheet, { paddingBottom: insets.bottom + 20 }]}>
+            <View style={styles.sheetHandle} />
             <View style={styles.modalHead}>
-              <Text style={styles.modalTitle}>Primary guest details</Text>
-              <TouchableOpacity onPress={() => setShowGuest(false)}><Text style={styles.modalClose}>✕</Text></TouchableOpacity>
+              <Text style={styles.modalTitle}>Primary Customer Info</Text>
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowGuest(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.modalSub}>Who should we put on the booking? Leave blank to use your account.</Text>
-            <Field placeholder="Full name" value={guest.name} onChangeText={(t) => setGuest({ ...guest, name: t })} />
-            <View style={{ height: 10 }} />
-            <Field placeholder="Phone" value={guest.phone} onChangeText={(t) => setGuest({ ...guest, phone: t })} keyboardType="phone-pad" />
-            <View style={{ height: 10 }} />
-            <Field placeholder="Email" value={guest.email} onChangeText={(t) => setGuest({ ...guest, email: t })} keyboardType="email-address" autoCapitalize="none" />
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 18 }} keyboardShouldPersistTaps="handled">
+              <Field
+                label="First Name*"
+                placeholder="First name"
+                value={guest.firstName}
+                onChangeText={(t) => setGuest({ ...guest, firstName: t })}
+                onBlur={() => setGuestTouched((t) => ({ ...t, firstName: true }))}
+                error={guestTouched.firstName && !guest.firstName.trim() ? 'Necessary detail' : null}
+              />
+              <View style={{ height: 14 }} />
+              <Field
+                label="Last Name*"
+                placeholder="Last name"
+                value={guest.lastName}
+                onChangeText={(t) => setGuest({ ...guest, lastName: t })}
+                onBlur={() => setGuestTouched((t) => ({ ...t, lastName: true }))}
+                error={guestTouched.lastName && !guest.lastName.trim() ? 'Necessary detail' : null}
+              />
+              <View style={{ height: 14 }} />
+              <Field placeholder="Select Country" value={guest.country} onChangeText={(t) => setGuest({ ...guest, country: t })} />
+              <View style={{ height: 14 }} />
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TextInput
+                  style={[styles.field, { width: 78, textAlign: 'center' }]}
+                  value={guest.phoneCode}
+                  onChangeText={(t) => setGuest({ ...guest, phoneCode: t })}
+                  placeholder="Code"
+                  placeholderTextColor={colors.inkFaint}
+                />
+                <Field
+                  style={{ flex: 1 }}
+                  placeholder="Enter Your Phone Number*"
+                  value={guest.phone}
+                  onChangeText={(t) => setGuest({ ...guest, phone: t })}
+                  onBlur={() => setGuestTouched((t) => ({ ...t, phone: true }))}
+                  keyboardType="phone-pad"
+                  error={guestTouched.phone && !guest.phone.trim() ? 'Necessary detail' : null}
+                />
+              </View>
+              <View style={{ height: 14 }} />
+              <Field
+                placeholder="Email Address*"
+                value={guest.email}
+                onChangeText={(t) => setGuest({ ...guest, email: t })}
+                onBlur={() => setGuestTouched((t) => ({ ...t, email: true }))}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                error={guestTouched.email && !guest.email.trim() ? 'Necessary detail' : null}
+              />
+              <View style={{ height: 40 }} />
+            </ScrollView>
+
             <TouchableOpacity style={styles.modalSave} onPress={() => setShowGuest(false)} activeOpacity={0.9}>
-              <Text style={styles.modalSaveTxt}>Save</Text>
+              <Text style={styles.modalSaveTxt}>Save &amp; Proceed</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -499,7 +552,15 @@ function Stepper({ label, sub, value, setValue, min = 0, max = 30 }) {
     </View>
   );
 }
-function Field(props) { return <TextInput {...props} placeholderTextColor={colors.inkFaint} style={styles.field} />; }
+function Field({ label, error, style, ...props }) {
+  return (
+    <View>
+      {!!label && <Text style={styles.fieldLabel}>{label}</Text>}
+      <TextInput {...props} placeholderTextColor={colors.inkFaint} style={[styles.field, error && styles.fieldErrorBorder, style]} />
+      {!!error && <Text style={styles.fieldErrorText}>{error}</Text>}
+    </View>
+  );
+}
 function Label({ children }) { return <Text style={styles.fieldLabel}>{children}</Text>; }
 function Section({ title, children }) { return (<View style={styles.sectionBox}><Text style={styles.sectionTitle}>{title}</Text>{children}</View>); }
 function KV({ k, v, bold, green, last }) {
@@ -588,14 +649,21 @@ const styles = StyleSheet.create({
   fieldIcon: { width: 18, height: 18, tintColor: colors.inkFaint, marginRight: 8 },
   fieldIconInput: { flex: 1, fontSize: font.body, color: colors.ink, paddingVertical: 0 },
 
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  modalCard: { width: '100%', backgroundColor: colors.surface, borderRadius: radius.lg, padding: 20 },
+  sheetBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
+  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: space.xl, paddingTop: 10 },
+  sheetHandle: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: colors.border, marginBottom: 8 },
+  // Tall, near-full-screen sheet — matches the reference's generous empty
+  // space below the fields rather than a compact card.
+  guestSheet: { height: '86%' },
   modalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   modalTitle: { fontSize: font.h3, fontWeight: '800', color: colors.ink },
-  modalClose: { fontSize: 18, color: colors.inkMuted, padding: 4 },
-  modalSub: { fontSize: font.small, color: colors.inkMuted, marginTop: 4, marginBottom: 14, lineHeight: 18 },
-  modalSave: { backgroundColor: colors.brand, height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
-  modalSaveTxt: { color: '#fff', fontWeight: '800', fontSize: font.h3 },
+  modalCloseBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center' },
+  modalClose: { fontSize: 13, fontWeight: '800', color: colors.inkMuted },
+  modalSave: { backgroundColor: colors.brand, height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+  modalSaveTxt: { color: '#101010', fontWeight: '800', fontSize: font.h3 },
+  fieldLabel: { fontSize: font.small, fontWeight: '700', color: colors.inkMuted, marginBottom: 6 },
+  fieldErrorBorder: { borderColor: '#DC2626' },
+  fieldErrorText: { fontSize: font.tiny, color: '#DC2626', fontWeight: '700', marginTop: 4 },
 
   expCard: { flexDirection: 'row', gap: 12, backgroundColor: colors.surface, borderRadius: radius.lg, padding: 10, marginTop: 16, ...shadow.card },
   expImg: { width: 70, height: 70, borderRadius: radius.md, backgroundColor: '#DCE0E6' },

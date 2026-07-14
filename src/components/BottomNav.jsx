@@ -49,9 +49,9 @@ export default function BottomNav({ current, onChange, mode = 'traveller' }) {
               {active && (
                 <View style={styles.notchWrap} pointerEvents="none">
                   <View style={styles.notchCutout} />
-                  <View style={styles.notchDot} />
                 </View>
               )}
+              {active && <View style={styles.notchDot} pointerEvents="none" />}
               <View>
                 {Icon ? <Icon size={22} color="#1A1A2E" /> : <Image source={it.icon} style={[styles.icon, { tintColor: '#1A1A2E' }]} />}
                 {it.dot && <View style={styles.dot} />}
@@ -67,27 +67,32 @@ export default function BottomNav({ current, onChange, mode = 'traveller' }) {
 
 const styles = StyleSheet.create({
   host: { position: 'absolute', left: 12, right: 12 },
+  // Glass-morphism: translucent frosted white + a bright top-edge hairline so
+  // it reads as glass even without a true native blur behind it.
   bar: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.96)',
+    backgroundColor: 'rgba(255,255,255,0.72)',
     borderRadius: 32, paddingVertical: 8, paddingHorizontal: 6,
-    borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.14, shadowRadius: 18, elevation: 12,
+    overflow: 'visible',
   },
   item: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: 22 },
-  itemActive: { backgroundColor: '#ECEDEF' },
+  itemActive: { backgroundColor: 'rgba(236,237,239,0.85)' },
   icon: { width: 22, height: 22 },
   dot: { position: 'absolute', top: -2, right: -4, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brand },
   label: { fontSize: font.tiny, color: '#1A1A2E', marginTop: 4 },
   labelActive: { color: '#1A1A2E', fontWeight: '700' },
 
   // Notch + dot poking above the active tab — a circle the page-background
-  // color "bites into" the pill's top edge, with a small amber dot (shadowed)
-  // sitting in the notch.
-  notchWrap: { position: 'absolute', top: -16, alignSelf: 'center', width: 30, height: 30, alignItems: 'center' },
+  // colour "bites into" the pill's top edge, with a small amber dot floating
+  // above it. Bottom edge of the circle must stay clear of the icon below it
+  // (icon starts at paddingVertical:6 from the item's top) — sized/positioned
+  // so it dips only slightly into the bar for the bite, mostly floating above.
+  notchWrap: { position: 'absolute', top: -32, alignSelf: 'center', width: 30, height: 30, alignItems: 'center', zIndex: 1 },
   notchCutout: { position: 'absolute', top: 0, width: 30, height: 30, borderRadius: 15, backgroundColor: colors.bg },
   notchDot: {
-    position: 'absolute', top: 9, width: 11, height: 11, borderRadius: 6, backgroundColor: colors.brand,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 6,
+    position: 'absolute', top: -24, alignSelf: 'center', width: 12, height: 12, borderRadius: 6, backgroundColor: colors.brand,
+    shadowColor: colors.brand, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.5, shadowRadius: 5, elevation: 8, zIndex: 2,
   },
 });

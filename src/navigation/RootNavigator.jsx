@@ -116,7 +116,11 @@ export default function RootNavigator() {
           <View style={{ flex: 1 }}>
             <TabScreen tab={tab} mode={mode} />
           </View>
-          <BottomNav current={tab} onChange={navigateTab} mode={mode} />
+          {/* Inbox is a full-screen chat once you're in it — no floating nav
+              on top of the composer. */}
+          {!(mode === 'host' && tab === 'inbox') && (
+            <BottomNav current={tab} onChange={navigateTab} mode={mode} />
+          )}
         </>
       )}
     </View>
