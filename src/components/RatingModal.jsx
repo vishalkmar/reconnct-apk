@@ -1,15 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, Image, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, Image, ActivityIndicator } from 'react-native';
 import { colors, radius, font, space, shadow } from '../theme';
 import { api, resolveImage } from '../api/client';
 import { useAuth } from '../store/AuthContext';
+import { MONTHS_FULL } from '../utils/booking';
+
+const ordinal = (n) => { const s = ['th', 'st', 'nd', 'rd']; const v = n % 100; return s[(v - 20) % 10] || s[v] || s[0]; };
+const experiencedLabel = (iso) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return `Experienced on ${d.getDate()}${ordinal(d.getDate())} of ${MONTHS_FULL[d.getMonth()]}, ${d.getFullYear()}`;
+};
 
 /**
  * Shared rate-and-review popup used both as the manual "Rate Experience"
  * action from a completed booking card, and as the automatic Home-screen
- * prompt. `variant="auto"` adds the "Stop showing" + top-right X (session
- * close, no server call) chrome the auto-popup needs; `variant="manual"`
- * keeps it to just stars + comment + Submit/Cancel.
+ * prompt. `variant="auto"` adds the "Stop showing" (session-independent,
+ * server-persisted dismissal) chrome the auto-popup needs; `variant="manual"`
+ * keeps its secondary action to a plain "Cancel". The X close button shows
+ * either way.
  */
 export default function RatingModal({ visible, variant = 'manual', booking, onClose, onDismissForever, onSubmitted }) {
   const { token } = useAuth();
@@ -27,6 +37,8 @@ export default function RatingModal({ visible, variant = 'manual', booking, onCl
   if (!booking) return null;
   const name = booking.itemName || (booking.item && booking.item.name) || 'this experience';
   const img = resolveImage(booking.itemImage || (booking.item && (booking.item.image || booking.item.mainImage)));
+  const location = booking.itemLocation || (booking.item && (booking.item.location || booking.item.city)) || '';
+  const dateLabel = experiencedLabel(booking.scheduledFor || booking.scheduledAt || (booking.item && booking.item.scheduledFor));
 
   const submit = async () => {
     if (!rating) { setError('Please pick a star rating.'); return; }
@@ -54,12 +66,6 @@ export default function RatingModal({ visible, variant = 'manual', booking, onCl
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
-          {variant === 'auto' && (
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={styles.closeBtnText}>✕</Text>
-            </TouchableOpacity>
-          )}
-
           {done ? (
             <View style={styles.doneWrap}>
               <Text style={styles.doneEmoji}>🎉</Text>
@@ -71,10 +77,28 @@ export default function RatingModal({ visible, variant = 'manual', booking, onCl
             </View>
           ) : (
             <>
-              {!!img && <Image source={{ uri: img }} style={styles.hero} />}
-              <Text style={styles.title}>Rate your experience</Text>
-              <Text style={styles.itemName} numberOfLines={2}>{name}</Text>
+              <View style={styles.headerRow}>
+                <Text style={styles.title}>How Was Your Experience</Text>
+                <TouchableOpacity style={styles.closeBtn} onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Text style={styles.closeBtnText}>✕</Text>
+                </TouchableOpacity>
+              </View>
 
+              <View style={styles.itemCard}>
+                {!!img && <Image source={{ uri: img }} style={styles.itemImg} />}
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.itemName} numberOfLines={2}>{name}</Text>
+                  {!!location && (
+                    <View style={styles.locRow}>
+                      <Text style={styles.locPin}>📍</Text>
+                      <Text style={styles.locText} numberOfLines={1}>{location}</Text>
+                    </View>
+                  )}
+                  {!!dateLabel && <Text style={styles.dateText}>{dateLabel}</Text>}
+                </View>
+              </View>
+
+              <Text style={styles.sectionLabel}>How would you rate the experience?</Text>
               <View style={styles.starsRow}>
                 {[1, 2, 3, 4, 5].map((n) => (
                   <TouchableOpacity key={n} onPress={() => setRating(n)} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>
@@ -83,14 +107,17 @@ export default function RatingModal({ visible, variant = 'manual', booking, onCl
                 ))}
               </View>
 
+              <Text style={styles.sectionLabel}>
+                In case you want to write a review <Text style={styles.optional}>(Optional)</Text>
+              </Text>
               <TextInput
                 style={styles.input}
-                placeholder="Share a few words about your experience (optional)"
+                placeholder="Share a few words about your experience"
                 placeholderTextColor={colors.inkFaint}
                 value={comment}
                 onChangeText={setComment}
                 multiline
-                numberOfLines={3}
+                numberOfLines={4}
               />
 
               {!!error && <Text style={styles.error}>{error}</Text>}
@@ -118,18 +145,31 @@ export default function RatingModal({ visible, variant = 'manual', booking, onCl
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: space.lg },
-  card: { width: '100%', maxWidth: 420, backgroundColor: colors.surface, borderRadius: radius.xl, padding: space.lg, ...shadow.card },
-  closeBtn: { position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: 15, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
-  closeBtnText: { color: colors.ink, fontSize: 15, fontWeight: '800' },
-  hero: { width: '100%', height: 110, borderRadius: radius.md, marginBottom: 12, resizeMode: 'cover' },
-  title: { fontSize: font.h3, fontWeight: '900', color: colors.ink, textAlign: 'center' },
-  itemName: { fontSize: font.body, color: colors.inkMuted, textAlign: 'center', marginTop: 4, marginBottom: 16, fontWeight: '600' },
-  starsRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 16 },
-  star: { fontSize: 34, color: colors.border },
+  card: { width: '100%', maxWidth: 420, backgroundColor: colors.surface, borderRadius: radius.xl, padding: 20, ...shadow.card },
+
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  title: { flex: 1, fontSize: font.h3, fontWeight: '900', color: colors.ink },
+  closeBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center', marginLeft: 10 },
+  closeBtnText: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+
+  itemCard: { flexDirection: 'row', alignItems: 'flex-start', borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 12, marginBottom: 20 },
+  itemImg: { width: 100, height: 75, borderRadius: 12, backgroundColor: colors.surfaceAlt },
+  itemName: { fontSize: 15, fontWeight: '800', color: colors.ink },
+  locRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  locPin: { fontSize: 10 },
+  locText: { fontSize: 12, color: colors.inkMuted, flex: 1 },
+  dateText: { fontSize: 11, color: colors.inkFaint, marginTop: 4 },
+
+  sectionLabel: { fontSize: 15, fontWeight: '800', color: colors.ink, marginBottom: 10 },
+  optional: { fontWeight: '500', color: colors.inkMuted, fontSize: 13 },
+
+  starsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+  star: { fontSize: 32, color: colors.border },
   starActive: { color: colors.star },
-  input: { borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, padding: 12, minHeight: 70, textAlignVertical: 'top', color: colors.ink, fontSize: font.body },
+
+  input: { borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 14, minHeight: 100, textAlignVertical: 'top', color: colors.ink, fontSize: font.body, backgroundColor: colors.surfaceAlt },
   error: { color: '#DC2626', fontSize: font.small, marginTop: 8, textAlign: 'center', fontWeight: '600' },
-  submitBtn: { backgroundColor: colors.brand, height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
+  submitBtn: { backgroundColor: colors.brand, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
   submitBtnText: { color: '#101010', fontWeight: '900', fontSize: font.body },
   linkBtn: { alignItems: 'center', justifyContent: 'center', marginTop: 12, paddingVertical: 6 },
   linkBtnText: { color: colors.inkMuted, fontWeight: '700', fontSize: font.small },

@@ -130,7 +130,13 @@ export default function MyBookingsScreen() {
       <RatingModal
         visible={!!rateBooking}
         variant="manual"
-        booking={rateBooking ? { bookingCode: rateBooking.bookingCode, itemName: (rateBooking.item || {}).name || (rateBooking.item || {}).title, itemImage: (rateBooking.item || {}).image || (rateBooking.item || {}).mainImage } : null}
+        booking={rateBooking ? {
+          bookingCode: rateBooking.bookingCode,
+          itemName: (rateBooking.item || {}).name || (rateBooking.item || {}).title,
+          itemImage: (rateBooking.item || {}).image || (rateBooking.item || {}).mainImage,
+          itemLocation: (rateBooking.item || {}).location || (rateBooking.item || {}).city,
+          scheduledFor: rateBooking.scheduledAt || rateBooking.scheduledFor,
+        } : null}
         onClose={() => setRateBooking(null)}
         onSubmitted={() => {
           setFetched((list) => list.map((b) => (b.bookingCode === rateBooking.bookingCode ? { ...b, review: { rating: 1 } } : b)));
