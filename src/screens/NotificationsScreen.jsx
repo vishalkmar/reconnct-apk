@@ -1,12 +1,26 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, SectionList, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, SectionList, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
 import { colors, radius, font, space } from '../theme';
 import { api } from '../api/client';
 import { formatMoney } from '../utils/format';
 import { useAuth } from '../store/AuthContext';
+import { useNav } from '../navigation/NavContext';
 import { ICONS } from '../icons';
 import ScreenHeader from '../components/ScreenHeader';
 import EmptyState from '../components/EmptyState';
+
+// Where tapping a notification should land — booking-shaped items (booking,
+// reminder, host_booking) go to the relevant booking's real screen; wallet/
+// welcome notes have no single page to open, so they stay inert.
+const routeFor = (item) => {
+  if (item.kind === 'booking') return item.bookingCode ? { name: 'bookingFullDetail', params: { code: item.bookingCode } } : null;
+  if (item.kind === 'reminder') {
+    if (item.isHostBooking) return item.bookingId ? { name: 'hostBookingDetail', params: { id: item.bookingId } } : null;
+    return item.bookingCode ? { name: 'bookingFullDetail', params: { code: item.bookingCode } } : null;
+  }
+  if (item.kind === 'host_booking') return item.bookingId ? { name: 'hostBookingDetail', params: { id: item.bookingId } } : null;
+  return null;
+};
 
 // Icon + tint per notification kind. The feed itself comes from the backend
 // (/api/notifications) so the app and website always show the same list.
@@ -28,6 +42,7 @@ function dayLabel(iso) {
 
 export default function NotificationsScreen() {
   const { token } = useAuth();
+  const { push } = useNav();
   const [feed, setFeed] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -64,18 +79,27 @@ export default function NotificationsScreen() {
           contentContainerStyle={{ padding: space.lg, paddingBottom: 32 }}
           stickySectionHeadersEnabled={false}
           renderSectionHeader={({ section }) => <Text style={styles.sectionTitle}>{section.title}</Text>}
-          renderItem={({ item }) => (
-            <View style={styles.row}>
-              <View style={[styles.iconWrap, { backgroundColor: (TINT_FOR[item.kind] || colors.brand) + '22' }]}>
-                <Image source={ICON_FOR[item.kind] || ICONS.bell} style={[styles.icon, { tintColor: TINT_FOR[item.kind] || colors.brand }]} />
-              </View>
-              <View style={styles.textCol}>
-                <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.body} numberOfLines={2}>{item.body}</Text>
-              </View>
-              {item.amount != null && <Text style={styles.amount}>{formatMoney(item.amount, 'INR')}</Text>}
-            </View>
-          )}
+          renderItem={({ item }) => {
+            const route = routeFor(item);
+            const Row = route ? TouchableOpacity : View;
+            return (
+              <Row
+                style={styles.row}
+                activeOpacity={0.7}
+                {...(route ? { onPress: () => push(route.name, route.params) } : {})}
+              >
+                <View style={[styles.iconWrap, { backgroundColor: (TINT_FOR[item.kind] || colors.brand) + '22' }]}>
+                  <Image source={ICON_FOR[item.kind] || ICONS.bell} style={[styles.icon, { tintColor: TINT_FOR[item.kind] || colors.brand }]} />
+                </View>
+                <View style={styles.textCol}>
+                  <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+                  <Text style={styles.body} numberOfLines={2}>{item.body}</Text>
+                </View>
+                {item.amount != null && <Text style={styles.amount}>{formatMoney(item.amount, 'INR')}</Text>}
+                {!!route && <Text style={styles.chevron}>›</Text>}
+              </Row>
+            );
+          }}
           ListEmptyComponent={<EmptyState emoji="🔔" title="No notifications yet" sub="Booking and wallet updates will show up here." />}
         />
       )}
@@ -92,4 +116,5 @@ const styles = StyleSheet.create({
   title: { fontSize: 14, fontWeight: '700', lineHeight: 16, color: colors.ink },
   body: { fontSize: 12, fontWeight: '400', lineHeight: 16, color: colors.inkMuted, marginTop: 4 },
   amount: { fontSize: font.body, fontWeight: '800', color: colors.price, marginLeft: 8 },
+  chevron: { fontSize: 20, color: colors.inkFaint, marginLeft: 4 },
 });
