@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { colors, radius, font, space, shadow } from '../../theme';
 import { api } from '../../api/client';
 import { useAuth } from '../../store/AuthContext';
+import { useNav } from '../../navigation/NavContext';
 import { ICONS } from '../../icons';
 import ScreenHeader from '../../components/ScreenHeader';
 import EmptyState from '../../components/EmptyState';
@@ -32,6 +33,7 @@ function timeAgo(iso) {
 
 export default function HostNotificationsScreen() {
   const { token } = useAuth();
+  const { push } = useNav();
   const [feed, setFeed] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -61,15 +63,22 @@ export default function HostNotificationsScreen() {
           contentContainerStyle={{ padding: space.lg, paddingTop: 14, paddingBottom: 32 }}
           renderItem={({ item }) => {
             const ty = TYPE[item.kind] || TYPE.host_booking;
+            const canOpen = !!item.bookingId;
+            const Row = canOpen ? TouchableOpacity : View;
             return (
-              <View style={styles.row}>
+              <Row
+                style={styles.row}
+                activeOpacity={0.7}
+                {...(canOpen ? { onPress: () => push('hostBookingDetail', { id: item.bookingId }) } : {})}
+              >
                 <View style={[styles.icon, { backgroundColor: ty.bg }]}><Image source={ty.icon} style={{ width: 18, height: 18, tintColor: ty.tint }} /></View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
                   <Text style={styles.body} numberOfLines={2}>{item.body}</Text>
                   <Text style={styles.time}>{timeAgo(item.at)}</Text>
                 </View>
-              </View>
+                {canOpen && <Text style={styles.chevron}>›</Text>}
+              </Row>
             );
           }}
           ListEmptyComponent={<EmptyState emoji="🔔" title="No notifications yet" sub="New bookings on your listings will show up here." />}
@@ -85,4 +94,5 @@ const styles = StyleSheet.create({
   title: { fontSize: font.body, fontWeight: '800', color: colors.ink },
   body: { fontSize: font.small, color: colors.inkMuted, marginTop: 2, lineHeight: 17 },
   time: { fontSize: font.tiny, color: colors.inkFaint, marginTop: 4 },
+  chevron: { fontSize: 20, color: colors.inkFaint, marginLeft: 4 },
 });
