@@ -115,19 +115,27 @@ export const api = {
   supportUpload: (token, asset) => uploadRequest('/support/attachments', asset, token),
 };
 
-// Multipart upload helper (RN FormData with { uri, name, type }).
+// Multipart upload helper (RN FormData with { uri, name, type }). Guarded by a
+// hard timeout — a stalled connection (e.g. a cold-starting backend) would
+// otherwise leave the caller's `uploading` state stuck forever since fetch()
+// has no default timeout of its own.
 async function uploadRequest(path, asset, token) {
   const form = new FormData();
   form.append('file', { uri: asset.uri, name: asset.name, type: asset.type });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
   let res;
   try {
     res = await fetch(`${API_BASE}${path}`, {
       method: 'POST',
       headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: form,
+      signal: controller.signal,
     });
   } catch (e) {
-    throw new Error('Network error while uploading.');
+    throw new Error(e.name === 'AbortError' ? 'Upload timed out — please try again.' : 'Network error while uploading.');
+  } finally {
+    clearTimeout(timer);
   }
   let json = null;
   try { json = await res.json(); } catch (_) { /* non-JSON */ }

@@ -4,6 +4,7 @@ import {
   Platform, ActivityIndicator, Linking, Alert, Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SvgXml } from 'react-native-svg';
 import { colors, radius, font } from '../theme';
 import { api, resolveImage } from '../api/client';
 import { useAuth } from '../store/AuthContext';
@@ -11,11 +12,22 @@ import { useNav } from '../navigation/NavContext';
 import { ICONS } from '../icons';
 import { pickAsset } from '../utils/imagePicker';
 import { connectSupport, disconnectSupport } from '../services/supportSocket';
+import { useVoiceRecorder } from '../utils/voiceRecorder';
+import Sound from 'react-native-nitro-sound';
 
 // Shown once, on a brand-new conversation, to nudge a first message — taps
 // send that exact text and the whole row disappears for the rest of this
 // chat (never shown again once there's at least one message from this side).
 const QUICK_REPLIES = ["What's the price?", 'Tell me more', 'How do I book?'];
+
+// Matches the lucide "Mic" icon used on the web support composer.
+const MIC_SVG = `
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="12" y1="19" x2="12" y2="22" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+`;
 
 const fmtTime = (d) => new Date(d).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
 const dayKey = (d) => new Date(d).toDateString();
@@ -146,9 +158,9 @@ export default function SupportScreen({ queue = 'user', embedded = false }) {
     typingTimerRef.current = setTimeout(() => { typingSentRef.current = false; emitTyping(false); }, 1200);
   };
 
-  const send = (overrideBody) => {
+  const send = (overrideBody, overrideAttachments) => {
     const body = (overrideBody ?? text).trim();
-    const attachments = pending;
+    const attachments = overrideAttachments || pending;
     if (!body && attachments.length === 0) return;
     setQuickRepliesGone(true);
     const s = socketRef.current;
@@ -191,6 +203,26 @@ export default function SupportScreen({ queue = 'user', embedded = false }) {
     }
   };
 
+  // Hold-to-record voice note — uploads then sends immediately on release,
+  // bypassing the `pending` staging list entirely (avoids the same-tick
+  // stale-closure issue `send()` would hit reading `pending` right after
+  // `setPending` in one gesture).
+  const sendVoice = async (asset) => {
+    try {
+      setUploading(true);
+      const att = await api.supportUpload(token, asset);
+      if (att?.url) send(undefined, [att]);
+    } catch (e) {
+      Alert.alert('Voice message', e.message || 'Could not send the voice message.');
+    } finally {
+      setUploading(false);
+    }
+  };
+  const { recording, start: startRecording, stop: stopRecording } = useVoiceRecorder({
+    onRecorded: sendVoice,
+    onError: (e) => Alert.alert('Voice message', e.message || 'Could not record audio.'),
+  });
+
   const renderItem = ({ item, index }) => {
     const prev = messages[index - 1];
     const showDay = !prev || dayLabel(prev.createdAt) !== dayLabel(item.createdAt);
@@ -203,7 +235,7 @@ export default function SupportScreen({ queue = 'user', embedded = false }) {
         <View style={[styles.row, mine ? styles.rowMine : styles.rowTheir]}>
           <View style={styles.bubbleCol}>
             <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheir, item._failed && styles.bubbleFailed]}>
-              {(item.attachments || []).map((a, i) => <Attachment key={i} att={a} />)}
+              {(item.attachments || []).map((a, i) => <Attachment key={i} att={a} mine={mine} />)}
               {!!item.body && <Text style={[styles.msgText, mine && styles.msgTextMine]}>{item.body}</Text>}
             </View>
             {/* Time + read ticks sit BELOW the bubble, outside it. */}
@@ -294,21 +326,41 @@ export default function SupportScreen({ queue = 'user', embedded = false }) {
             </View>
           )}
 
+          {recording && (
+            <View style={styles.recordingRow}>
+              <View style={styles.recordingDot} />
+              <Text style={styles.recordingText}>Recording… release to send</Text>
+            </View>
+          )}
+
           <View style={styles.composer}>
-            <TouchableOpacity style={styles.attachBtn} onPress={attach} disabled={uploading}>
+            <TouchableOpacity style={styles.attachBtn} onPress={attach} disabled={uploading || recording}>
               {uploading ? <ActivityIndicator size="small" color={colors.inkMuted} /> : <Image source={ICONS.upload} style={styles.attachIcon} />}
             </TouchableOpacity>
             <TextInput
               style={styles.input}
               value={text}
               onChangeText={onInput}
-              placeholder="Type a message…"
+              placeholder={recording ? 'Recording…' : 'Type a message…'}
               placeholderTextColor={colors.inkFaint}
               multiline
+              editable={!recording}
             />
-            <TouchableOpacity style={[styles.sendBtn, !text.trim() && pending.length === 0 && styles.sendOff]} onPress={() => send()} disabled={!text.trim() && pending.length === 0}>
-              <Image source={ICONS.send} style={styles.sendIcon} />
-            </TouchableOpacity>
+            {text.trim() || pending.length > 0 ? (
+              <TouchableOpacity style={styles.sendBtn} onPress={() => send()}>
+                <Image source={ICONS.send} style={styles.sendIcon} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.sendBtn, recording && styles.micBtnActive]}
+                onPressIn={startRecording}
+                onPressOut={stopRecording}
+                disabled={uploading}
+                activeOpacity={0.85}
+              >
+                <SvgXml xml={MIC_SVG} width={18} height={18} />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}
@@ -316,7 +368,7 @@ export default function SupportScreen({ queue = 'user', embedded = false }) {
   );
 }
 
-function Attachment({ att }) {
+function Attachment({ att, mine }) {
   const url = resolveImage(att.url);
   if (att.type === 'image') {
     return (
@@ -325,10 +377,52 @@ function Attachment({ att }) {
       </TouchableOpacity>
     );
   }
+  if (att.type === 'audio') return <VoiceAttachment url={url} mine={mine} />;
   return (
     <TouchableOpacity style={styles.pdfChip} onPress={() => Linking.openURL(url)} activeOpacity={0.85}>
       <Text style={styles.pdfIcon}>📄</Text>
       <Text style={styles.pdfName} numberOfLines={1}>{att.name || 'Document.pdf'}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function VoiceAttachment({ url, mine }) {
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => () => {
+    Sound.stopPlayer().catch(() => {});
+    Sound.removePlayBackListener();
+    Sound.removePlaybackEndListener();
+  }, []);
+
+  const toggle = async () => {
+    try {
+      if (playing) {
+        await Sound.stopPlayer();
+        Sound.removePlayBackListener();
+        Sound.removePlaybackEndListener();
+        setPlaying(false);
+        return;
+      }
+      await Sound.startPlayer(url);
+      setPlaying(true);
+      Sound.addPlaybackEndListener(() => {
+        Sound.removePlayBackListener();
+        Sound.removePlaybackEndListener();
+        setPlaying(false);
+      });
+    } catch {
+      setPlaying(false);
+    }
+  };
+
+  return (
+    <TouchableOpacity style={styles.voiceChip} onPress={toggle} activeOpacity={0.85}>
+      <View style={[styles.voicePlayBtn, mine && styles.voicePlayBtnMine]}>
+        <Text style={[styles.voicePlayIcon, mine && styles.voicePlayIconMine]}>{playing ? '⏸' : '▶'}</Text>
+      </View>
+      <View style={[styles.voiceWave, mine && styles.voiceWaveMine]} />
+      <Text style={[styles.voiceLabel, mine && styles.voiceLabelMine]}>Voice message</Text>
     </TouchableOpacity>
   );
 }
@@ -404,4 +498,19 @@ const styles = StyleSheet.create({
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   sendOff: { opacity: 0.4 },
   sendIcon: { width: 19, height: 19, tintColor: '#fff' },
+
+  micBtnActive: { backgroundColor: '#D4183D', transform: [{ scale: 1.08 }] },
+  recordingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingBottom: 6, backgroundColor: colors.surface },
+  recordingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#D4183D' },
+  recordingText: { fontSize: font.tiny, color: '#D4183D', fontWeight: '700' },
+
+  voiceChip: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 160, paddingVertical: 4 },
+  voicePlayBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.08)', alignItems: 'center', justifyContent: 'center' },
+  voicePlayIcon: { fontSize: 13, color: '#1C1712' },
+  voiceWave: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.15)' },
+  voiceLabel: { fontSize: font.tiny, color: '#5A5E6C' },
+  voicePlayBtnMine: { backgroundColor: 'rgba(255,255,255,0.25)' },
+  voicePlayIconMine: { color: '#fff' },
+  voiceWaveMine: { backgroundColor: 'rgba(255,255,255,0.4)' },
+  voiceLabelMine: { color: 'rgba(255,255,255,0.85)' },
 });
