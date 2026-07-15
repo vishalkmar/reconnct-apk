@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { colors, radius, font, space, shadow } from '../../theme';
-import { api } from '../../api/client';
+import { api, resolveImage } from '../../api/client';
 import { useAuth } from '../../store/AuthContext';
 import { useNav } from '../../navigation/NavContext';
 import { ICONS } from '../../icons';
@@ -71,7 +71,11 @@ export default function HostNotificationsScreen() {
                 activeOpacity={0.7}
                 {...(canOpen ? { onPress: () => push('hostBookingDetail', { id: item.bookingId }) } : {})}
               >
-                <View style={[styles.icon, { backgroundColor: ty.bg }]}><Image source={ty.icon} style={{ width: 18, height: 18, tintColor: ty.tint }} /></View>
+                {item.image ? (
+                  <Image source={{ uri: resolveImage(item.image) }} style={styles.iconImg} />
+                ) : (
+                  <View style={[styles.icon, { backgroundColor: ty.bg }]}><Image source={ty.icon} style={{ width: 18, height: 18, tintColor: ty.tint }} /></View>
+                )}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
                   <Text style={styles.body} numberOfLines={2}>{item.body}</Text>
@@ -91,6 +95,7 @@ export default function HostNotificationsScreen() {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 12, backgroundColor: colors.surface, borderRadius: radius.lg, padding: 14, marginBottom: 10, alignItems: 'center', ...shadow.card },
   icon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  iconImg: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceAlt },
   title: { fontSize: font.body, fontWeight: '800', color: colors.ink },
   body: { fontSize: font.small, color: colors.inkMuted, marginTop: 2, lineHeight: 17 },
   time: { fontSize: font.tiny, color: colors.inkFaint, marginTop: 4 },

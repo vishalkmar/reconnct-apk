@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, SectionList, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
+import { SvgXml } from 'react-native-svg';
 import { colors, radius, font, space } from '../theme';
-import { api } from '../api/client';
+import { api, resolveImage } from '../api/client';
 import { formatMoney } from '../utils/format';
 import { useAuth } from '../store/AuthContext';
 import { useNav } from '../navigation/NavContext';
 import { ICONS } from '../icons';
+import { PAYMENT_CHECK_SVG, PAYMENT_FAILED_SVG, PAYMENT_PENDING_SVG } from '../components/paymentStatusIcons';
 import ScreenHeader from '../components/ScreenHeader';
 import EmptyState from '../components/EmptyState';
 
@@ -88,9 +90,7 @@ export default function NotificationsScreen() {
                 activeOpacity={0.7}
                 {...(route ? { onPress: () => push(route.name, route.params) } : {})}
               >
-                <View style={[styles.iconWrap, { backgroundColor: (TINT_FOR[item.kind] || colors.brand) + '22' }]}>
-                  <Image source={ICON_FOR[item.kind] || ICONS.bell} style={[styles.icon, { tintColor: TINT_FOR[item.kind] || colors.brand }]} />
-                </View>
+                <NotificationIcon item={item} />
                 <View style={styles.textCol}>
                   <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
                   <Text style={styles.body} numberOfLines={2}>{item.body}</Text>
@@ -107,10 +107,34 @@ export default function NotificationsScreen() {
   );
 }
 
+// Payment-status notifications ('booking') get the coloured status glyph —
+// green/paid, amber/pending, red/cancelled — same assets as the Payment
+// Details screen. Activity-shaped ones ('reminder', 'host_booking') show the
+// experience's own photo when we have one. Everything else keeps the plain
+// tinted icon it always had.
+function NotificationIcon({ item }) {
+  if (item.kind === 'booking') {
+    const paid = ['confirmed', 'paid', 'completed'].includes(item.status);
+    const cancelled = ['cancelled', 'refunded'].includes(item.status);
+    const svg = cancelled ? PAYMENT_FAILED_SVG : paid ? PAYMENT_CHECK_SVG : PAYMENT_PENDING_SVG;
+    return <View style={styles.iconWrapPlain}><SvgXml xml={svg} width={44} height={44} /></View>;
+  }
+  if ((item.kind === 'reminder' || item.kind === 'host_booking') && item.image) {
+    return <Image source={{ uri: resolveImage(item.image) }} style={styles.iconImg} />;
+  }
+  return (
+    <View style={[styles.iconWrap, { backgroundColor: (TINT_FOR[item.kind] || colors.brand) + '22' }]}>
+      <Image source={ICON_FOR[item.kind] || ICONS.bell} style={[styles.icon, { tintColor: TINT_FOR[item.kind] || colors.brand }]} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   sectionTitle: { fontSize: font.body, fontWeight: '800', color: colors.ink, marginTop: 18, marginBottom: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
   iconWrap: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  iconWrapPlain: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
+  iconImg: { width: 50, height: 50, borderRadius: 16, backgroundColor: colors.surfaceAlt },
   icon: { width: 20, height: 20 },
   textCol: { flex: 1 },
   title: { fontSize: 14, fontWeight: '700', lineHeight: 16, color: colors.ink },
