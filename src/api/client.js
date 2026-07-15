@@ -113,6 +113,10 @@ export const api = {
   supportUnread: (token) => request('/support/me/unread', { token }),
   // Multipart image upload → { type, url, name, size }.
   supportUpload: (token, asset) => uploadRequest('/support/attachments', asset, token),
+
+  // ── Push notifications ──────────────────────────────────────────────
+  registerPushToken: (token, fcmToken) =>
+    request('/notifications/fcm-token', { method: 'POST', token, body: { fcmToken, platform: 'android' } }),
 };
 
 // Multipart upload helper (RN FormData with { uri, name, type }). Guarded by a

@@ -8,6 +8,8 @@ import { colors } from '../theme';
 import AuthNavigator from '../screens/auth/AuthNavigator';
 import IntroScreen from '../screens/auth/IntroScreen';
 import BottomNav from '../components/BottomNav';
+import { registerNavigator, unregisterNavigator } from '../services/pushNav';
+import { wirePushHandlers, registerPushToken } from '../services/pushNotifications';
 
 // Screens are loaded lazily (required when first shown) so a problem in any one
 // screen can never stop the whole app from opening — only the auth screen needs
@@ -61,10 +63,27 @@ function StackScreen({ name, params }) {
 }
 
 export default function RootNavigator() {
-  const { isAuthed, booting } = useAuth();
-  const { tab, top, navigateTab, goBack, mode, guestMode } = useNav();
+  const { isAuthed, booting, token } = useAuth();
+  const { tab, top, navigateTab, goBack, mode, guestMode, push, switchMode } = useNav();
   const [introDone, setIntroDone] = useState(false);
   const browsing = isAuthed || guestMode; // guests get the same main-app shell
+
+  // Push-notification tap → in-app navigation. Registered once and kept in
+  // sync with the live push/switchMode/mode closures so a route that
+  // arrives mid-session always lands with the right nav state (e.g. a host
+  // booking push while browsing in traveller mode switches mode first).
+  useEffect(() => {
+    registerNavigator((route) => {
+      const isHostRoute = route.name === 'hostBookingDetail';
+      if (isHostRoute && mode !== 'host') switchMode('host');
+      else if (!isHostRoute && mode !== 'traveller') switchMode('traveller');
+      push(route.name, route.params);
+    });
+    return unregisterNavigator;
+  }, [mode, push, switchMode]);
+
+  useEffect(() => { wirePushHandlers(); }, []);
+  useEffect(() => { if (token) registerPushToken(token); }, [token]);
 
   // Android hardware/system back → one step back inside the app instead of
   // closing it. When goBack() can't go further (Home, nothing pushed) we
