@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StatusBar, BackHandler, ActivityIndicator, Image } from 'react-native';
 import { useAuth } from '../store/AuthContext';
+import { useSupplierAuth } from '../store/SupplierAuthContext';
 import { ICONS } from '../icons';
 import { useNav } from './NavContext';
 import { colors } from '../theme';
@@ -24,6 +25,14 @@ function TabScreen({ tab, mode }) {
       case 'inbox': { const C = require('../screens/SupportScreen').default; return <C queue="supplier" embedded />; }
       case 'profile': return lazy(() => require('../screens/host/HostProfileScreen'));
       default: return lazy(() => require('../screens/host/HostDashboardScreen'));
+    }
+  }
+  if (mode === 'supplier') {
+    switch (tab) {
+      case 'dashboard': return lazy(() => require('../screens/supplier/SupplierDashboardScreen'));
+      case 'listings': return lazy(() => require('../screens/supplier/SupplierListingsScreen'));
+      case 'profile': return lazy(() => require('../screens/supplier/SupplierProfileScreen'));
+      default: return lazy(() => require('../screens/supplier/SupplierDashboardScreen'));
     }
   }
   switch (tab) {
@@ -58,15 +67,21 @@ function StackScreen({ name, params }) {
     case 'hostBookingDetail': { const C = require('../screens/host/HostBookingDetailScreen').default; return <C id={params.id} />; }
     case 'hostNotifications': return lazy(() => require('../screens/host/HostNotificationsScreen'));
     case 'hostTransactions': return lazy(() => require('../screens/host/HostTransactionsScreen'));
+    case 'supplierCreateListing': return lazy(() => require('../screens/supplier/SupplierCreateListingScreen'));
+    case 'supplierProfileDetail': return lazy(() => require('../screens/supplier/SupplierProfileDetailScreen'));
+    case 'supplierListingBookings': { const C = require('../screens/supplier/SupplierListingBookingsScreen').default; return <C listing={params.listing} />; }
+    case 'supplierBookingDetail': { const C = require('../screens/supplier/SupplierBookingDetailScreen').default; return <C id={params.id} />; }
+    case 'supplierTransactions': return lazy(() => require('../screens/supplier/SupplierTransactionsScreen'));
     default: return null;
   }
 }
 
 export default function RootNavigator() {
   const { isAuthed, booting, token } = useAuth();
+  const { isSupplierAuthed, booting: supplierBooting } = useSupplierAuth();
   const { tab, top, navigateTab, goBack, mode, guestMode, push, switchMode } = useNav();
   const [introDone, setIntroDone] = useState(false);
-  const browsing = isAuthed || guestMode; // guests get the same main-app shell
+  const browsing = isAuthed || isSupplierAuthed || guestMode; // guests get the same main-app shell
 
   // Push-notification tap → in-app navigation. Registered once and kept in
   // sync with the live push/switchMode/mode closures so a route that
@@ -98,14 +113,14 @@ export default function RootNavigator() {
   // navy header; traveller home/profile use the amber header.
   const onHeader = !browsing
     ? colors.surface
-    : mode === 'host'
+    : (mode === 'host' || mode === 'supplier')
       ? (tab === 'dashboard' || tab === 'profile' ? colors.navy : colors.surface)
       : (tab === 'home' || tab === 'profile' ? colors.brand : colors.surface);
   const darkHeader = onHeader === colors.brand || onHeader === colors.navy;
 
   // Restoring a saved session — show a splash instead of flashing the login
   // screen on every launch.
-  if (booting) {
+  if (booting || supplierBooting) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}>
         <StatusBar barStyle="light-content" backgroundColor={colors.brand} />

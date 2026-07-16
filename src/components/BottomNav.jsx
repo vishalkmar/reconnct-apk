@@ -29,6 +29,13 @@ const HOST_ITEMS = [
   { key: 'inbox', label: 'Inbox', icon: ICONS.navInbox, dot: true },
   { key: 'profile', label: 'Profile', icon: ICONS.navProfile },
 ];
+// Supplier Portal — same tab bar chrome as Host, minus Inbox (no support
+// chat for suppliers yet).
+const SUPPLIER_ITEMS = [
+  { key: 'dashboard', label: 'Dashboard', icon: ICONS.chart },
+  { key: 'listings', label: 'Listings', icon: ICONS.compass },
+  { key: 'profile', label: 'Profile', icon: ICONS.navProfile },
+];
 
 /**
  * Floating, frosted bottom navigation with standard (SVG-style) icons. The
@@ -37,7 +44,7 @@ const HOST_ITEMS = [
  */
 export default function BottomNav({ current, onChange, mode = 'traveller' }) {
   const insets = useSafeAreaInsets();
-  const items = mode === 'host' ? HOST_ITEMS : TRAVELLER_ITEMS;
+  const items = mode === 'host' ? HOST_ITEMS : mode === 'supplier' ? SUPPLIER_ITEMS : TRAVELLER_ITEMS;
   return (
     <View pointerEvents="box-none" style={[styles.host, { bottom: (insets.bottom || 8) + 6 }]}>
       <View style={styles.bar}>

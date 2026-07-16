@@ -10,11 +10,12 @@ const NavContext = createContext(null);
 
 export const TABS = ['home', 'search', 'reconnect', 'experiences', 'profile'];
 export const HOST_TABS = ['dashboard', 'listings', 'inbox', 'profile'];
-const HOME_TAB = { traveller: 'home', host: 'dashboard' };
+export const SUPPLIER_TABS = ['dashboard', 'listings', 'profile'];
+const HOME_TAB = { traveller: 'home', host: 'dashboard', supplier: 'dashboard' };
 
 export function NavProvider({ children }) {
   const { isAuthed } = useAuth();
-  const [mode, setMode] = useState('traveller'); // 'traveller' | 'host'
+  const [mode, setMode] = useState('traveller'); // 'traveller' | 'host' | 'supplier'
   const [tab, setTab] = useState('home');
   const [stack, setStack] = useState([]); // [{ name, params }]
   // Guest browsing: skipping login on the Login screen sets this true so

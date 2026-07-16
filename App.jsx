@@ -11,6 +11,8 @@ import { WishlistProvider } from './src/store/WishlistContext';
 import { LocationProvider } from './src/store/LocationContext';
 import { BookingsProvider } from './src/store/BookingsContext';
 import { HostProvider } from './src/store/HostContext';
+import { SupplierAuthProvider } from './src/store/SupplierAuthContext';
+import { SupplierProvider } from './src/store/SupplierContext';
 import { NavProvider } from './src/navigation/NavContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import SplashScreen from './src/components/SplashScreen';
@@ -50,17 +52,21 @@ export default function App() {
     <ErrorBoundary>
       <SafeAreaProvider>
         <AuthProvider>
-          <WishlistProvider>
-            <LocationProvider>
-              <BookingsProvider>
-                <HostProvider>
-                  <NavProvider>
-                    <AppShell />
-                  </NavProvider>
-                </HostProvider>
-              </BookingsProvider>
-            </LocationProvider>
-          </WishlistProvider>
+          <SupplierAuthProvider>
+            <WishlistProvider>
+              <LocationProvider>
+                <BookingsProvider>
+                  <HostProvider>
+                    <SupplierProvider>
+                      <NavProvider>
+                        <AppShell />
+                      </NavProvider>
+                    </SupplierProvider>
+                  </HostProvider>
+                </BookingsProvider>
+              </LocationProvider>
+            </WishlistProvider>
+          </SupplierAuthProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </ErrorBoundary>

@@ -105,6 +105,21 @@ export const api = {
   hostBooking: (token, id) => request(`/host/bookings/${id}`, { token }),
   hostTransactions: (token) => request('/host/transactions', { token }),
 
+  // ── Supplier Portal (Phase 7 — own login, own account, NOT a User).
+  // Completely separate from the Host functions above — same shape, own
+  // endpoints (/api/supplier/*), so Host code never has to change or branch
+  // for Supplier to exist. ─────────────────────────────────────────────
+  supplierLogin: (email, password) => request('/supplier/auth/login', { method: 'POST', body: { email, password } }),
+  supplierMe: (token) => request('/supplier/auth/me', { token }),
+  supplierSummary: (token) => request('/supplier/summary', { token }),
+  supplierListings: (token) => request('/supplier/listings', { token }),
+  supplierListing: (token, id) => request(`/supplier/listings/${id}`, { token }),
+  supplierCreateListing: (token, form, submit = false) => request('/supplier/listings', { method: 'POST', token, body: { form, submit } }),
+  supplierUpdateListing: (token, id, form, submit = false) => request(`/supplier/listings/${id}`, { method: 'PUT', token, body: { form, submit } }),
+  supplierDeleteListing: (token, id) => request(`/supplier/listings/${id}`, { method: 'DELETE', token }),
+  supplierBooking: (token, id) => request(`/supplier/bookings/${id}`, { token }),
+  supplierTransactions: (token) => request('/supplier/transactions', { token }),
+
   // ── Support chat (party = user / host) ──────────────────────────────
   supportConversation: (token, queue = 'user') => request(`/support/me/conversation${qs({ queue })}`, { token }),
   supportMessages: (token, conversationId, before) => request(`/support/me/messages${qs({ conversationId, before })}`, { token }),

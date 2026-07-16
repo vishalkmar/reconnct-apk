@@ -10,7 +10,7 @@ import { AuthHeader, AuthCard, AuthNote, AuthField, AuthButton, MAIL_SVG, FIELD_
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-export default function LoginScreen({ onOtpSent }) {
+export default function LoginScreen({ onOtpSent, onSupplierLogin }) {
   const insets = useSafeAreaInsets();
   const { setGuestMode } = useNav();
   const [email, setEmail] = useState('');
@@ -71,6 +71,12 @@ export default function LoginScreen({ onOtpSent }) {
         </AuthCard>
 
         <AuthButton label="Send OTP" active={valid} loading={loading} onPress={sendOtp} style={{ marginTop: 26 }} />
+
+        {!!onSupplierLogin && (
+          <TouchableOpacity style={styles.supplierLink} onPress={onSupplierLogin} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={styles.supplierLinkText}>Login as Supplier</Text>
+          </TouchableOpacity>
+        )}
       </KeyboardAvoidingView>
     </View>
   );
@@ -84,4 +90,6 @@ const styles = StyleSheet.create({
   skip: { position: 'absolute', left: 20, zIndex: 5 },
   skipText: { color: colors.inkMuted, fontWeight: '700', fontSize: font.body },
   error: { width: FIELD_W, alignSelf: 'center', color: '#DC2626', fontSize: font.small, marginTop: 10 },
+  supplierLink: { alignSelf: 'center', marginTop: 18 },
+  supplierLinkText: { color: colors.inkMuted, fontWeight: '700', fontSize: font.small, textDecorationLine: 'underline' },
 });
