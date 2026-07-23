@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { useAuth } from '../store/AuthContext';
+import { useSupplierAuth } from '../store/SupplierAuthContext';
 
 /**
  * Dependency-free navigator: a bottom-tab root with a push/pop stack layered
@@ -15,6 +16,7 @@ const HOME_TAB = { traveller: 'home', host: 'dashboard', supplier: 'dashboard' }
 
 export function NavProvider({ children }) {
   const { isAuthed } = useAuth();
+  const { isSupplierAuthed, booting: supplierBooting } = useSupplierAuth();
   const [mode, setMode] = useState('traveller'); // 'traveller' | 'host' | 'supplier'
   const [tab, setTab] = useState('home');
   const [stack, setStack] = useState([]); // [{ name, params }]
@@ -23,6 +25,29 @@ export function NavProvider({ children }) {
   // that need an account (Book Now, etc.) go through requireAuth below.
   const [guestMode, setGuestMode] = useState(false);
   const [pendingAuth, setPendingAuth] = useState(null); // { name, params } OR { run } to resume after login
+
+  // A Supplier's own session persists across app restarts (SupplierAuthContext,
+  // 3-day AsyncStorage), but `mode` above always boots back to 'traveller'.
+  // Without this, a cold start after a supplier login would leave `mode`
+  // stuck on 'traveller' while RootNavigator's `browsing` gate still treats
+  // the lingering supplier session as "logged in" — showing traveller
+  // screens whose guest-login redirects (Book Now, Wishlist, Profile's Sign
+  // In) then silently no-op since nothing ever flips `browsing` to false.
+  // Restoring `mode` the moment the session is known to still be active
+  // fixes this at the source instead of chasing it in every screen.
+  useEffect(() => {
+    if (supplierBooting) return;
+    if (isSupplierAuthed) {
+      setMode((m) => (m === 'traveller' ? 'supplier' : m));
+    } else {
+      // Signing out of the Supplier Portal (or a session simply expiring)
+      // must fall back to 'traveller' just as reliably — otherwise `mode`
+      // is stuck on 'supplier' with no session behind it, and the main
+      // shell keeps rendering Supplier screens (with empty/default data)
+      // instead of dropping into the traveller/guest flow.
+      setMode((m) => (m === 'supplier' ? 'traveller' : m));
+    }
+  }, [supplierBooting, isSupplierAuthed]);
 
   const push = useCallback((name, params = {}) => {
     setStack((s) => [...s, { name, params }]);

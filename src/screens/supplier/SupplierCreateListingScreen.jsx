@@ -80,6 +80,10 @@ export default function SupplierCreateListingScreen() {
   const [submitting, setSubmitting] = useState(false);
   const submit = async (isReview) => {
     if (submitting) return;
+    // At least 6 photos are mandatory before submitting for review.
+    if (isReview && form.photos.filter(Boolean).length < 6) {
+      return Alert.alert('Add more photos', `At least 6 photos are required before submitting for review — you have ${form.photos.filter(Boolean).length}.`);
+    }
     setSubmitting(true);
     try {
       // Give the listing a cover fallback if the host added no photos at all.

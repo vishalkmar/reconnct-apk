@@ -11,10 +11,13 @@ import ScreenHeader from '../../components/ScreenHeader';
 const TABS = [
   { key: 'all', label: 'All' },
   { key: 'upcoming', label: 'Upcoming' },
+  { key: 'ongoing', label: 'Ongoing' },
   { key: 'completed', label: 'Completed' },
 ];
 const PILL = {
   upcoming: { label: 'upcoming', bg: colors.brandSoft, fg: colors.brandDark },
+  // Live right now — green, so it stands out from the settled buckets.
+  ongoing: { label: 'ongoing', bg: '#DCFCE7', fg: '#16A34A' },
   completed: { label: 'completed', bg: '#EEF0F3', fg: colors.inkMuted },
   cancelled: { label: 'cancelled', bg: '#FEE2E2', fg: '#DC2626' },
 };
@@ -35,11 +38,16 @@ export default function SupplierListingBookingsScreen({ listing }) {
   useEffect(() => {
     let alive = true;
     if (!listing || !listing.id) { setLoading(false); return undefined; }
-    api.supplierListing(token, listing.id)
+    const fetchOnce = () => api.supplierListing(token, listing.id)
       .then((d) => { if (alive && d && d.listing) setBookings(d.listing.bookings || []); })
       .catch(() => {})
       .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
+    fetchOnce();
+    // The upcoming/ongoing/completed status is computed server-side, so refetch
+    // periodically to move a booking through its lifecycle without a manual
+    // pull-to-refresh.
+    const t = setInterval(fetchOnce, 60000);
+    return () => { alive = false; clearInterval(t); };
   }, [token, listing]);
 
   const all = bookings || [];

@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, FlatList, Dimensions,
   ActivityIndicator, ScrollView, TextInput, Image,
 } from 'react-native';
-import { ICONS } from '../icons';
+import { ICONS, iconForCategory } from '../icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space } from '../theme';
 import { api } from '../api/client';
@@ -97,7 +97,7 @@ export default function ExperiencesScreen({ initialFilters, tagMode = 'category'
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
             <Tab label="All" icon={ICONS.globe} active={!filters.audienceId} onPress={() => setFilters((f) => ({ ...f, audienceId: null }))} />
             {auds.map((a) => (
-              <Tab key={a.id} label={a.name} icon={ICONS.tag} active={filters.audienceId === a.id}
+              <Tab key={a.id} label={a.name} icon={iconForCategory(a.name)} active={filters.audienceId === a.id}
                 onPress={() => setFilters((f) => ({ ...f, audienceId: f.audienceId === a.id ? null : a.id }))} />
             ))}
           </ScrollView>
@@ -105,7 +105,7 @@ export default function ExperiencesScreen({ initialFilters, tagMode = 'category'
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
             <Tab label="All" icon={ICONS.globe} active={!filters.categoryId} onPress={() => setFilters((f) => ({ ...f, categoryId: null }))} />
             {cats.map((c) => (
-              <Tab key={c.id} label={c.name} icon={ICONS.tag} active={filters.categoryId === c.id}
+              <Tab key={c.id} label={c.name} icon={iconForCategory(c.name)} active={filters.categoryId === c.id}
                 onPress={() => setFilters((f) => ({ ...f, categoryId: f.categoryId === c.id ? null : c.id }))} />
             ))}
           </ScrollView>

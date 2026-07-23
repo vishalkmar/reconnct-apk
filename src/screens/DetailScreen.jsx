@@ -28,6 +28,9 @@ export default function DetailScreen({ idOrSlug }) {
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Only one policy block open at a time — they're long enough that two open
+  // at once buries the rest of the page.
+  const [openPolicy, setOpenPolicy] = useState(null);
   const [page, setPage] = useState(0);
 
   useEffect(() => {
@@ -59,6 +62,12 @@ export default function DetailScreen({ idOrSlug }) {
   const reviews = item.reviews || [];
   const faqs = item.faqs || [];
   const wished = isWished('experience', item.id);
+  // The same three blocks the website's detail page shows, in the same order.
+  const policies = [
+    { key: 'terms', label: 'Terms & Conditions', text: stripHtml(item.termsConditions) },
+    { key: 'privacy', label: 'Privacy Policy', text: stripHtml(item.privacyPolicy) },
+    { key: 'refund', label: 'Refund & Cancellation Policy', text: stripHtml(item.refundCancellationPolicy) },
+  ].filter((p) => p.text);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface }}>
@@ -131,6 +140,32 @@ export default function DetailScreen({ idOrSlug }) {
           {faqs.length > 0 && (<>
             <Text style={styles.section}>FAQs</Text>
             {faqs.map((f, i) => { const q = stripHtml(f.question); const a = stripHtml(f.answer); return (<View key={i} style={styles.faq}>{!!q && <Text style={styles.faqQ}>{q}</Text>}{!!a && <Text style={styles.faqA}>{a}</Text>}</View>); })}
+          </>)}
+
+          {/* Policies & terms — collapsed by default; these are long blocks
+              nobody reads inline, and the website shows them the same way. */}
+          {policies.length > 0 && (<>
+            <Text style={styles.section}>Policies &amp; terms</Text>
+            <View style={styles.policyCard}>
+              {policies.map((p, i) => {
+                const open = openPolicy === p.key;
+                return (
+                  <View key={p.key} style={[styles.policyRow, i === policies.length - 1 && styles.policyRowLast]}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => setOpenPolicy(open ? null : p.key)}
+                      style={styles.policyHead}
+                    >
+                      <Text style={styles.policyTitle}>{p.label}</Text>
+                      <View style={styles.policyToggle}>
+                        <Text style={styles.policyToggleTxt}>{open ? '–' : '+'}</Text>
+                      </View>
+                    </TouchableOpacity>
+                    {open && <Text style={styles.policyBody}>{p.text}</Text>}
+                  </View>
+                );
+              })}
+            </View>
           </>)}
 
           {/* Reviews */}
@@ -207,6 +242,17 @@ const styles = StyleSheet.create({
   incItem: { width: '50%', flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, paddingRight: 8 },
   incCheck: { width: 16, height: 16, tintColor: colors.brand },
   incText: { fontSize: font.small, color: colors.ink, flex: 1 },
+  policyCard: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, overflow: 'hidden' },
+  policyRow: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  policyRowLast: { borderBottomWidth: 0 },
+  policyHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 14 },
+  policyTitle: { flex: 1, fontSize: font.body, fontWeight: '700', color: colors.ink, paddingRight: 12 },
+  policyToggle: {
+    width: 26, height: 26, borderRadius: 13, backgroundColor: colors.brandSoft,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  policyToggleTxt: { fontSize: 17, fontWeight: '900', color: colors.brandText, lineHeight: 19 },
+  policyBody: { fontSize: font.small, color: colors.inkMuted, lineHeight: 20, paddingHorizontal: 14, paddingBottom: 14, marginTop: -2 },
   faq: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 10 },
   faqQ: { fontSize: font.body, fontWeight: '700', color: colors.ink }, faqA: { fontSize: font.small, color: colors.inkMuted, marginTop: 4, lineHeight: 19 },
   review: { backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 12, marginBottom: 10 },

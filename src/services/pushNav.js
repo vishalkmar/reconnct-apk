@@ -39,6 +39,10 @@ export function routeForPush(data = {}) {
     }
     return data.bookingCode ? { name: 'bookingFullDetail', params: { code: data.bookingCode } } : null;
   }
+  // Post-experience "how was it?" — straight into that booking's rating sheet.
+  if (kind === 'review') {
+    return { name: 'bookings', params: { reviewCode: data.bookingCode } };
+  }
   if (kind === 'host_booking') {
     return data.bookingId ? { name: 'hostBookingDetail', params: { id: data.bookingId } } : null;
   }

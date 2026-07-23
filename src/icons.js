@@ -70,23 +70,40 @@ export const ICONS = {
   catTag: require('./assets/cat-tag.png'),
 };
 
-// Map a broad-category name to a distinct gray icon (keyword match, most
-// specific first; falls back to a generic tag).
+/*
+  Map a category / audience name to a distinct gray icon, most specific first.
+
+  Matching is on WORD STARTS, not bare substrings: a plain `includes` made
+  "Partner" match 'art' (p-art-ner) and land on the palette, and "Recognition"
+  match 'eco' (r-eco-gnition) and land on the tree. `\b` keeps short keywords
+  like art / eco / spa usable without those collisions.
+*/
+const startsWord = (n, w) => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(n);
+
 export function iconForCategory(name) {
   const n = (name || '').toLowerCase();
-  const has = (...ws) => ws.some((w) => n.includes(w));
-  if (has('romantic', 'couple', 'love')) return ICONS.catHeart;
-  if (has('food', 'culinary', 'dining', 'cuisine')) return ICONS.catFood;
+  const has = (...ws) => ws.some((w) => startsWord(n, w));
+
+  // Audiences first — they're the narrower vocabulary and would otherwise be
+  // swallowed by the broader category keywords below.
+  if (has('yourself', 'solo', 'self')) return ICONS.catSprout;
+  if (has('kid', 'teen', 'child', 'little one')) return ICONS.catStar;
+  if (has('elder', 'senior')) return ICONS.catUsers;
+
+  if (has('romantic', 'couple', 'love', 'partner')) return ICONS.catHeart;
+  if (has('food', 'culinary', 'dining', 'cuisine', 'nightlife')) return ICONS.catFood;
   if (has('fitness', 'gym', 'sport', 'workout')) return ICONS.catDumbbell;
-  if (has('nature', 'wildlife', 'eco', 'garden')) return ICONS.catTree;
-  if (has('adventure', 'trek', 'hiking', 'outdoor', 'play', 'thrill')) return ICONS.catMountain;
+  if (has('nature', 'wildlife', 'eco', 'garden', 'outdoor')) return ICONS.catTree;
+  if (has('adventure', 'trek', 'hiking', 'play', 'thrill')) return ICONS.catMountain;
   if (has('art', 'creativ', 'craft', 'paint', 'design')) return ICONS.catPalette;
   if (has('travel', 'getaway', 'trip', 'tour', 'staycation')) return ICONS.catPlane;
   if (has('wellness', 'relax', 'spa', 'health', 'well-being', 'wellbeing', 'spiritual', 'inner', 'meditat', 'mindful', 'yoga')) return ICONS.catSun;
-  if (has('corporate', 'team', 'business', 'work', 'professional')) return ICONS.catBriefcase;
+  if (has('corporate', 'team', 'business', 'work', 'professional', 'network')) return ICONS.catBriefcase;
   if (has('learn', 'education', 'knowledge', 'study', 'skill')) return ICONS.catBook;
   if (has('discover', 'explore', 'journey')) return ICONS.catCompass;
+  if (has('volunteer', 'impact', 'charity', 'giving')) return ICONS.catHeart;
   if (has('social', 'communit', 'together', 'family', 'group', 'friend', 'connection')) return ICONS.catUsers;
+  if (has('entertainment', 'music', 'show', 'celebrat', 'recognition', 'fun')) return ICONS.catStar;
   if (has('growth', 'personal', 'develop')) return ICONS.catSprout;
   if (has('cultur', 'heritage', 'histor')) return ICONS.catGlobe;
   return ICONS.catTag;

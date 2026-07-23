@@ -13,6 +13,7 @@ const NAVY = '#15233F';
 const MENU = [
   { label: 'Supplier Profile', sub: 'Your details & company', icon: ICONS.navProfile, screen: 'supplierProfileDetail' },
   { label: 'My Listings', sub: 'Listings & their bookings', icon: ICONS.compass, tab: 'listings' },
+  { label: 'Notifications', sub: 'New bookings & payments', icon: ICONS.bell, screen: 'supplierNotifications' },
   { label: 'Transactions', sub: 'Revenue, completed & pending', icon: ICONS.card, screen: 'supplierTransactions' },
 ];
 

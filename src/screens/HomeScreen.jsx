@@ -22,7 +22,7 @@ import OfferBannerCarousel from '../components/OfferBannerCarousel';
 import LocationSheet from '../components/LocationSheet';
 import FilterSheet, { draftToParams } from './FilterSheet';
 import RatingModal from '../components/RatingModal';
-import { ICONS } from '../icons';
+import { ICONS, iconForCategory } from '../icons';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const H_PAD = 16;
@@ -69,11 +69,17 @@ export default function HomeScreen() {
   const [reviewPopupClosed, setReviewPopupClosed] = useState(false);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) return undefined;
     let alive = true;
-    api.pendingReview(token).then((d) => { if (alive) setPendingReview((d && d.booking) || null); }).catch(() => {});
-    return () => { alive = false; };
-  }, [token]);
+    const check = () => api.pendingReview(token)
+      .then((d) => { if (alive && !reviewPopupClosed) setPendingReview((d && d.booking) || null); })
+      .catch(() => {});
+    check();
+    // Poll so the rate-and-review popup appears on its own the moment an
+    // experience ends, even if the user is sitting on Home the whole time.
+    const t = setInterval(check, 60000);
+    return () => { alive = false; clearInterval(t); };
+  }, [token, reviewPopupClosed]);
 
   const geoParams = coords ? { lat: coords.lat, lon: coords.lon } : {};
 
@@ -264,7 +270,7 @@ export default function HomeScreen() {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catTabs}>
             <CatTab label="All" icon={ICONS.globe} active={!activeCat} onPress={() => setActiveCat(null)} />
-            {cats.map((c) => <CatTab key={c.id} label={c.name} icon={ICONS.tag} active={activeCat === c.id} onPress={() => setActiveCat(c.id)} />)}
+            {cats.map((c) => <CatTab key={c.id} label={c.name} icon={iconForCategory(c.name)} active={activeCat === c.id} onPress={() => setActiveCat(c.id)} />)}
           </ScrollView>
 
           <FlatList
@@ -785,13 +791,13 @@ const styles = StyleSheet.create({
   },
   partnerGradImg: {},
   partnerHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 16 },
-  partnerTitle: { fontSize: 23, fontWeight: '900', color: '#1A1A2E', fontFamily: 'serif', lineHeight: 28 },
+  partnerTitle: { fontSize: 23, fontWeight: '900', color: '#1A1A2E', lineHeight: 28 },
   polaroids: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   polaroid: { width: 61, height: 70, borderRadius: 4, borderWidth: 2, borderColor: '#FFFFFF', backgroundColor: '#D9D9D9', ...shadow.card },
   polaroid2: { marginLeft: -18 },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', minHeight: 24 },
   sectionTitleIcon: { width: 16, height: 16, tintColor: colors.brand, marginRight: 6 },
-  sectionTitle: { fontSize: 16, fontWeight: '900', color: '#242235', fontFamily: 'serif' },
+  sectionTitle: { fontSize: 16, fontWeight: '900', color: '#242235' },
   seeAll: { color: colors.brand, fontWeight: '800', fontSize: 12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: H_PAD },
   masonry: { flexDirection: 'row', paddingHorizontal: H_PAD, gap: GRID_GAP },

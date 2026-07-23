@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space } from '../theme';
 import { api } from '../api/client';
 import { categoryAudiences } from '../data/categoryAudiences';
-import { ICONS } from '../icons';
+import { ICONS, iconForCategory } from '../icons';
 
 export const PRICE_BANDS = [
   { key: 'under', label: 'Under ₹1,500', sub: 'Budget-friendly', priceMax: 1500 },
@@ -123,7 +123,7 @@ export default function FilterSheet({ visible, taxonomy, initial, onApply, onClo
                         onPress={() => toggle('categoryId', c.id)}
                         activeOpacity={0.85}
                       >
-                        <Image source={ICONS.tag} style={[styles.chipIcon, sel && styles.chipIconSel]} />
+                        <Image source={iconForCategory(c.name)} style={[styles.chipIcon, sel && styles.chipIconSel]} />
                         <Text style={[styles.chipText, sel && styles.chipTextSel]}>{c.name}</Text>
                       </TouchableOpacity>
                     );

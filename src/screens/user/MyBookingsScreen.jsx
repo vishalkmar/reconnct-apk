@@ -15,6 +15,7 @@ import RatingModal from '../../components/RatingModal';
 // category → the pill shown on the card image (top-right).
 const PILL = {
   upcoming: { label: 'Upcoming', bg: colors.brand, fg: '#101010' },
+  ongoing: { label: 'Ongoing', bg: '#DCFCE7', fg: '#16A34A' },
   completed: { label: 'Completed', bg: '#16A34A', fg: '#fff' },
   cancelled: { label: 'Cancelled', bg: '#DC2626', fg: '#fff' },
   // Only ever visible under the "All" tab (pending_payment has no tab of its
@@ -25,30 +26,59 @@ const PILL = {
 const TABS = [
   { key: 'all', label: 'All' },
   { key: 'upcoming', label: 'Upcoming' },
+  { key: 'ongoing', label: 'Ongoing' },
   { key: 'completed', label: 'Completed' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
-// A booking is Upcoming until its scheduled date/time passes. Same rule the
-// backend's isCompletedNow (experienceReview.controller.js) uses for the
-// rate/review prompts, so "completed" never disagrees between this list, the
-// review popup, and the web portal. Prefer scheduledEndAt (full duration),
-// then the exact scheduledAt timestamp, falling back to the date-only
-// scheduledFor for older bookings that predate that column. Explicitly
-// cancelled/refunded bookings are always Cancelled regardless of date.
+const DEFAULT_DURATION_MIN = 120; // 2h floor when an experience has no duration
+
+// A booking is Upcoming until it STARTS, Ongoing while it's actually running,
+// and Completed only once it has ENDED — the exact rule the backend uses
+// (utils/bookingLifecycle), so this list, the review popup and the web portal
+// never disagree. End = scheduledEndAt if set, else start + duration; the old
+// code compared against the START, so a 10–11am slot wrongly read as completed
+// at 10:00. Cancelled/refunded are always Cancelled regardless of date.
 //
-// pending_payment never lands in Upcoming/Completed/Cancelled — that's the
-// Transactions tab's job now (Pending/Failed live there). It still shows up
-// under "All" (inGroup below matches everything for that tab) but has no
-// home tab of its own here.
+// pending_payment never lands in a dated tab — that's the Transactions tab's
+// job now. It still shows under "All".
+const IST_OFFSET_MIN = 5 * 60 + 30;
+// The booked slot's end from "Preferred time: 1:57 PM – 2:00 PM" — the truest
+// completion moment, matching the backend (utils/bookingLifecycle). Combines
+// the end time with the booking date (IST) into a real UTC instant.
+function slotEnd(b) {
+  const m = String(b.specialRequests || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)\s*[–—-]\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!m) return null;
+  const ymd = String(b.scheduledFor || b.scheduledAt || b.date || '').slice(0, 10);
+  const [y, mo, d] = ymd.split('-').map(Number);
+  if (!y || !mo || !d) return null;
+  let hh = parseInt(m[4], 10) % 12;
+  if (/PM/i.test(m[6])) hh += 12;
+  return Date.UTC(y, mo - 1, d, hh, parseInt(m[5], 10) || 0) - IST_OFFSET_MIN * 60000;
+}
+function bookingEnd(b) {
+  if (b.scheduledEndAt) return new Date(b.scheduledEndAt).getTime();
+  const se = slotEnd(b);
+  if (se) return se;
+  const startIso = b.scheduledAt || b.scheduledFor || b.date;
+  if (!startIso) return null;
+  const start = new Date(startIso).getTime();
+  if (Number.isNaN(start)) return null;
+  const mins = Number(b.item?.durationMinutes) || DEFAULT_DURATION_MIN;
+  return start + mins * 60000;
+}
 function categorize(b) {
   if (!b) return 'upcoming';
   if (b.status === 'cancelled' || b.status === 'refunded') return 'cancelled';
   if (b.status === 'completed') return 'completed';
   if (b.status === 'pending_payment') return 'pending';
-  const endIso = b.scheduledEndAt || b.scheduledAt || b.scheduledFor || b.date;
-  const end = endIso ? new Date(endIso) : null;
-  if (end && end.getTime() <= Date.now()) return 'completed';
+  const startIso = b.scheduledAt || b.scheduledFor || b.date;
+  const start = startIso ? new Date(startIso).getTime() : null;
+  const now = Date.now();
+  if (start && now < start) return 'upcoming';
+  const end = bookingEnd(b);
+  if (end && now < end) return 'ongoing';
+  if (end) return 'completed';
   return 'upcoming';
 }
 const inGroup = (b, key) => key === 'all' || categorize(b) === key;
@@ -61,7 +91,7 @@ function prettyDate(v) {
   return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
-export default function MyBookingsScreen() {
+export default function MyBookingsScreen({ reviewCode }) {
   const { token } = useAuth();
   const { bookings: localBookings, hideBooking, isHidden } = useBookings();
   const { navigateTab, push } = useNav();
@@ -69,6 +99,8 @@ export default function MyBookingsScreen() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all');
   const [rateBooking, setRateBooking] = useState(null);
+  const [autoRated, setAutoRated] = useState(false);
+  const [, setTick] = useState(0); // ticks so upcoming→ongoing→completed flips live
 
   useEffect(() => {
     let alive = true;
@@ -78,6 +110,22 @@ export default function MyBookingsScreen() {
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [token]);
+
+  // Category is a clock event (start/end passing), not a server event — so
+  // re-render every 30s to move a booking through its lifecycle without a
+  // manual refresh.
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Arrived from the post-experience push — open that booking's rating sheet
+  // as soon as the list has loaded. Once only, so closing it doesn't reopen.
+  useEffect(() => {
+    if (!reviewCode || autoRated || loading) return;
+    const match = fetched.find((b) => b.bookingCode === reviewCode);
+    if (match) { setRateBooking(match); setAutoRated(true); }
+  }, [reviewCode, autoRated, loading, fetched]);
 
   // In-app confirmed bookings first, then any server bookings — minus any the
   // user has deleted (cancelled bookings only) from their visible list.

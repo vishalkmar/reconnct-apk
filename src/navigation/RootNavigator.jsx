@@ -10,7 +10,7 @@ import AuthNavigator from '../screens/auth/AuthNavigator';
 import IntroScreen from '../screens/auth/IntroScreen';
 import BottomNav from '../components/BottomNav';
 import { registerNavigator, unregisterNavigator } from '../services/pushNav';
-import { wirePushHandlers, registerPushToken } from '../services/pushNotifications';
+import { wirePushHandlers, registerPushToken, registerSupplierPushToken } from '../services/pushNotifications';
 
 // Screens are loaded lazily (required when first shown) so a problem in any one
 // screen can never stop the whole app from opening — only the auth screen needs
@@ -53,7 +53,9 @@ function StackScreen({ name, params }) {
     case 'experiences': { const C = require('../screens/ExperiencesScreen').default; return <C initialFilters={params.initialFilters} tagMode={params.tagMode} />; }
     case 'myProfile': return lazy(() => require('../screens/user/MyProfileScreen'));
     case 'support': { const C = require('../screens/SupportScreen').default; return <C queue={(params && params.queue) || 'user'} />; }
-    case 'bookings': return lazy(() => require('../screens/user/MyBookingsScreen'));
+    // reviewCode opens the rating sheet straight away — set when the post-
+    // experience "how was it?" push is tapped.
+    case 'bookings': { const C = require('../screens/user/MyBookingsScreen').default; return <C reviewCode={params && params.reviewCode} />; }
     case 'bookingDetail': { const C = require('../screens/user/BookingDetailScreen').default; return <C code={params.code} startCancel={params.startCancel} />; }
     case 'paymentDetail': { const C = require('../screens/user/PaymentDetailScreen').default; return <C code={params.code} />; }
     case 'bookingFullDetail': { const C = require('../screens/user/BookingFullDetailScreen').default; return <C code={params.code} />; }
@@ -69,16 +71,18 @@ function StackScreen({ name, params }) {
     case 'hostTransactions': return lazy(() => require('../screens/host/HostTransactionsScreen'));
     case 'supplierCreateListing': return lazy(() => require('../screens/supplier/SupplierCreateListingScreen'));
     case 'supplierProfileDetail': return lazy(() => require('../screens/supplier/SupplierProfileDetailScreen'));
+    case 'supplierListingDetail': { const C = require('../screens/supplier/SupplierListingDetailScreen').default; return <C id={params.id} listing={params.listing} />; }
     case 'supplierListingBookings': { const C = require('../screens/supplier/SupplierListingBookingsScreen').default; return <C listing={params.listing} />; }
     case 'supplierBookingDetail': { const C = require('../screens/supplier/SupplierBookingDetailScreen').default; return <C id={params.id} />; }
     case 'supplierTransactions': return lazy(() => require('../screens/supplier/SupplierTransactionsScreen'));
+    case 'supplierNotifications': return lazy(() => require('../screens/supplier/SupplierNotificationsScreen'));
     default: return null;
   }
 }
 
 export default function RootNavigator() {
   const { isAuthed, booting, token } = useAuth();
-  const { isSupplierAuthed, booting: supplierBooting } = useSupplierAuth();
+  const { isSupplierAuthed, booting: supplierBooting, token: supplierToken } = useSupplierAuth();
   const { tab, top, navigateTab, goBack, mode, guestMode, push, switchMode } = useNav();
   const [introDone, setIntroDone] = useState(false);
   const browsing = isAuthed || isSupplierAuthed || guestMode; // guests get the same main-app shell
@@ -99,6 +103,9 @@ export default function RootNavigator() {
 
   useEffect(() => { wirePushHandlers(); }, []);
   useEffect(() => { if (token) registerPushToken(token); }, [token]);
+  // A supplier logged in on their own portal → register this device so booking
+  // pushes reach them too.
+  useEffect(() => { if (supplierToken) registerSupplierPushToken(supplierToken); }, [supplierToken]);
 
   // Android hardware/system back → one step back inside the app instead of
   // closing it. When goBack() can't go further (Home, nothing pushed) we

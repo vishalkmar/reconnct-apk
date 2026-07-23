@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   heartBadge: { width: 32, height: 32, borderRadius: 9, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   heartBadgeIcon: { width: 18, height: 18, tintColor: '#fff' },
   pillText: { color: colors.brand, fontWeight: '800', fontSize: font.small, letterSpacing: 1 },
-  title: { color: '#fff', fontSize: 28, fontWeight: '800', fontFamily: 'serif', marginTop: 14, lineHeight: 36 },
+  title: { color: '#fff', fontSize: 28, fontWeight: '800', marginTop: 14, lineHeight: 36 },
   subtitle: { color: 'rgba(255,255,255,0.7)', fontSize: font.body, marginTop: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: H_PAD },
   note: { backgroundColor: colors.surface, marginHorizontal: H_PAD, marginTop: 6, padding: 14, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },

@@ -92,26 +92,40 @@ export function wirePushHandlers() {
 
 // Requests permission, pulls the device's FCM token, and registers it with
 // the backend against the signed-in user — call once an auth token exists.
+// Get this device's FCM token (after ensuring permission). Shared by the user
+// and supplier registration paths below.
+async function getDeviceFcmToken() {
+  const granted = await ensureNotificationPermission();
+  if (!granted) return null;
+  const messaging = getMessaging(getApp());
+  await requestPermission(messaging).catch(() => AuthorizationStatus.DENIED);
+  return { messaging, fcmToken: await getToken(messaging) };
+}
+
 // Same account for both traveller and host mode (Switch to Hosting is the
 // same User row), so one token covers both.
 export async function registerPushToken(authToken) {
   if (!authToken) return;
   try {
-    const granted = await ensureNotificationPermission();
-    console.warn('[push] permission granted:', granted);
-    if (!granted) return;
-    const messaging = getMessaging(getApp());
-    await requestPermission(messaging).catch((e) => { console.warn('[push] requestPermission failed:', e.message); return AuthorizationStatus.DENIED; });
-    const fcmToken = await getToken(messaging);
-    console.warn('[push] fcmToken:', fcmToken ? fcmToken.slice(0, 24) + '...' : fcmToken);
-    if (fcmToken) {
-      const res = await api.registerPushToken(authToken, fcmToken).catch((e) => { console.warn('[push] register API failed:', e.message); return null; });
-      console.warn('[push] register API result:', JSON.stringify(res));
-    }
-    onTokenRefresh(messaging, (newToken) => {
-      api.registerPushToken(authToken, newToken).catch(() => {});
-    });
+    const r = await getDeviceFcmToken();
+    if (!r || !r.fcmToken) return;
+    await api.registerPushToken(authToken, r.fcmToken).catch((e) => { console.warn('[push] register API failed:', e.message); });
+    onTokenRefresh(r.messaging, (newToken) => { api.registerPushToken(authToken, newToken).catch(() => {}); });
   } catch (e) {
     console.warn('[push] registerPushToken failed:', e.message);
+  }
+}
+
+// A supplier signed in on their own portal — register the device against the
+// SUPPLIER so a booking on their listing pushes to this phone.
+export async function registerSupplierPushToken(supplierToken) {
+  if (!supplierToken) return;
+  try {
+    const r = await getDeviceFcmToken();
+    if (!r || !r.fcmToken) return;
+    await api.registerSupplierPushToken(supplierToken, r.fcmToken).catch((e) => { console.warn('[push] supplier register failed:', e.message); });
+    onTokenRefresh(r.messaging, (newToken) => { api.registerSupplierPushToken(supplierToken, newToken).catch(() => {}); });
+  } catch (e) {
+    console.warn('[push] registerSupplierPushToken failed:', e.message);
   }
 }

@@ -117,8 +117,12 @@ export const api = {
   supplierCreateListing: (token, form, submit = false) => request('/supplier/listings', { method: 'POST', token, body: { form, submit } }),
   supplierUpdateListing: (token, id, form, submit = false) => request(`/supplier/listings/${id}`, { method: 'PUT', token, body: { form, submit } }),
   supplierDeleteListing: (token, id) => request(`/supplier/listings/${id}`, { method: 'DELETE', token }),
+  // Written confirmation of post-QC changes — note is REQUIRED (see the web
+  // portal's Acknowledge action; same endpoint, same validation).
+  supplierAckChanges: (token, id, note) => request(`/supplier/listings/${id}/up-ack`, { method: 'POST', token, body: { note } }),
   supplierBooking: (token, id) => request(`/supplier/bookings/${id}`, { token }),
   supplierTransactions: (token) => request('/supplier/transactions', { token }),
+  supplierNotifications: (token) => request('/supplier/notifications', { token }),
 
   // ── Support chat (party = user / host) ──────────────────────────────
   supportConversation: (token, queue = 'user') => request(`/support/me/conversation${qs({ queue })}`, { token }),
@@ -132,6 +136,10 @@ export const api = {
   // ── Push notifications ──────────────────────────────────────────────
   registerPushToken: (token, fcmToken) =>
     request('/notifications/fcm-token', { method: 'POST', token, body: { fcmToken, platform: 'android' } }),
+  // Same, but registers against the signed-in SUPPLIER so booking pushes reach
+  // their device too.
+  registerSupplierPushToken: (token, fcmToken) =>
+    request('/supplier/fcm-token', { method: 'POST', token, body: { fcmToken, platform: 'android' } }),
 };
 
 // Multipart upload helper (RN FormData with { uri, name, type }). Guarded by a
