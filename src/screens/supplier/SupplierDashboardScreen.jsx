@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../../theme';
@@ -22,9 +22,12 @@ const prettyDate = (s) => {
 export default function SupplierDashboardScreen() {
   const insets = useSafeAreaInsets();
   const { push, navigateTab } = useNav();
-  const { token, stats, profile } = useSupplier();
+  const { token, stats, profile , reload } = useSupplier();
   const { signOut } = useSupplierAuth();
   const [kamOpen, setKamOpen] = useState(false);
+  // Stats/bookings are fetched once at login otherwise, so a listing that went
+  // live (or a new booking) never showed up until a reinstall.
+  useEffect(() => { if (reload) reload(); }, [reload]);
   const name = profile.name || 'Supplier';
 
   return (

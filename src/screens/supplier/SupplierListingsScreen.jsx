@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput, Alert, ScrollView, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../../theme';
 import { useNav } from '../../navigation/NavContext';
@@ -158,6 +158,18 @@ export default function SupplierListingsScreen() {
   const [filters, setFilters] = useState(emptyFilters);
   // Listings whose review moved on since the owner last opened them.
   const [unseen, setUnseen] = useState(() => new Set());
+  const [refreshing, setRefreshing] = useState(false);
+  /*
+    Listings are otherwise fetched ONCE at login, so a listing that went live
+    (or picked up an objection) server-side kept showing its old tab and badge
+    until the app was reinstalled. Refresh whenever this screen is shown, and
+    let the owner pull to force it.
+  */
+  useEffect(() => { if (reload) reload(); }, [reload]);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try { if (reload) await reload(); } finally { setRefreshing(false); }
+  };
   useEffect(() => { loadUnseen(listings).then(setUnseen).catch(() => {}); }, [listings]);
 
   // A supplier can self-add listings only once they already have a live one
@@ -213,6 +225,7 @@ export default function SupplierListingsScreen() {
         keyExtractor={(l) => String(l.id)}
         contentContainerStyle={{ padding: space.lg, paddingTop: 8, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} colors={[colors.brand]} />}
         ListEmptyComponent={<Text style={styles.empty}>{query.trim() ? `No listings match "${query.trim()}".` : `Nothing in ${TABS.find((t) => t.key === tab)?.label}.`}</Text>}
         renderItem={({ item }) => {
           const st = badgeFor(item);
