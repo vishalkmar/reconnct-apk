@@ -100,10 +100,19 @@ export const api = {
   hostListings: (token) => request('/host/listings', { token }),
   hostListing: (token, id) => request(`/host/listings/${id}`, { token }),
   hostCreateListing: (token, form, submit = false) => request('/host/listings', { method: 'POST', token, body: { form, submit } }),
-  hostUpdateListing: (token, id, form, submit = false) => request(`/host/listings/${id}`, { method: 'PUT', token, body: { form, submit } }),
+  // `resolutions` (a { sectionKey: note } map) is sent only on a "Review again"
+  // resubmit from the objection-resolution flow — the backend logs each note
+  // into that section's thread. Omitted for a normal edit/submit.
+  hostUpdateListing: (token, id, form, submit = false, resolutions) => request(`/host/listings/${id}`, { method: 'PUT', token, body: { form, submit, ...(resolutions ? { resolutions } : {}) } }),
   hostDeleteListing: (token, id) => request(`/host/listings/${id}`, { method: 'DELETE', token }),
   hostBooking: (token, id) => request(`/host/bookings/${id}`, { token }),
   hostTransactions: (token) => request('/host/transactions', { token }),
+  // Every booking across all of this owner's listings (the "All Bookings" tab).
+  hostAllBookings: (token) => request('/host/all-bookings', { token }),
+  // Who from the reconnct team looks after this owner (null for a pure host).
+  hostAccountManager: (token) => request('/host/account-manager', { token }),
+  // Written confirmation of post-QC changes — note REQUIRED (same as supplier).
+  hostAckChanges: (token, id, note) => request(`/host/listings/${id}/up-ack`, { method: 'POST', token, body: { note } }),
 
   // ── Supplier Portal (Phase 7 — own login, own account, NOT a User).
   // Completely separate from the Host functions above — same shape, own
@@ -115,14 +124,18 @@ export const api = {
   supplierListings: (token) => request('/supplier/listings', { token }),
   supplierListing: (token, id) => request(`/supplier/listings/${id}`, { token }),
   supplierCreateListing: (token, form, submit = false) => request('/supplier/listings', { method: 'POST', token, body: { form, submit } }),
-  supplierUpdateListing: (token, id, form, submit = false) => request(`/supplier/listings/${id}`, { method: 'PUT', token, body: { form, submit } }),
+  // See hostUpdateListing — `resolutions` rides along only on a Review-again.
+  supplierUpdateListing: (token, id, form, submit = false, resolutions) => request(`/supplier/listings/${id}`, { method: 'PUT', token, body: { form, submit, ...(resolutions ? { resolutions } : {}) } }),
   supplierDeleteListing: (token, id) => request(`/supplier/listings/${id}`, { method: 'DELETE', token }),
+  // Every booking across all of this supplier's listings (the "All Bookings" tab).
+  supplierAllBookings: (token) => request('/supplier/all-bookings', { token }),
   // Written confirmation of post-QC changes — note is REQUIRED (see the web
   // portal's Acknowledge action; same endpoint, same validation).
   supplierAckChanges: (token, id, note) => request(`/supplier/listings/${id}/up-ack`, { method: 'POST', token, body: { note } }),
   supplierBooking: (token, id) => request(`/supplier/bookings/${id}`, { token }),
   supplierTransactions: (token) => request('/supplier/transactions', { token }),
   supplierNotifications: (token) => request('/supplier/notifications', { token }),
+  supplierAccountManager: (token) => request('/supplier/account-manager', { token }),
 
   // ── Support chat (party = user / host) ──────────────────────────────
   supportConversation: (token, queue = 'user') => request(`/support/me/conversation${qs({ queue })}`, { token }),
@@ -132,6 +145,17 @@ export const api = {
   supportUnread: (token) => request('/support/me/unread', { token }),
   // Multipart image upload → { type, url, name, size }.
   supportUpload: (token, asset) => uploadRequest('/support/attachments', asset, token),
+
+  /*
+    Listing photo upload → { url }. The picker hands back a LOCAL device URI
+    (file:///…/cache/rn_image_picker_lib_temp_x.jpg) which only exists on that
+    phone — persisting it meant the website (and the app after a reinstall, once
+    the cache is cleared) had nothing to load. Every picked image now goes
+    through here first and only the returned public URL is stored.
+    /uploads/user-image accepts BOTH a signed-in user (host) and a supplier
+    login, so one call serves both wizards.
+  */
+  uploadListingImage: (token, asset) => uploadRequest('/uploads/user-image', asset, token),
 
   // ── Push notifications ──────────────────────────────────────────────
   registerPushToken: (token, fcmToken) =>

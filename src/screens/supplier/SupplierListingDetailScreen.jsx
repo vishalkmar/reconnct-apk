@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { colors, radius, font, space } from '../../theme';
 import { useSupplierAuth } from '../../store/SupplierAuthContext';
+import { useAuth } from '../../store/AuthContext';
 import { useNav } from '../../navigation/NavContext';
 import { api, resolveImage } from '../../api/client';
 import { formatMoney } from '../../utils/format';
@@ -35,8 +36,12 @@ const badgeFor = (l) => (l.isPublished ? { label: 'Published', bg: '#16A34A' } :
 
   Mirrors the website's HostListingViewPage — same source, same sections.
 */
-export default function SupplierListingDetailScreen({ id, listing: passed }) {
-  const { token } = useSupplierAuth();
+// `mode` picks supplier vs host identity/endpoint so one read-only detail
+// screen serves both portals.
+export default function SupplierListingDetailScreen({ id, listing: passed, mode = 'supplier' }) {
+  const supplierAuth = useSupplierAuth();
+  const userAuth = useAuth();
+  const token = mode === 'host' ? userAuth.token : supplierAuth.token;
   const { push } = useNav();
   const [listing, setListing] = useState(passed || null);
   const [form, setForm] = useState(null);
@@ -47,7 +52,7 @@ export default function SupplierListingDetailScreen({ id, listing: passed }) {
   useEffect(() => {
     let alive = true;
     if (!listingId) { setLoading(false); return undefined; }
-    api.supplierListing(token, listingId)
+    (mode === 'host' ? api.hostListing : api.supplierListing)(token, listingId)
       .then((d) => {
         if (!alive || !d) return;
         if (d.listing) setListing(d.listing);
@@ -56,7 +61,7 @@ export default function SupplierListingDetailScreen({ id, listing: passed }) {
       .catch(() => {})
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [token, listingId]);
+  }, [token, listingId, mode]);
 
   if (loading) {
     return (
@@ -115,9 +120,16 @@ export default function SupplierListingDetailScreen({ id, listing: passed }) {
           <Text style={styles.price}>{formatMoney(price)}<Text style={styles.priceUnit}> / {(listing && listing.priceUnit) || 'person'}</Text></Text>
 
           {listing && listing.isPublished && (
-            <TouchableOpacity style={styles.bookingsBtn} activeOpacity={0.85} onPress={() => push('supplierListingBookings', { listing })}>
+            <TouchableOpacity style={styles.bookingsBtn} activeOpacity={0.85} onPress={() => push(mode === 'host' ? 'listingBookings' : 'supplierListingBookings', { listing })}>
               <Image source={ICONS.ticket} style={styles.bookingsIcon} />
               <Text style={styles.bookingsText}>See bookings</Text>
+            </TouchableOpacity>
+          )}
+
+          {listing && listing.status === 'changes' && (
+            <TouchableOpacity style={styles.resolveBtn} activeOpacity={0.9} onPress={() => push('resolveObjections', { id: listingId, mode })}>
+              <Image source={ICONS.edit} style={styles.resolveIcon} />
+              <Text style={styles.resolveText}>Resolve objections</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -237,6 +249,9 @@ const styles = StyleSheet.create({
   bookingsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: colors.brand, height: 46, borderRadius: radius.md, marginTop: 14 },
   bookingsIcon: { width: 17, height: 17, tintColor: '#101010' },
   bookingsText: { fontWeight: '900', color: '#101010', fontSize: font.body },
+  resolveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: '#DC2626', height: 46, borderRadius: radius.md, marginTop: 12 },
+  resolveIcon: { width: 17, height: 17, tintColor: '#fff' },
+  resolveText: { fontWeight: '900', color: '#fff', fontSize: font.body },
 
   section: { backgroundColor: colors.surface, padding: space.lg, marginTop: 10 },
   sectionTitle: { fontSize: font.h3, fontWeight: '900', color: colors.ink, marginBottom: 10 },

@@ -11,6 +11,7 @@ import { ICONS } from '../../icons';
 import ScreenHeader from '../../components/ScreenHeader';
 import EmptyState from '../../components/EmptyState';
 import RatingModal from '../../components/RatingModal';
+import MonthFilter, { monthKey, buildMonths } from '../../components/MonthFilter';
 
 // category → the pill shown on the card image (top-right).
 const PILL = {
@@ -98,6 +99,7 @@ export default function MyBookingsScreen({ reviewCode }) {
   const [fetched, setFetched] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all');
+  const [month, setMonth] = useState('all');
   const [rateBooking, setRateBooking] = useState(null);
   const [autoRated, setAutoRated] = useState(false);
   const [, setTick] = useState(0); // ticks so upcoming→ongoing→completed flips live
@@ -129,7 +131,12 @@ export default function MyBookingsScreen({ reviewCode }) {
 
   // In-app confirmed bookings first, then any server bookings — minus any the
   // user has deleted (cancelled bookings only) from their visible list.
-  const items = [...localBookings, ...fetched].filter((b) => !isHidden(b.bookingCode));
+  const allItems = [...localBookings, ...fetched].filter((b) => !isHidden(b.bookingCode));
+  // Bookings are grouped by the date the experience is scheduled for.
+  const bookingDate = (b) => b.scheduledFor || b.scheduledAt || b.date || b.createdAt;
+  const months = buildMonths(allItems.map(bookingDate));
+  // The month filter narrows the tab counts too, so they match the list.
+  const items = month === 'all' ? allItems : allItems.filter((b) => monthKey(bookingDate(b)) === month);
   const counts = TABS.reduce((acc, t) => { acc[t.key] = items.filter((b) => inGroup(b, t.key)).length; return acc; }, {});
   const shown = items.filter((b) => inGroup(b, tab));
 
@@ -148,6 +155,9 @@ export default function MyBookingsScreen({ reviewCode }) {
           );
         })}
       </ScrollView>
+      <View style={styles.monthRow}>
+        <MonthFilter value={month} months={months} onChange={setMonth} />
+      </View>
       {loading ? (
         <ActivityIndicator color={colors.brand} style={{ marginTop: 40 }} />
       ) : (
@@ -303,6 +313,7 @@ const styles = StyleSheet.create({
   // flexGrow:0 stops the horizontal tab strip from stretching to fill the
   // column's vertical space (which pushed the list down, leaving a top gap).
   tabsScroll: { flexGrow: 0, flexShrink: 0 },
+  monthRow: { paddingHorizontal: space.lg, paddingBottom: 10 },
   tabs: { paddingHorizontal: space.lg, paddingVertical: 12, gap: 8 },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 38, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   tabActive: { backgroundColor: colors.brand, borderColor: colors.brand },

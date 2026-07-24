@@ -22,7 +22,6 @@ function TabScreen({ tab, mode }) {
     switch (tab) {
       case 'dashboard': return lazy(() => require('../screens/host/HostDashboardScreen'));
       case 'listings': return lazy(() => require('../screens/host/MyListingsScreen'));
-      case 'inbox': { const C = require('../screens/SupportScreen').default; return <C queue="supplier" embedded />; }
       case 'profile': return lazy(() => require('../screens/host/HostProfileScreen'));
       default: return lazy(() => require('../screens/host/HostDashboardScreen'));
     }
@@ -67,6 +66,7 @@ function StackScreen({ name, params }) {
     case 'hostProfileDetail': return lazy(() => require('../screens/host/HostProfileDetailScreen'));
     case 'listingBookings': { const C = require('../screens/host/ListingBookingsScreen').default; return <C listing={params.listing} />; }
     case 'hostBookingDetail': { const C = require('../screens/host/HostBookingDetailScreen').default; return <C id={params.id} />; }
+    case 'hostListingDetail': { const C = require('../screens/supplier/SupplierListingDetailScreen').default; return <C id={params.id} listing={params.listing} mode="host" />; }
     case 'hostNotifications': return lazy(() => require('../screens/host/HostNotificationsScreen'));
     case 'hostTransactions': return lazy(() => require('../screens/host/HostTransactionsScreen'));
     case 'supplierCreateListing': return lazy(() => require('../screens/supplier/SupplierCreateListingScreen'));
@@ -74,6 +74,10 @@ function StackScreen({ name, params }) {
     case 'supplierListingDetail': { const C = require('../screens/supplier/SupplierListingDetailScreen').default; return <C id={params.id} listing={params.listing} />; }
     case 'supplierListingBookings': { const C = require('../screens/supplier/SupplierListingBookingsScreen').default; return <C listing={params.listing} />; }
     case 'supplierBookingDetail': { const C = require('../screens/supplier/SupplierBookingDetailScreen').default; return <C id={params.id} />; }
+    // Objection-resolution + All Bookings — one screen each, `mode` picks the
+    // supplier portal vs the "Switch to Host" panel.
+    case 'resolveObjections': { const C = require('../screens/listing/ResolveObjectionsScreen').default; return <C id={params.id} mode={(params && params.mode) || 'supplier'} />; }
+    case 'allBookings': { const C = require('../screens/listing/AllBookingsScreen').default; return <C mode={(params && params.mode) || 'supplier'} />; }
     case 'supplierTransactions': return lazy(() => require('../screens/supplier/SupplierTransactionsScreen'));
     case 'supplierNotifications': return lazy(() => require('../screens/supplier/SupplierNotificationsScreen'));
     default: return null;
@@ -157,11 +161,7 @@ export default function RootNavigator() {
           <View style={{ flex: 1 }}>
             <TabScreen tab={tab} mode={mode} />
           </View>
-          {/* Inbox is a full-screen chat once you're in it — no floating nav
-              on top of the composer. */}
-          {!(mode === 'host' && tab === 'inbox') && (
-            <BottomNav current={tab} onChange={navigateTab} mode={mode} />
-          )}
+          <BottomNav current={tab} onChange={navigateTab} mode={mode} />
         </>
       )}
     </View>

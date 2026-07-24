@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../../theme';
@@ -7,6 +7,8 @@ import { useSupplier } from '../../store/SupplierContext';
 import { useSupplierAuth } from '../../store/SupplierAuthContext';
 import { initials, formatMoney } from '../../utils/format';
 import { ICONS } from '../../icons';
+import NotificationBell from '../../components/NotificationBell';
+import KamSheet from '../../components/KamSheet';
 
 const NAVY = '#15233F';
 
@@ -20,8 +22,9 @@ const prettyDate = (s) => {
 export default function SupplierDashboardScreen() {
   const insets = useSafeAreaInsets();
   const { push, navigateTab } = useNav();
-  const { stats, profile } = useSupplier();
+  const { token, stats, profile } = useSupplier();
   const { signOut } = useSupplierAuth();
+  const [kamOpen, setKamOpen] = useState(false);
   const name = profile.name || 'Supplier';
 
   return (
@@ -31,9 +34,12 @@ export default function SupplierDashboardScreen() {
         <View style={styles.headerCircle} />
         <View style={styles.headerTop}>
           <Image source={ICONS.logoWhite} style={styles.logo} resizeMode="contain" />
+          <View style={styles.headerActions}>
+            <NotificationBell mode="supplier" token={token} />
           <TouchableOpacity style={styles.modePill} onPress={signOut} activeOpacity={0.85}>
             <Text style={styles.modePillText}>Supplier</Text>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
         </View>
         <View style={styles.idRow}>
           <View style={styles.avatar}><Text style={styles.avatarInit}>{initials(name)}</Text></View>
@@ -47,8 +53,14 @@ export default function SupplierDashboardScreen() {
       {/* Stat cards */}
       <View style={styles.statRow}>
         <StatCard icon={ICONS.dollar} tint={colors.brand} bg="#FDEFD3" value={formatMoney(stats.earnedMonth)} label="This Month" />
-        <StatCard icon={ICONS.plane} tint="#2563EB" bg="#DBEAFE" value={String(stats.bookings)} label="Bookings" />
+        {/* Tapping Bookings opens the full All Bookings board — same place the
+            web portal's "All Bookings" sidebar tab goes. */}
+        <StatCard icon={ICONS.plane} tint="#2563EB" bg="#DBEAFE" value={String(stats.bookings)} label="Bookings"
+          onPress={() => push('allBookings', { mode: 'supplier' })} />
         <StatCard icon={ICONS.star} tint="#16A34A" bg="#DCFCE7" value={String(stats.rating)} label="Rating" />
+        {/* Your Key Account Manager — same info the web portal's KAM page shows. */}
+        <StatCard icon={ICONS.people} tint="#7C3AED" bg="#EDE9FE" value="KAM" label="Assigned KAM"
+          onPress={() => setKamOpen(true)} />
       </View>
 
       {/* Action cards */}
@@ -86,14 +98,15 @@ export default function SupplierDashboardScreen() {
       {/* Recent bookings */}
       <View style={styles.recentHead}>
         <Text style={styles.recentTitle}>Recent Bookings</Text>
-        <TouchableOpacity onPress={() => navigateTab('listings')}><Text style={styles.viewAll}>View all</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => push('allBookings', { mode: 'supplier' })}><Text style={styles.viewAll}>View all</Text></TouchableOpacity>
       </View>
       <View style={{ marginHorizontal: space.lg }}>
         {!stats.recentBookings.length && (
           <Text style={styles.empty}>No bookings yet on your listings.</Text>
         )}
         {stats.recentBookings.map((r) => (
-          <View key={r.id} style={styles.bk}>
+          <TouchableOpacity key={r.id} style={styles.bk} activeOpacity={0.85}
+            onPress={() => push('supplierBookingDetail', { id: r.id })}>
             <View style={styles.bkAvatar}><Text style={styles.bkAvatarText}>{initials(r.guest)}</Text></View>
             <View style={{ flex: 1 }}>
               <Text style={styles.bkName}>{r.guest}</Text>
@@ -105,20 +118,24 @@ export default function SupplierDashboardScreen() {
                 <Text style={[styles.bkPillText, r.status === 'completed' ? styles.bkPillTextDone : styles.bkPillTextUp]}>{r.status}</Text>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
       </View>
+
+      <KamSheet visible={kamOpen} onClose={() => setKamOpen(false)} mode="supplier" token={token} />
     </ScrollView>
   );
 }
 
-function StatCard({ icon, tint, bg, value, label }) {
+// A plain card, or a tappable one when `onPress` is given.
+function StatCard({ icon, tint, bg, value, label, onPress }) {
+  const Wrap = onPress ? TouchableOpacity : View;
   return (
-    <View style={styles.stat}>
+    <Wrap style={styles.stat} {...(onPress ? { onPress, activeOpacity: 0.85 } : {})}>
       <View style={[styles.statIcon, { backgroundColor: bg }]}><Image source={icon} style={{ width: 18, height: 18, tintColor: tint }} /></View>
       <Text style={styles.statValue} numberOfLines={1}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </Wrap>
   );
 }
 
@@ -126,6 +143,7 @@ const styles = StyleSheet.create({
   header: { backgroundColor: NAVY, paddingHorizontal: space.lg, paddingBottom: 28, overflow: 'hidden' },
   headerCircle: { position: 'absolute', top: -70, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(255,255,255,0.045)' },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerActions: { flexDirection: 'row', alignItems: 'center' },
   logo: { width: 116, height: 26 },
   modePill: { backgroundColor: colors.brand, paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.pill },
   modePillText: { color: '#101010', fontWeight: '900', fontSize: font.small },
@@ -135,11 +153,11 @@ const styles = StyleSheet.create({
   welcome: { color: 'rgba(255,255,255,0.6)', fontSize: font.small },
   name: { color: '#fff', fontSize: font.h2, fontWeight: '900', marginTop: 1 },
 
-  statRow: { flexDirection: 'row', gap: 12, paddingHorizontal: space.lg, marginTop: 18 },
-  stat: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.lg, paddingVertical: 16, alignItems: 'center', ...shadow.card },
+  statRow: { flexDirection: 'row', gap: 8, paddingHorizontal: space.lg, marginTop: 18 },
+  stat: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.lg, paddingVertical: 14, paddingHorizontal: 4, alignItems: 'center', ...shadow.card },
   statIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  statValue: { fontSize: font.h3, fontWeight: '900', color: colors.ink },
-  statLabel: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 2 },
+  statValue: { fontSize: font.body, fontWeight: '900', color: colors.ink },
+  statLabel: { fontSize: 10, color: colors.inkMuted, marginTop: 2, textAlign: 'center' },
 
   actionRow: { flexDirection: 'row', gap: 12, paddingHorizontal: space.lg, marginTop: 16 },
   action: { flex: 1, borderRadius: radius.lg, padding: 16, minHeight: 116, justifyContent: 'flex-end' },

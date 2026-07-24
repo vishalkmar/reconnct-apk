@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../../theme';
 import { useNav } from '../../navigation/NavContext';
@@ -7,42 +7,67 @@ import { useHost } from '../../store/HostContext';
 import { resolveImage } from '../../api/client';
 import { formatMoney } from '../../utils/format';
 import { ICONS } from '../../icons';
+import ListFilterBar from '../../components/ListFilterBar';
+import { emptyFilters, passesFilters } from '../../utils/listFilters';
 
+// Same wording and the same four lanes the Supplier Portal and the website
+// use, driven by the SAME `tab` the API sends (submitterTab) — so an owner
+// sees an identical board on web and app, host or supplier.
 const STATUS = {
-  active: { label: 'approved', bg: '#16A34A' },
-  pending: { label: 'pending', bg: '#D97706' },
-  draft: { label: 'draft', bg: '#6B7280' },
-  paused: { label: 'paused', bg: '#D97706' },
+  active: { label: 'Published', bg: '#16A34A' },
+  approved: { label: 'Published', bg: '#16A34A' },
+  pending: { label: 'Pending review', bg: '#D97706' },
+  changes: { label: 'Objections', bg: '#DC2626' },
+  draft: { label: 'Draft', bg: '#6B7280' },
+  paused: { label: 'Paused', bg: '#D97706' },
 };
-// Filter tabs → which listing statuses they include.
+const badgeFor = (l) => (l.isPublished ? { label: 'Published', bg: '#16A34A' } : (STATUS[l.status] || STATUS.draft));
+
 const TABS = [
-  { key: 'all', label: 'All' },
-  { key: 'pending', label: 'Pending', statuses: ['pending'] },
-  { key: 'approved', label: 'Approved', statuses: ['active'] },
-  { key: 'draft', label: 'Drafts', statuses: ['draft'] },
+  { key: 'in_queue', label: 'Under Review' },
+  { key: 'live', label: 'Published' },
+  { key: 'rejected', label: 'Rejected' },
+  { key: 'delisted', label: 'Delisted' },
 ];
+
+// Fallback for an older API build that sends no `tab`.
+const deriveTab = (l) => {
+  const stage = l.review?.stage || null;
+  if (stage === 'delisted') return 'delisted';
+  if (l.isPublished || stage === 'live') return 'live';
+  if (['rejected', 'qc_rejected'].includes(stage) || (l.reviewStatus === 'archived' && stage !== 'delisted')) return 'rejected';
+  return 'in_queue';
+};
+const tabOf = (l) => {
+  const t = l.tab || deriveTab(l);
+  return t === 'under_progress' ? 'in_queue' : t;
+};
+/*
+  Free-form editing is for a plain draft ONLY. Once it has been submitted the
+  website routes every change through the objection-resolution flow, so Edit
+  must disappear there — showing it (as this screen used to) let an owner think
+  they could still edit a listing that is locked under review.
+*/
+const isPlainDraft = (l) => l.reviewStatus === 'draft' && l.status === 'draft' && !l.review?.stage;
+const canEditOf = (l) => (typeof l.canEdit === 'boolean' ? l.canEdit : isPlainDraft(l));
+const canDeleteOf = (l) => (typeof l.canDelete === 'boolean' ? l.canDelete : isPlainDraft(l));
 
 export default function MyListingsScreen() {
   const insets = useSafeAreaInsets();
   const { push } = useNav();
   const { listings, removeListing } = useHost();
-  const [tab, setTab] = useState('all');
+  const [tab, setTab] = useState('in_queue');
   const [query, setQuery] = useState('');
-  const soon = (w) => Alert.alert(w, 'Coming soon.');
+  const [filters, setFilters] = useState(emptyFilters);
 
-  const countFor = (t) => (t.key === 'all' ? listings.length : listings.filter((l) => t.statuses.includes(l.status)).length);
-  const active = TABS.find((t) => t.key === tab);
-  const byTab = tab === 'all' ? listings : listings.filter((l) => active.statuses.includes(l.status));
-  // Search by name, city or price.
-  const shown = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return byTab;
-    return byTab.filter((l) => (
-      (l.title || '').toLowerCase().includes(q)
-      || (l.city || '').toLowerCase().includes(q)
-      || String(l.price || '').includes(q)
-    ));
-  }, [byTab, query]);
+  const categories = useMemo(() => [...new Set(listings.map((l) => l.category).filter(Boolean))].sort(), [listings]);
+  // Every filter except the status tab, so the tab counts match the list.
+  const base = useMemo(() => listings.filter((l) => passesFilters({
+    date: l.createdAt, amount: l.price, category: l.category, rating: l.rating,
+    search: [l.title, l.city, l.price, l.category],
+  }, filters, query)), [listings, filters, query]);
+  const countFor = (t) => base.filter((l) => tabOf(l) === t.key).length;
+  const shown = base.filter((l) => tabOf(l) === tab);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -54,23 +79,16 @@ export default function MyListingsScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.searchWrap}>
-        <Image source={ICONS.searchMuted} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by name, location or price…"
-          placeholderTextColor={colors.inkFaint}
-          value={query}
-          onChangeText={setQuery}
-        />
-        {!!query && (
-          <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Text style={styles.searchClear}>✕</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <ListFilterBar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search by name, location or price…"
+        filters={filters}
+        onChange={setFilters}
+        categories={categories}
+      />
 
-      <View style={styles.tabs}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
         {TABS.map((t) => {
           const on = tab === t.key;
           return (
@@ -80,7 +98,7 @@ export default function MyListingsScreen() {
             </TouchableOpacity>
           );
         })}
-      </View>
+      </ScrollView>
 
       <FlatList
         data={shown}
@@ -88,9 +106,9 @@ export default function MyListingsScreen() {
         keyExtractor={(l) => String(l.id)}
         contentContainerStyle={{ padding: space.lg, paddingTop: 8, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={<Text style={styles.empty}>{query.trim() ? `No listings match "${query.trim()}".` : `No ${tab === 'all' ? '' : tab} listings yet.`}</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>{query.trim() ? `No listings match "${query.trim()}".` : `Nothing in ${TABS.find((t) => t.key === tab)?.label}.`}</Text>}
         renderItem={({ item }) => {
-          const st = STATUS[item.status] || STATUS.draft;
+          const st = badgeFor(item);
           const img = resolveImage(item.image);
           return (
             <View style={styles.card}>
@@ -104,19 +122,39 @@ export default function MyListingsScreen() {
                   <View style={styles.rating}><Image source={ICONS.star} style={styles.ratingIcon} /><Text style={styles.ratingText}>{item.rating || '—'}</Text></View>
                 </View>
                 <Text style={styles.meta}>{formatMoney(item.price)}/{item.priceUnit || 'person'} · {item.durationLabel || '—'}</Text>
+                {item.status === 'changes' && (
+                  <TouchableOpacity style={styles.resolveBtn} activeOpacity={0.9}
+                    onPress={() => push('resolveObjections', { id: item.id, mode: 'host' })}>
+                    <Image source={ICONS.edit} style={styles.resolveIcon} />
+                    <Text style={styles.resolveText}>Resolve objections</Text>
+                  </TouchableOpacity>
+                )}
+                {/* Identical rules to the web portal: edit only while it's a
+                    plain draft, bookings only once it's actually live. */}
                 <View style={styles.actions}>
-                  <TouchableOpacity style={styles.btn} activeOpacity={0.85} onPress={() => soon('Edit listing')}>
-                    <Image source={ICONS.edit} style={styles.btnIcon} />
-                    <Text style={styles.btnText}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.btn} activeOpacity={0.85} onPress={() => push('listingBookings', { listing: item })}>
-                    <Image source={ICONS.eye} style={styles.btnIcon} />
-                    <Text style={styles.btnText}>Bookings</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.trashBtn} activeOpacity={0.85}
-                    onPress={() => Alert.alert('Delete listing', `Remove "${item.title}"?`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => removeListing(item.id) }])}>
-                    <Image source={ICONS.trash} style={styles.trashIcon} />
-                  </TouchableOpacity>
+                  {canEditOf(item) ? (
+                    <TouchableOpacity style={styles.btn} activeOpacity={0.85} onPress={() => push('createListing', { listing: item })}>
+                      <Image source={ICONS.edit} style={styles.btnIcon} />
+                      <Text style={styles.btnText}>Edit</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity style={styles.btn} activeOpacity={0.85} onPress={() => push('hostListingDetail', { id: item.id, listing: item })}>
+                      <Image source={ICONS.eye} style={styles.btnIcon} />
+                      <Text style={styles.btnText}>View</Text>
+                    </TouchableOpacity>
+                  )}
+                  {item.isPublished && (
+                    <TouchableOpacity style={styles.btn} activeOpacity={0.85} onPress={() => push('listingBookings', { listing: item })}>
+                      <Image source={ICONS.ticket} style={styles.btnIcon} />
+                      <Text style={styles.btnText}>Bookings</Text>
+                    </TouchableOpacity>
+                  )}
+                  {canDeleteOf(item) && (
+                    <TouchableOpacity style={styles.trashBtn} activeOpacity={0.85}
+                      onPress={() => Alert.alert('Delete listing', `Remove "${item.title}"?`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => removeListing(item.id) }])}>
+                      <Image source={ICONS.trash} style={styles.trashIcon} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             </View>
@@ -132,14 +170,15 @@ const styles = StyleSheet.create({
   title: { fontSize: font.h2, fontWeight: '900', color: colors.ink },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.brand, paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill },
   addIcon: { width: 16, height: 16, tintColor: '#101010' },
+  resolveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: '#DC2626', height: 42, borderRadius: radius.md, marginTop: 12 },
+  resolveIcon: { width: 16, height: 16, tintColor: '#fff' },
+  resolveText: { color: '#fff', fontWeight: '900', fontSize: font.body },
   addText: { color: '#101010', fontWeight: '900', fontSize: font.small },
 
-  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, marginHorizontal: space.lg, marginTop: 12, paddingHorizontal: 14, height: 42 },
-  searchIcon: { width: 15, height: 15, tintColor: colors.inkFaint },
-  searchInput: { flex: 1, fontSize: font.small, color: colors.ink, paddingVertical: 0 },
-  searchClear: { color: colors.inkFaint, fontSize: 13, fontWeight: '700' },
 
-  tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: space.lg, paddingTop: 12 },
+  // Keeps the horizontal tab strip from stretching vertically.
+  tabsScroll: { flexGrow: 0, flexShrink: 0 },
+  tabs: { gap: 8, paddingHorizontal: space.lg, paddingTop: 12 },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, height: 36, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   tabActive: { backgroundColor: colors.brand, borderColor: colors.brand },
   tabText: { color: colors.ink, fontWeight: '700', fontSize: font.small },

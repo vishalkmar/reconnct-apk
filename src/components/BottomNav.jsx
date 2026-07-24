@@ -23,14 +23,13 @@ const TRAVELLER_ITEMS = [
   { key: 'experiences', label: 'Experiences', icon: ICONS.navExp },
   { key: 'profile', label: 'Profile', icon: ICONS.navProfile },
 ];
+// Host and Supplier now carry the SAME tabs — support chat was dropped from
+// the host panel, so neither owner portal has an Inbox.
 const HOST_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: ICONS.chart },
   { key: 'listings', label: 'Listings', icon: ICONS.compass },
-  { key: 'inbox', label: 'Inbox', icon: ICONS.navInbox, dot: true },
   { key: 'profile', label: 'Profile', icon: ICONS.navProfile },
 ];
-// Supplier Portal — same tab bar chrome as Host, minus Inbox (no support
-// chat for suppliers yet).
 const SUPPLIER_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: ICONS.chart },
   { key: 'listings', label: 'Listings', icon: ICONS.compass },

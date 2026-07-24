@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import { colors, radius, font, space, shadow } from '../../theme';
 import { useSupplier } from '../../store/SupplierContext';
 import { useSupplierAuth } from '../../store/SupplierAuthContext';
@@ -7,6 +7,8 @@ import { useNav } from '../../navigation/NavContext';
 import { api, resolveImage } from '../../api/client';
 import { initials, formatMoney } from '../../utils/format';
 import ScreenHeader from '../../components/ScreenHeader';
+import ListFilterBar from '../../components/ListFilterBar';
+import { emptyFilters, passesFilters } from '../../utils/listFilters';
 
 const TABS = [
   { key: 'all', label: 'All' },
@@ -29,6 +31,8 @@ export default function SupplierListingBookingsScreen({ listing }) {
   const { push } = useNav();
   const { bookingsForListing } = useSupplier();
   const [tab, setTab] = useState('all');
+  const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState(emptyFilters);
   // Fetch the listing detail so we get the REAL bookings feed for this
   // experience (the list endpoint carries none). Falls back to any bookings
   // already on the passed-in listing while the request is in flight.
@@ -50,7 +54,10 @@ export default function SupplierListingBookingsScreen({ listing }) {
     return () => { alive = false; clearInterval(t); };
   }, [token, listing]);
 
-  const all = bookings || [];
+  // Filters narrow everything — counts, revenue and the list.
+  const all = useMemo(() => (bookings || []).filter((b) => passesFilters({
+    date: b.date, amount: b.amount, search: [b.guest, b.amount],
+  }, filters, query)), [bookings, filters, query]);
   const counts = TABS.reduce((a, t) => { a[t.key] = t.key === 'all' ? all.length : all.filter((b) => b.status === t.key).length; return a; }, {});
   const shown = [...(tab === 'all' ? all : all.filter((b) => b.status === tab))].sort((a, b) => String(b.date).localeCompare(String(a.date)));
   const revenue = all.filter((b) => b.status === 'completed').reduce((n, b) => n + b.amount, 0);
@@ -69,7 +76,7 @@ export default function SupplierListingBookingsScreen({ listing }) {
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabs}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
         {TABS.map((t) => {
           const active = tab === t.key;
           return (
@@ -79,7 +86,17 @@ export default function SupplierListingBookingsScreen({ listing }) {
             </TouchableOpacity>
           );
         })}
-      </View>
+      </ScrollView>
+
+      <ListFilterBar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search guest or amount…"
+        filters={filters}
+        onChange={setFilters}
+        show={{ category: false, rating: false }}
+        style={styles.filterBar}
+      />
 
       <FlatList
         data={shown}
@@ -118,7 +135,10 @@ const styles = StyleSheet.create({
   revPill: { alignSelf: 'flex-start', backgroundColor: '#DCFCE7', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, marginTop: 6 },
   revText: { color: '#16A34A', fontWeight: '800', fontSize: font.tiny },
 
-  tabs: { flexDirection: 'row', paddingHorizontal: space.lg, paddingVertical: 12, gap: 8 },
+  filterBar: { paddingTop: 0, paddingBottom: 8 },
+  // Keeps the horizontal tab strip from stretching vertically.
+  tabsScroll: { flexGrow: 0, flexShrink: 0 },
+  tabs: { paddingHorizontal: space.lg, paddingVertical: 12, gap: 8 },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 38, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   tabActive: { backgroundColor: colors.brand, borderColor: colors.brand },
   tabText: { color: colors.ink, fontWeight: '700', fontSize: font.small },

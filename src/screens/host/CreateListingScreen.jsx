@@ -6,8 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../../theme';
 import { useNav } from '../../navigation/NavContext';
 import { useHost } from '../../store/HostContext';
+import { api } from '../../api/client';
 import { ICONS } from '../../icons';
-import { pickFromDevice } from '../../utils/imagePicker';
+import { pickAsset } from '../../utils/imagePicker';
 import TaxonomyPicker from './TaxonomyPicker';
 
 // Fixed square photo/video tile — 3 per row (matches Figma's 114px on a 390 screen).
@@ -46,7 +47,9 @@ const blank = {
 export default function CreateListingScreen() {
   const insets = useSafeAreaInsets();
   const { pop, navigateTab } = useNav();
-  const { addListing, listingDraft, saveListingDraft, clearListingDraft } = useHost();
+  const { token, addListing, listingDraft, saveListingDraft, clearListingDraft } = useHost();
+  // Picked photos are uploaded here and only the returned public URL is kept.
+  const uploadImage = (asset) => api.uploadListingImage(token, asset);
   // Restore an in-progress draft (data + step) so nothing is lost on back/exit.
   const [step, setStep] = useState(() => (listingDraft && listingDraft.step) || 1);
   const [form, setForm] = useState(() => (listingDraft && listingDraft.form) || blank);
@@ -124,7 +127,7 @@ export default function CreateListingScreen() {
         {step === 1 && <Step1 form={form} patch={patch} />}
         {step === 2 && <Step2 form={form} patch={patch} />}
         {step === 3 && <Step3 form={form} patch={patch} />}
-        {step === 4 && <Step4 form={form} patch={patch} />}
+        {step === 4 && <Step4 form={form} patch={patch} uploadImage={uploadImage} />}
       </ScrollView>
 
       {/* Action bar */}
@@ -309,7 +312,7 @@ function Step3({ form, patch }) {
 }
 
 /* ───────────────────────── STEP 4 — photos & videos ──────────────────── */
-function Step4({ form, patch }) {
+function Step4({ form, patch, uploadImage }) {
   const [picker, setPicker] = useState(null); // 'photo' | 'video' | null
   const add = (url) => {
     if (picker === 'photo') patch({ photos: [...form.photos, url] });
@@ -335,7 +338,7 @@ function Step4({ form, patch }) {
       <Modal visible={picker !== null} transparent animationType="fade" onRequestClose={() => setPicker(null)}>
         <View style={styles.modalBackdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setPicker(null)} />
-          <UrlPicker kind={picker} onPick={add} onClose={() => setPicker(null)} />
+          <UrlPicker kind={picker} onPick={add} onClose={() => setPicker(null)} uploadImage={uploadImage} />
         </View>
       </Modal>
     </View>
@@ -406,16 +409,25 @@ function MediaSection({ title, kind, items, onAdd, onRemove }) {
   );
 }
 
-function UrlPicker({ kind, onPick, onClose }) {
+function UrlPicker({ kind, onPick, onClose, uploadImage }) {
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
+  /*
+    The picker returns a LOCAL device URI that only resolves on this phone —
+    storing it left the website (and the app itself after a reinstall wipes the
+    cache) with a dead image. So upload it first and keep only the public URL.
+  */
   const fromDevice = async () => {
     setBusy(true);
     try {
-      const uri = await pickFromDevice(kind === 'video' ? 'video' : 'photo');
-      if (uri) onPick(uri);
+      const asset = await pickAsset(kind === 'video' ? 'video' : 'photo');
+      if (!asset) return;
+      const res = await uploadImage(asset);
+      const url = res && res.url;
+      if (!url) throw new Error('Upload did not return a URL.');
+      onPick(url);
     } catch (e) {
-      Alert.alert('Gallery', e.message || 'Could not open the device gallery.');
+      Alert.alert('Could not add it', e.message || 'Please try again, or paste a link instead.');
     } finally { setBusy(false); }
   };
   return (
@@ -440,6 +452,25 @@ const pad = (n) => String(n).padStart(2, '0');
 const MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const toMin = (s) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
 const toHHMM = (m) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
+/*
+  Snap already-built slots to the CURRENT activity duration — same rule as the
+  website (ExperienceScheduling.fitSlotsToDuration). If every slot already
+  matches the duration they come back untouched; if the duration changed
+  (1 hr → 2 hrs) the same NUMBER of back-to-back slots is rebuilt from the
+  earliest start, so the owner never has to delete and re-add everything.
+*/
+const fitSlotsToDuration = (slots, dur) => {
+  const list = Array.isArray(slots) ? slots.filter((s) => s && s.start && s.end) : [];
+  if (!list.length || dur <= 0) return list.map((s) => ({ ...s }));
+  if (list.every((s) => toMin(s.end) - toMin(s.start) === dur)) return list.map((s) => ({ ...s }));
+  const sorted = [...list].sort((a, b) => toMin(a.start) - toMin(b.start));
+  let cur = toMin(sorted[0].start);
+  return sorted.map(() => {
+    const s = { start: toHHMM(cur), end: toHHMM(cur + dur) };
+    cur += dur;
+    return s;
+  });
+};
 const fmtTime = (s) => { const [h, m] = s.split(':').map(Number); const ap = h < 12 ? 'AM' : 'PM'; return `${h % 12 || 12}:${pad(m)} ${ap}`; };
 const fmtDateShort = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }); };
 
@@ -453,6 +484,20 @@ function Availability({ form, patch }) {
   const dur = (Number(form.durationHours) || 0) * 60 + (Number(form.durationMinutes) || 0) || 60;
 
   const setRows = (next) => patch({ schedule: { ...schedule, dates: next } });
+
+  /*
+    The owner went back and picked a different duration (1 hr → 2 hrs) after
+    already building slots. Re-snap EVERY date's slots to the new length right
+    away, so the rows below and the slot editor both show the new timings
+    instead of stale ones — matching the website. Guarded by a deep compare so
+    it only writes on a real change and can never loop.
+  */
+  useEffect(() => {
+    if (!rows.length) return;
+    const next = rows.map((r) => ({ ...r, slots: fitSlotsToDuration(r.slots, dur) }));
+    if (JSON.stringify(next) !== JSON.stringify(rows)) setRows(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dur]);
 
   // Merge calendar selection: keep slots for surviving dates, drop removed ones.
   const saveDates = (dates, mode) => {
@@ -523,7 +568,7 @@ function Availability({ form, patch }) {
 
       <Modal visible={bulkOpen} transparent animationType="slide" onRequestClose={() => setBulkOpen(false)}>
         <View style={styles.calBackdrop}>
-          <SlotsModal title="Manage Slots · applies to every date" slots={[]} durationMinutes={dur} requireApplyAll onClose={() => setBulkOpen(false)} onSave={applyToAll} />
+          <SlotsModal title="Manage Slots · applies to every date" slots={(rows.find((r) => r.slots.length) || {}).slots || []} durationMinutes={dur} requireApplyAll onClose={() => setBulkOpen(false)} onSave={applyToAll} />
         </View>
       </Modal>
     </View>
@@ -535,7 +580,9 @@ function Availability({ form, patch }) {
 // every date at once.
 function SlotsModal({ title, slots, durationMinutes, requireApplyAll, onSave, onClose }) {
   const dur = durationMinutes > 0 ? durationMinutes : 60;
-  const [list, setList] = useState(slots.map((s) => ({ ...s })));
+  // Pre-fill with the chosen slots, snapped to the CURRENT duration — so a
+  // changed duration shows the updated timings instead of the stale ones.
+  const [list, setList] = useState(() => fitSlotsToDuration(slots, dur));
   const [start, setStart] = useState('09:00');
   const [applyAll, setApplyAll] = useState(false);
 

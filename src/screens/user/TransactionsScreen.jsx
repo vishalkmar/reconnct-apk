@@ -8,6 +8,7 @@ import { useAuth } from '../../store/AuthContext';
 import { useNav } from '../../navigation/NavContext';
 import ScreenHeader from '../../components/ScreenHeader';
 import EmptyState from '../../components/EmptyState';
+import MonthFilter, { monthKey, buildMonths } from '../../components/MonthFilter';
 
 // Mirrors the website (UserTransactionsPage): a "transaction" is a booking on
 // which money actually moved, OR one still mid-payment (Pending) or that gave
@@ -56,6 +57,9 @@ export default function TransactionsScreen() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all');
+  const [month, setMonth] = useState('all');
+
+  const months = useMemo(() => buildMonths(bookings.map(dateOf)), [bookings]);
 
   useEffect(() => {
     let alive = true;
@@ -71,6 +75,7 @@ export default function TransactionsScreen() {
   const groups = useMemo(() => {
     const activeTab = TABS.find((t) => t.key === tab) || TABS[0];
     const rows = bookings.filter(activeTab.match)
+      .filter((b) => month === 'all' || monthKey(dateOf(b)) === month)
       .sort((a, b) => new Date(dateOf(b)).getTime() - new Date(dateOf(a)).getTime());
 
     const now = new Date();
@@ -86,7 +91,7 @@ export default function TransactionsScreen() {
       const [y, m] = key.split('-').map(Number);
       return { key, title: key === curKey ? 'This Month' : `${MONTHS_FULL[m - 1]} ${y}`, data };
     });
-  }, [bookings, tab]);
+  }, [bookings, tab, month]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -99,17 +104,22 @@ export default function TransactionsScreen() {
           keyExtractor={(g) => g.key}
           contentContainerStyle={{ paddingBottom: 32 }}
           ListHeaderComponent={
-            <View style={styles.tabs}>
-              {TABS.map((t) => {
-                const active = tab === t.key;
-                return (
-                  <TouchableOpacity key={t.key} onPress={() => setTab(t.key)} style={styles.tab} activeOpacity={0.7}>
-                    <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
-                    <View style={[styles.tabUnderline, active && styles.tabUnderlineActive]} />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            <>
+              <View style={styles.tabs}>
+                {TABS.map((t) => {
+                  const active = tab === t.key;
+                  return (
+                    <TouchableOpacity key={t.key} onPress={() => setTab(t.key)} style={styles.tab} activeOpacity={0.7}>
+                      <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
+                      <View style={[styles.tabUnderline, active && styles.tabUnderlineActive]} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View style={styles.monthRow}>
+                <MonthFilter value={month} months={months} onChange={setMonth} />
+              </View>
+            </>
           }
           renderItem={({ item: group }) => (
             <View style={styles.section}>
@@ -161,6 +171,7 @@ const styles = StyleSheet.create({
   tabUnderline: { height: 2, marginTop: 8, width: '100%', backgroundColor: 'transparent' },
   tabUnderlineActive: { backgroundColor: '#FE9A00' },
 
+  monthRow: { paddingHorizontal: space.lg, paddingTop: 14 },
   section: { paddingHorizontal: space.lg, marginTop: 18 },
   sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.ink, marginBottom: 8 },
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, overflow: 'hidden' },

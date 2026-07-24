@@ -96,16 +96,16 @@ export function HostProvider({ children }) {
   const bookingsForListing = useCallback((id) => (listings.find((l) => l.id === id) || {}).bookings || [], [listings]);
 
   const value = useMemo(() => ({
-    listings, loading, reload, addListing, removeListing, bookingsForListing,
+    token, listings, loading, reload, addListing, removeListing, bookingsForListing,
     profile, setProfile, transactions, stats,
     listingDraft, saveListingDraft, clearListingDraft,
-  }), [listings, loading, reload, addListing, removeListing, bookingsForListing, profile, setProfile, transactions, stats, listingDraft, saveListingDraft, clearListingDraft]);
+  }), [token, listings, loading, reload, addListing, removeListing, bookingsForListing, profile, setProfile, transactions, stats, listingDraft, saveListingDraft, clearListingDraft]);
 
   return <HostContext.Provider value={value}>{children}</HostContext.Provider>;
 }
 
 export const useHost = () => useContext(HostContext) || {
-  listings: [], loading: false, reload: () => {}, addListing: () => {}, removeListing: () => {}, bookingsForListing: () => [],
+  token: null, listings: [], loading: false, reload: () => {}, addListing: () => {}, removeListing: () => {}, bookingsForListing: () => [],
   profile: {}, setProfile: () => {}, transactions: [], stats: EMPTY_STATS,
   listingDraft: null, saveListingDraft: () => {}, clearListingDraft: () => {},
 };

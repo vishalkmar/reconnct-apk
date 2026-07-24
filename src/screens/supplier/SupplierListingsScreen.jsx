@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../../theme';
 import { useNav } from '../../navigation/NavContext';
@@ -7,6 +7,8 @@ import { useSupplier } from '../../store/SupplierContext';
 import { api, resolveImage } from '../../api/client';
 import { formatMoney } from '../../utils/format';
 import { ICONS } from '../../icons';
+import ListFilterBar from '../../components/ListFilterBar';
+import { emptyFilters, passesFilters } from '../../utils/listFilters';
 
 // Same badge wording as the web portal.
 const STATUS = {
@@ -119,6 +121,7 @@ export default function SupplierListingsScreen() {
   const { listings, removeListing, reload } = useSupplier();
   const [tab, setTab] = useState('in_queue');
   const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState(emptyFilters);
 
   // A supplier can self-add listings only once they already have a live one
   // (the first is onboarded by their account manager / BD).
@@ -127,18 +130,14 @@ export default function SupplierListingsScreen() {
     if (!hasLive) return Alert.alert('Almost there', 'You can add your own listings once your first experience is live on the platform. Your account manager onboards the first one.');
     push('supplierCreateListing');
   };
-  const countFor = (t) => listings.filter((l) => tabOf(l) === t.key).length;
-  const byTab = listings.filter((l) => tabOf(l) === tab);
-  // Search by name, city or price.
-  const shown = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return byTab;
-    return byTab.filter((l) => (
-      (l.title || '').toLowerCase().includes(q)
-      || (l.city || '').toLowerCase().includes(q)
-      || String(l.price || '').includes(q)
-    ));
-  }, [byTab, query]);
+  const categories = useMemo(() => [...new Set(listings.map((l) => l.category).filter(Boolean))].sort(), [listings]);
+  // Every filter except the status tab, so the tab counts match the list.
+  const base = useMemo(() => listings.filter((l) => passesFilters({
+    date: l.createdAt, amount: l.price, category: l.category, rating: l.rating,
+    search: [l.title, l.city, l.price, l.category],
+  }, filters, query)), [listings, filters, query]);
+  const countFor = (t) => base.filter((l) => tabOf(l) === t.key).length;
+  const shown = base.filter((l) => tabOf(l) === tab);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -150,23 +149,16 @@ export default function SupplierListingsScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.searchWrap}>
-        <Image source={ICONS.searchMuted} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by name, location or price…"
-          placeholderTextColor={colors.inkFaint}
-          value={query}
-          onChangeText={setQuery}
-        />
-        {!!query && (
-          <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Text style={styles.searchClear}>✕</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <ListFilterBar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search by name, location or price…"
+        filters={filters}
+        onChange={setFilters}
+        categories={categories}
+      />
 
-      <View style={styles.tabs}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
         {TABS.map((t) => {
           const on = tab === t.key;
           return (
@@ -176,7 +168,7 @@ export default function SupplierListingsScreen() {
             </TouchableOpacity>
           );
         })}
-      </View>
+      </ScrollView>
 
       <FlatList
         data={shown}
@@ -203,6 +195,16 @@ export default function SupplierListingsScreen() {
                 {/* Post-QC changes this supplier has to confirm in writing —
                     the same block (and the same endpoint) as the website. */}
                 {item.upChanges && <UpChangesBlock listing={item} onDone={reload} />}
+
+                {/* Center Ops raised objections — the ONLY way to change a
+                    listing once it's in review, exactly like the website. */}
+                {item.status === 'changes' && (
+                  <TouchableOpacity style={styles.resolveBtn} activeOpacity={0.9}
+                    onPress={() => push('resolveObjections', { id: item.id, mode: 'supplier' })}>
+                    <Image source={ICONS.edit} style={styles.resolveIcon} />
+                    <Text style={styles.resolveText}>Resolve objections</Text>
+                  </TouchableOpacity>
+                )}
 
                 {/* Identical rules to the web portal: edit only while it's a
                     plain draft, bookings only once it's actually live. */}
@@ -247,10 +249,10 @@ const styles = StyleSheet.create({
   addIcon: { width: 16, height: 16, tintColor: '#101010' },
   addText: { color: '#101010', fontWeight: '900', fontSize: font.small },
 
-  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, marginHorizontal: space.lg, marginTop: 12, paddingHorizontal: 14, height: 42 },
-  searchIcon: { width: 15, height: 15, tintColor: colors.inkFaint },
-  searchInput: { flex: 1, fontSize: font.small, color: colors.ink, paddingVertical: 0 },
-  searchClear: { color: colors.inkFaint, fontSize: 13, fontWeight: '700' },
+
+  resolveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: '#DC2626', height: 44, borderRadius: radius.md, marginTop: 10 },
+  resolveIcon: { width: 16, height: 16, tintColor: '#fff' },
+  resolveText: { color: '#fff', fontWeight: '900', fontSize: font.body },
 
   upBox: { backgroundColor: '#FFFBEB', borderRadius: radius.md, padding: 10, marginTop: 10 },
   upHead: { fontSize: 10, fontWeight: '900', color: '#B45309', letterSpacing: 0.4 },
@@ -271,7 +273,9 @@ const styles = StyleSheet.create({
   upSend: { backgroundColor: colors.success, paddingHorizontal: 16, paddingVertical: 7, borderRadius: radius.pill },
   upSendText: { color: colors.white, fontWeight: '800', fontSize: font.small },
 
-  tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: space.lg, paddingTop: 12 },
+  // Keeps the horizontal tab strip from stretching vertically.
+  tabsScroll: { flexGrow: 0, flexShrink: 0 },
+  tabs: { gap: 8, paddingHorizontal: space.lg, paddingTop: 12 },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, height: 36, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   tabActive: { backgroundColor: colors.brand, borderColor: colors.brand },
   tabText: { color: colors.ink, fontWeight: '700', fontSize: font.small },
