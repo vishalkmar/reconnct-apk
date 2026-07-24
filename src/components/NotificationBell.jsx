@@ -17,6 +17,13 @@ import { api } from '../api/client';
 */
 const seenKey = (mode) => `notif_seen_${mode}`;
 
+// Same set the notification screens show — bookings, reminders and every
+// review-pipeline ping. Keeping these in step matters: the badge must count
+// exactly what the list will display.
+const USER_KINDS = new Set(['host_booking', 'reminder']);
+const isOwnerNotification = (n) => USER_KINDS.has(n.kind)
+  || /^(review|objection|approved|rejected|live|delisted|am_assigned|supplier_listing_|deadline|resubmitted|submitted)/.test(String(n.kind || ''));
+
 export default function NotificationBell({ mode = 'supplier', token, tint = '#fff' }) {
   const { push } = useNav();
   const [count, setCount] = useState(0);
@@ -28,7 +35,7 @@ export default function NotificationBell({ mode = 'supplier', token, tint = '#ff
       const d = await fetcher(token);
       const all = (d && d.notifications) || [];
       // Same slice both notification screens show for an owner.
-      const mine = all.filter((n) => n.kind === 'host_booking' || n.kind === 'reminder');
+      const mine = all.filter(isOwnerNotification);
       const seenRaw = await AsyncStorage.getItem(seenKey(mode));
       const seen = seenRaw ? Number(seenRaw) : 0;
       const unread = mine.filter((n) => {

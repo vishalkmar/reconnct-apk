@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../../theme';
@@ -7,6 +7,7 @@ import { useSupplier } from '../../store/SupplierContext';
 import { api, resolveImage } from '../../api/client';
 import { formatMoney } from '../../utils/format';
 import { ICONS } from '../../icons';
+import { loadUnseen } from '../../utils/reviewSeen';
 import ListFilterBar from '../../components/ListFilterBar';
 import { emptyFilters, passesFilters } from '../../utils/listFilters';
 
@@ -19,9 +20,41 @@ const STATUS = {
   draft: { label: 'Draft', bg: '#6B7280' },
   paused: { label: 'Paused', bg: '#D97706' },
 };
-const badgeFor = (l) => (l.isPublished
-  ? { label: 'Published', bg: '#16A34A' }
-  : (STATUS[l.status] || STATUS.draft));
+/*
+  Whether this listing REALLY has objections waiting on the owner.
+
+  Deliberately NOT `status === 'changes'`: that comes from data.hostStatus,
+  a legacy mirror the backend itself documents as "not always cleared when a
+  round ends" — a resubmitted listing kept 'changes' all the way to QCOPS. That
+  left a dead "Resolve objections" button that opened an empty screen. The
+  review round's own objection list is the truth.
+*/
+const openObjections = (l) => ((l.review && l.review.objections) || []).length;
+const hasOpenObjections = (l) => openObjections(l) > 0;
+
+
+// Center Ops passed content review (round 1) and handed it to QCOPS for the
+// on-site check. Green, because for the owner this is a WIN — the old amber
+// "Pending review" made an approved listing look like it was still waiting.
+const QC_STAGES = ['qc_assigned', 'qc_acknowledged', 'qc_onsite', 'qc_feedback'];
+const QC_PASSED = 'qc_passed';
+const copsApproved = (l) => {
+  const stage = (l.review && l.review.stage) || null;
+  return QC_STAGES.includes(stage) || stage === QC_PASSED;
+};
+
+const badgeFor = (l) => {
+  if (l.isPublished) return { label: 'Published', bg: '#16A34A' };
+  if (hasOpenObjections(l)) return STATUS.changes;
+  if (copsApproved(l)) {
+    return (l.review && l.review.stage) === QC_PASSED
+      ? { label: 'Quality check passed', bg: '#16A34A' }
+      : { label: 'Round 1 approved · QCOPS visit', bg: '#16A34A' };
+  }
+  // status may still say 'changes' after a resubmit — fall back to review.
+  if (l.status === 'changes') return STATUS.pending;
+  return STATUS[l.status] || STATUS.draft;
+};
 /*
   The SAME four lanes the web Supplier Portal shows, driven by the SAME `tab`
   the API sends (submitterTab) — so a supplier sees an identical board whether
@@ -115,6 +148,7 @@ function UpChangesBlock({ listing, onDone }) {
   );
 }
 
+
 export default function SupplierListingsScreen() {
   const insets = useSafeAreaInsets();
   const { push } = useNav();
@@ -122,6 +156,9 @@ export default function SupplierListingsScreen() {
   const [tab, setTab] = useState('in_queue');
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState(emptyFilters);
+  // Listings whose review moved on since the owner last opened them.
+  const [unseen, setUnseen] = useState(() => new Set());
+  useEffect(() => { loadUnseen(listings).then(setUnseen).catch(() => {}); }, [listings]);
 
   // A supplier can self-add listings only once they already have a live one
   // (the first is onboarded by their account manager / BD).
@@ -185,6 +222,9 @@ export default function SupplierListingsScreen() {
               <View style={styles.imgWrap}>
                 {img ? <Image source={{ uri: img }} style={styles.img} /> : <View style={[styles.img, styles.imgPh]} />}
                 <View style={[styles.statusPill, { backgroundColor: st.bg }]}><Text style={styles.statusText}>{st.label}</Text></View>
+                {unseen.has(item.id) && (
+                  <View style={styles.newDot}><Text style={styles.newDotText}>NEW</Text></View>
+                )}
               </View>
               <View style={styles.body}>
                 <View style={styles.rowTop}>
@@ -198,7 +238,7 @@ export default function SupplierListingsScreen() {
 
                 {/* Center Ops raised objections — the ONLY way to change a
                     listing once it's in review, exactly like the website. */}
-                {item.status === 'changes' && (
+                {hasOpenObjections(item) && (
                   <TouchableOpacity style={styles.resolveBtn} activeOpacity={0.9}
                     onPress={() => push('resolveObjections', { id: item.id, mode: 'supplier' })}>
                     <Image source={ICONS.edit} style={styles.resolveIcon} />
@@ -292,6 +332,9 @@ const styles = StyleSheet.create({
   imgPh: { backgroundColor: '#DCE0E6' },
   statusPill: { position: 'absolute', top: 10, left: 10, paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill },
   statusText: { color: '#fff', fontSize: font.tiny, fontWeight: '900' },
+  // "Review moved on since you last looked" — cleared when they open View.
+  newDot: { position: 'absolute', top: 10, right: 10, backgroundColor: '#DC2626', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  newDotText: { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   body: { padding: 14 },
   rowTop: { flexDirection: 'row', alignItems: 'center' },
   name: { flex: 1, fontSize: font.h3, fontWeight: '900', color: '#1A1A2E' },

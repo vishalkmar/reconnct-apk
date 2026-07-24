@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../../theme';
@@ -7,6 +7,7 @@ import { useHost } from '../../store/HostContext';
 import { resolveImage } from '../../api/client';
 import { formatMoney } from '../../utils/format';
 import { ICONS } from '../../icons';
+import { loadUnseen } from '../../utils/reviewSeen';
 import ListFilterBar from '../../components/ListFilterBar';
 import { emptyFilters, passesFilters } from '../../utils/listFilters';
 
@@ -21,7 +22,40 @@ const STATUS = {
   draft: { label: 'Draft', bg: '#6B7280' },
   paused: { label: 'Paused', bg: '#D97706' },
 };
-const badgeFor = (l) => (l.isPublished ? { label: 'Published', bg: '#16A34A' } : (STATUS[l.status] || STATUS.draft));
+/*
+  Whether this listing REALLY has objections waiting on the owner.
+
+  Deliberately NOT `status === 'changes'`: that comes from data.hostStatus,
+  a legacy mirror the backend itself documents as "not always cleared when a
+  round ends" — a resubmitted listing kept 'changes' all the way to QCOPS. That
+  left a dead "Resolve objections" button that opened an empty screen. The
+  review round's own objection list is the truth.
+*/
+const openObjections = (l) => ((l.review && l.review.objections) || []).length;
+const hasOpenObjections = (l) => openObjections(l) > 0;
+
+
+// Center Ops passed content review (round 1) and handed it to QCOPS for the
+// on-site check. Green, because for the owner this is a WIN — the old amber
+// "Pending review" made an approved listing look like it was still waiting.
+const QC_STAGES = ['qc_assigned', 'qc_acknowledged', 'qc_onsite', 'qc_feedback'];
+const QC_PASSED = 'qc_passed';
+const copsApproved = (l) => {
+  const stage = (l.review && l.review.stage) || null;
+  return QC_STAGES.includes(stage) || stage === QC_PASSED;
+};
+
+const badgeFor = (l) => {
+  if (l.isPublished) return { label: 'Published', bg: '#16A34A' };
+  if (hasOpenObjections(l)) return STATUS.changes;
+  if (copsApproved(l)) {
+    return (l.review && l.review.stage) === QC_PASSED
+      ? { label: 'Quality check passed', bg: '#16A34A' }
+      : { label: 'Round 1 approved · QCOPS visit', bg: '#16A34A' };
+  }
+  if (l.status === 'changes') return STATUS.pending;
+  return STATUS[l.status] || STATUS.draft;
+};
 
 const TABS = [
   { key: 'in_queue', label: 'Under Review' },
@@ -52,6 +86,7 @@ const isPlainDraft = (l) => l.reviewStatus === 'draft' && l.status === 'draft' &
 const canEditOf = (l) => (typeof l.canEdit === 'boolean' ? l.canEdit : isPlainDraft(l));
 const canDeleteOf = (l) => (typeof l.canDelete === 'boolean' ? l.canDelete : isPlainDraft(l));
 
+
 export default function MyListingsScreen() {
   const insets = useSafeAreaInsets();
   const { push } = useNav();
@@ -59,6 +94,9 @@ export default function MyListingsScreen() {
   const [tab, setTab] = useState('in_queue');
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState(emptyFilters);
+  // Listings whose review moved on since the owner last opened them.
+  const [unseen, setUnseen] = useState(() => new Set());
+  useEffect(() => { loadUnseen(listings).then(setUnseen).catch(() => {}); }, [listings]);
 
   const categories = useMemo(() => [...new Set(listings.map((l) => l.category).filter(Boolean))].sort(), [listings]);
   // Every filter except the status tab, so the tab counts match the list.
@@ -115,6 +153,9 @@ export default function MyListingsScreen() {
               <View style={styles.imgWrap}>
                 {img ? <Image source={{ uri: img }} style={styles.img} /> : <View style={[styles.img, styles.imgPh]} />}
                 <View style={[styles.statusPill, { backgroundColor: st.bg }]}><Text style={styles.statusText}>{st.label}</Text></View>
+                {unseen.has(item.id) && (
+                  <View style={styles.newDot}><Text style={styles.newDotText}>NEW</Text></View>
+                )}
               </View>
               <View style={styles.body}>
                 <View style={styles.rowTop}>
@@ -122,7 +163,7 @@ export default function MyListingsScreen() {
                   <View style={styles.rating}><Image source={ICONS.star} style={styles.ratingIcon} /><Text style={styles.ratingText}>{item.rating || '—'}</Text></View>
                 </View>
                 <Text style={styles.meta}>{formatMoney(item.price)}/{item.priceUnit || 'person'} · {item.durationLabel || '—'}</Text>
-                {item.status === 'changes' && (
+                {hasOpenObjections(item) && (
                   <TouchableOpacity style={styles.resolveBtn} activeOpacity={0.9}
                     onPress={() => push('resolveObjections', { id: item.id, mode: 'host' })}>
                     <Image source={ICONS.edit} style={styles.resolveIcon} />
@@ -195,6 +236,9 @@ const styles = StyleSheet.create({
   imgPh: { backgroundColor: '#DCE0E6' },
   statusPill: { position: 'absolute', top: 10, left: 10, paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill },
   statusText: { color: '#fff', fontSize: font.tiny, fontWeight: '900' },
+  // "Review moved on since you last looked" — cleared when they open View.
+  newDot: { position: 'absolute', top: 10, right: 10, backgroundColor: '#DC2626', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  newDotText: { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   body: { padding: 14 },
   rowTop: { flexDirection: 'row', alignItems: 'center' },
   name: { flex: 1, fontSize: font.h3, fontWeight: '900', color: '#1A1A2E' },

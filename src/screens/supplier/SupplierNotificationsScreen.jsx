@@ -31,6 +31,15 @@ function timeAgo(iso) {
   return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
 
+// Kinds an OWNER (host or supplier) should see in their bell: bookings on
+// their listings, the "starting soon" reminder, AND every review-pipeline
+// ping (objection / approved / rejected / live / delisted / KAM assigned /
+// deadline). The old filter kept only bookings, which is why objections and
+// go-live pings never appeared even though the emails did.
+const USER_KINDS = new Set(['host_booking', 'reminder']);
+const isOwnerNotification = (n) => USER_KINDS.has(n.kind)
+  || /^(review|objection|approved|rejected|live|delisted|am_assigned|supplier_listing_|deadline|resubmitted|submitted)/.test(String(n.kind || ''));
+
 export default function SupplierNotificationsScreen() {
   const { token } = useSupplierAuth();
   const { push } = useNav();
@@ -43,7 +52,7 @@ export default function SupplierNotificationsScreen() {
       .then((d) => {
         if (!alive) return;
         const all = (d && d.notifications) || [];
-        setFeed(all.filter((n) => n.kind === 'host_booking' || n.kind === 'reminder'));
+        setFeed(all.filter(isOwnerNotification));
       })
       .catch(() => {})
       .finally(() => { if (alive) setLoading(false); });

@@ -10,6 +10,7 @@ import { api, resolveImage } from '../../api/client';
 import { formatMoney } from '../../utils/format';
 import { ICONS } from '../../icons';
 import ScreenHeader from '../../components/ScreenHeader';
+import { markReviewSeen } from '../../utils/reviewSeen';
 
 // Admin-entered text can carry stray HTML — strip it so the page stays tidy.
 const stripHtml = (s) => String(s || '')
@@ -25,7 +26,23 @@ const STATUS = {
   changes: { label: 'Objections', bg: '#DC2626' },
   draft: { label: 'Draft', bg: '#6B7280' },
 };
-const badgeFor = (l) => (l.isPublished ? { label: 'Published', bg: '#16A34A' } : (STATUS[l.status] || STATUS.draft));
+// See the listings screens: data.hostStatus ('changes') is a legacy mirror
+// that survives a resubmit, so trust the round's own objection list instead.
+const openObjections = (l) => ((l && l.review && l.review.objections) || []).length;
+const badgeFor = (l) => {
+  if (l.isPublished) return { label: 'Published', bg: '#16A34A' };
+  if (openObjections(l) > 0) return STATUS.changes;
+  {
+    // COPS passed round 1 → QCOPS on-site check. Green: this is progress.
+    const stage = (l.review && l.review.stage) || null;
+    if (['qc_assigned', 'qc_acknowledged', 'qc_onsite', 'qc_feedback'].includes(stage)) {
+      return { label: 'Round 1 approved · QCOPS visit', bg: '#16A34A' };
+    }
+    if (stage === 'qc_passed') return { label: 'Quality check passed', bg: '#16A34A' };
+  }
+  if (l.status === 'changes') return STATUS.pending;
+  return STATUS[l.status] || STATUS.draft;
+};
 
 /*
   A supplier's OWN listing detail — reachable from the "View" action on any
@@ -55,7 +72,11 @@ export default function SupplierListingDetailScreen({ id, listing: passed, mode 
     (mode === 'host' ? api.hostListing : api.supplierListing)(token, listingId)
       .then((d) => {
         if (!alive || !d) return;
-        if (d.listing) setListing(d.listing);
+        if (d.listing) {
+          setListing(d.listing);
+          // Opening this screen is what "seeing" the review activity means.
+          markReviewSeen(listingId, d.listing);
+        }
         if (d.form) setForm(d.form);
       })
       .catch(() => {})
@@ -126,13 +147,15 @@ export default function SupplierListingDetailScreen({ id, listing: passed, mode 
             </TouchableOpacity>
           )}
 
-          {listing && listing.status === 'changes' && (
+          {openObjections(listing) > 0 && (
             <TouchableOpacity style={styles.resolveBtn} activeOpacity={0.9} onPress={() => push('resolveObjections', { id: listingId, mode })}>
               <Image source={ICONS.edit} style={styles.resolveIcon} />
               <Text style={styles.resolveText}>Resolve objections</Text>
             </TouchableOpacity>
           )}
         </View>
+
+        <ReviewHistory listing={listing} />
 
         <Section title="Basic details">
           <Row label="Name" value={f.name} />
@@ -219,6 +242,89 @@ export default function SupplierListingDetailScreen({ id, listing: passed, mode 
   );
 }
 
+const STAGE_LABEL = {
+  submitted: 'Submitted — waiting for Center Ops',
+  in_review: 'Center Ops content review',
+  changes: 'Changes requested',
+  resubmitted: 'Re-submitted — waiting for Center Ops',
+  qc_assigned: 'Round 1 approved — QCOPS visit assigned',
+  qc_acknowledged: 'QCOPS scheduled their visit',
+  qc_onsite: 'QCOPS is on site',
+  qc_feedback: 'QCOPS submitted their report',
+  qc_passed: 'Quality check passed',
+  under_progress: 'Changes requested after the on-site check',
+  published: 'Live on the platform',
+  rejected: 'Not approved',
+  qc_rejected: 'Not approved after the on-site check',
+  delisted: 'Delisted',
+};
+
+/*
+  The full review trail for this listing — where it stands, how many sections
+  Center Ops has approved, every objection raised and the whole back-and-forth
+  on each. This is the "see the history" surface: the card only ever shows the
+  current state, so everything that already happened lives here.
+*/
+function ReviewHistory({ listing }) {
+  const r = (listing && listing.review) || null;
+  if (!r) return null;
+  const objections = r.objections || [];
+  const thread = r.thread || {};
+  const threadKeys = Object.keys(thread).filter((k) => (thread[k] || []).length);
+  const total = r.total || 0;
+  const stageLabel = STAGE_LABEL[r.stage] || (listing.isPublished ? 'Live on the platform' : 'In review');
+  if (!total && !objections.length && !threadKeys.length) return null;
+
+  return (
+    <Section title="Review history">
+      <View style={styles.histStage}><Text style={styles.histStageText}>{stageLabel}</Text></View>
+      {r.round > 0 && <Text style={styles.histRound}>Review round {r.round}</Text>}
+
+      {total > 0 && (
+        <View style={styles.histCounts}>
+          <Count value={r.approved || 0} label="Approved" tint="#16A34A" />
+          <Count value={r.objection || 0} label="Objections" tint="#DC2626" />
+          <Count value={r.pending || 0} label="Pending" tint={colors.inkMuted} />
+        </View>
+      )}
+
+      {!!r.suggestion && (
+        <View style={styles.histSuggest}>
+          <Text style={styles.histSuggestText}>
+            <Text style={styles.histSuggestLabel}>Center Ops suggestion: </Text>{r.suggestion}
+          </Text>
+        </View>
+      )}
+
+      {objections.map((o) => (
+        <View key={o.key} style={styles.histObj}>
+          <Text style={styles.histObjTitle}>{o.label}</Text>
+          <Text style={styles.histObjText}>{o.objection}</Text>
+        </View>
+      ))}
+
+      {threadKeys.map((k) => (
+        <View key={k} style={styles.histThread}>
+          <Text style={styles.histThreadHead}>{k.toUpperCase()}</Text>
+          {(thread[k] || []).map((m, i) => (
+            <View key={i} style={styles.histMsg}>
+              <Text style={styles.histWho}>{m.by || m.role || (m.fromOwner ? 'You' : 'Center Ops')}</Text>
+              <Text style={styles.histText}>{m.text || m.message || m.note || ''}</Text>
+            </View>
+          ))}
+        </View>
+      ))}
+    </Section>
+  );
+}
+
+const Count = ({ value, label, tint }) => (
+  <View style={styles.countCell}>
+    <Text style={[styles.countValue, { color: tint }]}>{value}</Text>
+    <Text style={styles.countLabel}>{label}</Text>
+  </View>
+);
+
 const Section = ({ title, children }) => (
   <View style={styles.section}>
     <Text style={styles.sectionTitle}>{title}</Text>
@@ -234,6 +340,24 @@ const Row = ({ label, value }) => (value ? (
 
 const styles = StyleSheet.create({
   empty: { textAlign: 'center', color: colors.inkMuted, marginTop: 60 },
+  histStage: { alignSelf: 'flex-start', backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
+  histStageText: { fontSize: font.small, fontWeight: '800', color: colors.ink },
+  histRound: { fontSize: font.tiny, color: colors.inkMuted, marginTop: 6 },
+  histCounts: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  countCell: { flex: 1, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, paddingVertical: 10, alignItems: 'center' },
+  countValue: { fontSize: font.h3, fontWeight: '900' },
+  countLabel: { fontSize: 10, color: colors.inkMuted, marginTop: 2 },
+  histSuggest: { backgroundColor: '#FFFBEB', borderRadius: radius.md, padding: 12, marginTop: 12 },
+  histSuggestText: { fontSize: font.small, color: '#78350F', lineHeight: 19 },
+  histSuggestLabel: { fontWeight: '900', color: '#B45309' },
+  histObj: { backgroundColor: '#FEF2F2', borderRadius: radius.md, padding: 12, marginTop: 10 },
+  histObjTitle: { fontSize: font.small, fontWeight: '900', color: '#991B1B' },
+  histObjText: { fontSize: font.small, color: '#991B1B', marginTop: 4, lineHeight: 19 },
+  histThread: { backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 12, marginTop: 10 },
+  histThreadHead: { fontSize: 10, fontWeight: '900', color: colors.inkMuted, letterSpacing: 0.4, marginBottom: 8 },
+  histMsg: { marginBottom: 8 },
+  histWho: { fontSize: font.tiny, fontWeight: '900', color: colors.ink },
+  histText: { fontSize: font.small, color: colors.inkMuted, marginTop: 2, lineHeight: 18 },
   cover: { width: '100%', height: 210, backgroundColor: '#DCE0E6' },
   coverPh: {},
   head: { backgroundColor: colors.surface, padding: space.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
