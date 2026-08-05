@@ -23,6 +23,9 @@ export function SupplierProvider({ children }) {
   const [stats, setStats] = useState(EMPTY_STATS);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
+  // A supplier can self-create listings only once their first experience is
+  // LIVE (same gate as the web portal). Starts locked until the summary says so.
+  const [canAddListing, setCanAddListing] = useState(false);
 
   const profile = useMemo(() => ({
     name: (supplier && supplier.companyName) || '',
@@ -44,6 +47,7 @@ export function SupplierProvider({ children }) {
       ]);
       if (l && Array.isArray(l.listings)) setListings(l.listings);
       if (s && s.stats) setStats(s.stats);
+      if (s) setCanAddListing(!!s.canAddListing);
       if (t && Array.isArray(t.transactions)) setTransactions(t.transactions);
     } finally {
       setLoading(false);
@@ -51,7 +55,7 @@ export function SupplierProvider({ children }) {
   }, [token]);
 
   useEffect(() => {
-    if (!isSupplierAuthed) { setListings([]); setStats(EMPTY_STATS); setTransactions([]); return; }
+    if (!isSupplierAuthed) { setListings([]); setStats(EMPTY_STATS); setTransactions([]); setCanAddListing(false); return; }
     reload();
   }, [isSupplierAuthed, reload]);
 
@@ -81,15 +85,15 @@ export function SupplierProvider({ children }) {
 
   const value = useMemo(() => ({
     token, listings, loading, reload, addListing, removeListing, bookingsForListing,
-    profile, setProfile, transactions, stats,
+    profile, setProfile, transactions, stats, canAddListing,
     listingDraft, saveListingDraft, clearListingDraft,
-  }), [token, listings, loading, reload, addListing, removeListing, bookingsForListing, profile, setProfile, transactions, stats, listingDraft, saveListingDraft, clearListingDraft]);
+  }), [token, listings, loading, reload, addListing, removeListing, bookingsForListing, profile, setProfile, transactions, stats, canAddListing, listingDraft, saveListingDraft, clearListingDraft]);
 
   return <SupplierContext.Provider value={value}>{children}</SupplierContext.Provider>;
 }
 
 export const useSupplier = () => useContext(SupplierContext) || {
   token: null, listings: [], loading: false, reload: () => {}, addListing: () => {}, removeListing: () => {}, bookingsForListing: () => [],
-  profile: {}, setProfile: () => {}, transactions: [], stats: EMPTY_STATS,
+  profile: {}, setProfile: () => {}, transactions: [], stats: EMPTY_STATS, canAddListing: false,
   listingDraft: null, saveListingDraft: () => {}, clearListingDraft: () => {},
 };

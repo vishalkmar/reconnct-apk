@@ -22,13 +22,16 @@ const prettyDate = (s) => {
 export default function SupplierDashboardScreen() {
   const insets = useSafeAreaInsets();
   const { push, navigateTab } = useNav();
-  const { token, stats, profile , reload } = useSupplier();
+  const { token, stats, profile, reload, canAddListing } = useSupplier();
   const { signOut } = useSupplierAuth();
   const [kamOpen, setKamOpen] = useState(false);
   // Stats/bookings are fetched once at login otherwise, so a listing that went
   // live (or a new booking) never showed up until a reinstall.
   useEffect(() => { if (reload) reload(); }, [reload]);
   const name = profile.name || 'Supplier';
+  // Backend gate is authoritative; a live listing count is the same rule as a
+  // fallback while the summary is still loading.
+  const canAdd = canAddListing || (stats.activeCount || 0) > 0;
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
@@ -68,17 +71,37 @@ export default function SupplierDashboardScreen() {
 
       {/* Action cards */}
       <View style={styles.actionRow}>
-        <TouchableOpacity style={[styles.action, styles.actionPrimary]} activeOpacity={0.9} onPress={() => push('supplierCreateListing')}>
-          <Image source={ICONS.plus} style={styles.actionPlus} />
-          <Text style={styles.actionPrimaryTitle}>Create Listing</Text>
-          <Text style={styles.actionPrimarySub}>Add a new experience</Text>
-        </TouchableOpacity>
+        {canAdd ? (
+          <TouchableOpacity style={[styles.action, styles.actionPrimary]} activeOpacity={0.9} onPress={() => push('supplierCreateListing')}>
+            <Image source={ICONS.plus} style={styles.actionPlus} />
+            <Text style={styles.actionPrimaryTitle}>Create Listing</Text>
+            <Text style={styles.actionPrimarySub}>Add a new experience</Text>
+          </TouchableOpacity>
+        ) : (
+          // Locked until the supplier's first experience is live (same gate as
+          // the web portal) — the account manager onboards the first one.
+          <View style={[styles.action, styles.actionLocked]}>
+            <Image source={ICONS.plus} style={[styles.actionPlus, { tintColor: colors.inkFaint }]} />
+            <Text style={[styles.actionPrimaryTitle, { color: colors.inkMuted }]}>Create Listing</Text>
+            <Text style={[styles.actionPrimarySub, { color: colors.inkFaint }]}>Unlocks after your first live listing</Text>
+          </View>
+        )}
         <TouchableOpacity style={[styles.action, styles.actionGhost]} activeOpacity={0.9} onPress={() => navigateTab('listings')}>
           <View style={styles.actionGhostIcon}><Image source={ICONS.compass} style={styles.actionGhostImg} /></View>
           <Text style={styles.actionGhostTitle}>My Listings</Text>
           <Text style={styles.actionGhostSub}>{stats.activeCount} active</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Why Create Listing is locked — mirrors the web portal's amber note. */}
+      {!canAdd && (
+        <View style={styles.lockNote}>
+          <Image source={ICONS.plus} style={styles.lockNoteIcon} />
+          <Text style={styles.lockNoteText}>
+            You can add your own listings once your first experience is <Text style={{ fontWeight: '900' }}>live</Text> on the platform. Your account manager onboards the first one — after that, this unlocks.
+          </Text>
+        </View>
+      )}
 
       {/* Earnings */}
       <View style={styles.card}>
@@ -165,6 +188,7 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: 12, paddingHorizontal: space.lg, marginTop: 16 },
   action: { flex: 1, borderRadius: radius.lg, padding: 16, minHeight: 116, justifyContent: 'flex-end' },
   actionPrimary: { backgroundColor: colors.brand },
+  actionLocked: { backgroundColor: '#EEF0F3', borderWidth: 1, borderColor: colors.border },
   actionPlus: { width: 26, height: 26, tintColor: '#101010', marginBottom: 'auto' },
   actionPrimaryTitle: { fontSize: font.h3, fontWeight: '900', color: '#101010' },
   actionPrimarySub: { fontSize: font.small, color: 'rgba(16,16,16,0.7)', marginTop: 2 },
@@ -173,6 +197,10 @@ const styles = StyleSheet.create({
   actionGhostImg: { width: 26, height: 26, tintColor: colors.brand },
   actionGhostTitle: { fontSize: font.h3, fontWeight: '900', color: colors.ink },
   actionGhostSub: { fontSize: font.small, color: colors.inkMuted, marginTop: 2 },
+
+  lockNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#FEF3C7', marginHorizontal: space.lg, marginTop: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: radius.lg },
+  lockNoteIcon: { width: 16, height: 16, tintColor: '#B45309', marginTop: 1 },
+  lockNoteText: { flex: 1, color: '#92400E', fontSize: font.small, lineHeight: 18 },
 
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, marginHorizontal: space.lg, marginTop: 16, padding: 16, ...shadow.card },
   cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

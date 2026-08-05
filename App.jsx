@@ -14,8 +14,10 @@ import { HostProvider } from './src/store/HostContext';
 import { SupplierAuthProvider } from './src/store/SupplierAuthContext';
 import { SupplierProvider } from './src/store/SupplierContext';
 import { NavProvider } from './src/navigation/NavContext';
+import { ConnectivityProvider } from './src/store/ConnectivityContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import SplashScreen from './src/components/SplashScreen';
+import OfflineBanner from './src/components/OfflineBanner';
 
 // Splash plays its split/merge/zoom logo animation on cold start, then calls
 // onFinish itself (no fixed timer). It is the ONLY thing mounted while active —
@@ -26,7 +28,12 @@ function AppShell() {
   if (showSplash) {
     return <SplashScreen onFinish={() => setShowSplash(false)} />;
   }
-  return <RootNavigator />;
+  return (
+    <>
+      <RootNavigator />
+      <OfflineBanner />
+    </>
+  );
 }
 
 // Catches any render/runtime error so the app shows a message instead of
@@ -59,7 +66,9 @@ export default function App() {
                   <HostProvider>
                     <SupplierProvider>
                       <NavProvider>
-                        <AppShell />
+                        <ConnectivityProvider>
+                          <AppShell />
+                        </ConnectivityProvider>
                       </NavProvider>
                     </SupplierProvider>
                   </HostProvider>

@@ -152,7 +152,7 @@ function UpChangesBlock({ listing, onDone }) {
 export default function SupplierListingsScreen() {
   const insets = useSafeAreaInsets();
   const { push } = useNav();
-  const { listings, removeListing, reload } = useSupplier();
+  const { listings, removeListing, reload, canAddListing } = useSupplier();
   const [tab, setTab] = useState('in_queue');
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState(emptyFilters);
@@ -173,10 +173,13 @@ export default function SupplierListingsScreen() {
   useEffect(() => { loadUnseen(listings).then(setUnseen).catch(() => {}); }, [listings]);
 
   // A supplier can self-add listings only once they already have a live one
-  // (the first is onboarded by their account manager / BD).
+  // (the first is onboarded by their account manager / BD). The backend's
+  // canAddListing is authoritative; fall back to the local listings check while
+  // the summary is still loading.
   const hasLive = listings.some((l) => l.isPublished || tabOf(l) === 'live');
+  const canAdd = canAddListing || hasLive;
   const onAdd = () => {
-    if (!hasLive) return Alert.alert('Almost there', 'You can add your own listings once your first experience is live on the platform. Your account manager onboards the first one.');
+    if (!canAdd) return Alert.alert('Almost there', 'You can add your own listings once your first experience is live on the platform. Your account manager onboards the first one.');
     push('supplierCreateListing');
   };
   const categories = useMemo(() => [...new Set(listings.map((l) => l.category).filter(Boolean))].sort(), [listings]);
@@ -192,7 +195,7 @@ export default function SupplierListingsScreen() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.title}>My Listings</Text>
-        <TouchableOpacity style={[styles.addBtn, !hasLive && { opacity: 0.5 }]} activeOpacity={0.9} onPress={onAdd}>
+        <TouchableOpacity style={[styles.addBtn, !canAdd && { opacity: 0.5 }]} activeOpacity={0.9} onPress={onAdd}>
           <Image source={ICONS.plus} style={styles.addIcon} />
           <Text style={styles.addText}>Add</Text>
         </TouchableOpacity>

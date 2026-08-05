@@ -1,16 +1,18 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions,
-  ActivityIndicator, RefreshControl, FlatList, TextInput, Image, ImageBackground, Animated,
+  ActivityIndicator, RefreshControl, FlatList, TextInput, Image, ImageBackground, Animated, Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, radius, font, space, shadow } from '../theme';
 import { AUD_META, AUD_DEFAULT } from '../components/connectWithIcons';
 import { api, resolveImage, DUMMY_IMAGE } from '../api/client';
 import { formatMoney } from '../utils/format';
 import { useAuth } from '../store/AuthContext';
 import { useLocation } from '../store/LocationContext';
+import { useConnectivity } from '../store/ConnectivityContext';
 import { useWishlist } from '../store/WishlistContext';
 import { useNav } from '../navigation/NavContext';
 import ExperienceCard from '../components/ExperienceCard';
@@ -26,6 +28,9 @@ import { ICONS, iconForCategory } from '../icons';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const H_PAD = 16;
+// Last-resort NEUTRAL cityscape for the "You are here" popup if the fetched
+// photo fails — not a specific monument, so it never implies the wrong place.
+const YAH_FALLBACK_IMG = 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=800&q=80';
 const GRID_GAP = 12;
 const COL_W = (SCREEN_W - H_PAD * 2 - GRID_GAP) / 2;
 
@@ -39,10 +44,16 @@ const greeting = () => {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user, token } = useAuth();
-  const { city, selectedCity, coords, detectedCity, fullAddress } = useLocation();
+  const {
+    city, selectedCity, coords, detectedCity, fullAddress, area, pincode,
+    servicesOff, promptEnableLocation,
+  } = useLocation();
+  const { reconnectNonce } = useConnectivity();
   const { push, navigateTab } = useNav();
 
   const [items, setItems] = useState([]);
+  const [nearby, setNearby] = useState([]); // nearest real experiences, distance-sorted
+  const [nearbyBusy, setNearbyBusy] = useState(false);
   const [featured, setFeatured] = useState([]);
   const [cats, setCats] = useState([]);
   const [auds, setAuds] = useState([]);
@@ -57,7 +68,13 @@ export default function HomeScreen() {
   const [showFilter, setShowFilter] = useState(false);
   const [results, setResults] = useState(null);
   const [searchingBusy, setSearchingBusy] = useState(false);
-  const [geoDismissed, setGeoDismissed] = useState(false);
+  const [youAreHere, setYouAreHere] = useState(null); // { name, image, blurb } famous place
+  const [showYah, setShowYah] = useState(false); // one-time "You are here" popup
+  const [yahImgErr, setYahImgErr] = useState(false); // remote image failed → use fallback
+  // "You are here" pops up only the FIRST time ever (persisted). Assume it has
+  // been shown until storage tells us otherwise, so it never flashes on repeat.
+  const [yahLoaded, setYahLoaded] = useState(false);
+  const [yahEverShown, setYahEverShown] = useState(true);
   const [compact, setCompact] = useState(false); // sticky mini-header on scroll
   const [showLocation, setShowLocation] = useState(false); // Choose Location sheet
 
@@ -105,9 +122,62 @@ export default function HomeScreen() {
       setRefreshing(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [city, coords && coords.lat]);
+  }, [city, coords && coords.lat, coords && coords.lon]);
 
   useEffect(() => { load(); }, [load]);
+
+  // When the internet comes back after a drop, repopulate the page on its own.
+  useEffect(() => { if (reconnectNonce > 0) load(); }, [reconnectNonce, load]);
+
+  // "Near you" — the nearest real experiences to the device's EXACT live
+  // coordinates, sorted ascending by distance (server-computed via Haversine
+  // against each experience's own coordinates — no city matching). Each card
+  // shows how far it is. No distance filter is shown to the user.
+  useEffect(() => {
+    if (!(coords && coords.lat != null)) { setNearby([]); return undefined; }
+    let alive = true;
+    setNearbyBusy(true);
+    // Metro-wide radius so we surface the nearest ones without a filter UI; the
+    // list is ordered by real distance, so "near you" shows the closest first.
+    api.nearbyExperiences(coords.lat, coords.lon, { radius: 50, limit: 20 })
+      .then((d) => { if (alive) setNearby(d.experiences || []); })
+      .catch(() => { if (alive) setNearby([]); })
+      .finally(() => { if (alive) setNearbyBusy(false); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coords && coords.lat, coords && coords.lon, reconnectNonce]);
+
+  // "You are here" — fetch a famous place NEAR the user's exact spot (an LLM-
+  // picked metro/mall/monument for this area) + its real photo. Feeds both the
+  // one-time popup and the persistent home card.
+  useEffect(() => {
+    if (!detectedCity) { setYouAreHere(null); return; }
+    let alive = true;
+    setYahImgErr(false);
+    api.placeImage(detectedCity, undefined, area)
+      .then((d) => {
+        if (!alive || !d || !d.image) return;
+        setYouAreHere(d);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [detectedCity, area]);
+
+  // Has the "You are here" popup been shown before? (persisted across launches)
+  useEffect(() => {
+    AsyncStorage.getItem('yah_popup_shown')
+      .then((v) => { setYahEverShown(v === '1'); setYahLoaded(true); })
+      .catch(() => setYahLoaded(true));
+  }, []);
+
+  // Show it exactly once — the first time we ever have the place, and never again.
+  useEffect(() => {
+    if (yahLoaded && !yahEverShown && youAreHere && youAreHere.image) {
+      setShowYah(true);
+      setYahEverShown(true);
+      AsyncStorage.setItem('yah_popup_shown', '1').catch(() => {});
+    }
+  }, [yahLoaded, yahEverShown, youAreHere]);
 
   const hasActiveFilters = !!(filters.audienceId || filters.categoryId || filters.priceBand);
   const isSearching = query.trim().length > 0 || hasActiveFilters;
@@ -228,19 +298,21 @@ export default function HomeScreen() {
           {/* Offer banners — auto-sliding carousel (admin-managed) */}
           <View style={{ marginTop: 6 }}><OfferBannerCarousel /></View>
 
-          {/* You're here — dismissible tooltip */}
-          {!!detectedCity && !geoDismissed && (
-            <View style={styles.geoBanner}>
-              <View style={styles.geoIconWrap}><Image source={ICONS.locMuted} style={styles.geoPin} /></View>
+          {/* Device location is off → "near you" / "you are here" can't be exact.
+              Persistent nudge to turn it on. */}
+          {servicesOff && (
+            <TouchableOpacity style={styles.locOffBanner} activeOpacity={0.85} onPress={promptEnableLocation}>
+              <Image source={ICONS.locMuted} style={styles.locOffIcon} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.geoTitle}>You’re in {detectedCity}</Text>
-                <Text style={styles.geoText} numberOfLines={2}>{fullAddress || 'Showing experiences nearby you first.'}</Text>
+                <Text style={styles.locOffTitle}>Location is off</Text>
+                <Text style={styles.locOffText} numberOfLines={2}>Turn on device location to see experiences near you.</Text>
               </View>
-              <TouchableOpacity onPress={() => setGeoDismissed(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Text style={styles.geoClose}>✕</Text>
-              </TouchableOpacity>
-            </View>
+              <Text style={styles.locOffCta}>Turn on</Text>
+            </TouchableOpacity>
           )}
+
+          {/* "You are here" is shown as a one-time popup (below) — no inline card
+              here, so the home feed stays clean. */}
 
           {/* Connect With — audience taxonomy from the DB, tap opens that audience's experiences */}
           <ConnectWithSection auds={auds} onPressAud={goAudience} onSeeAll={() => navigateTab('reconnect')} />
@@ -254,8 +326,17 @@ export default function HomeScreen() {
             </View>
           ) : (
             <>
-              {/* Trending Near You — standalone experience cards, replaces the old Explore grid */}
-              <TrendingNearYouSection data={items} onSeeAll={() => navigateTab('experiences')} onPressItem={openDetail} />
+              {/* Near you — nearest real experiences to the exact live location,
+                  distance-sorted (each card shows how far). Sits right under
+                  Connect With. No distance filter UI. */}
+              {!!(coords && coords.lat != null) && (
+                <NearYouSection
+                  data={nearby}
+                  busy={nearbyBusy}
+                  onSeeAll={() => push('experiences', { nearbyMode: true })}
+                  onPressItem={openDetail}
+                />
+              )}
 
               {/* Experiences for every moment — one tile per broad audience category */}
               <ExperienceMomentsSection cats={cats} onPressCat={goCategory} />
@@ -381,6 +462,49 @@ export default function HomeScreen() {
 
       <LocationSheet visible={showLocation} onClose={() => setShowLocation(false)} />
 
+      {/* "You are here" — one-time popup with a real photo of a famous place
+          (metro / mall / monument) near the user's exact geocoded location. */}
+      <Modal visible={showYah && !!youAreHere} transparent animationType="fade" onRequestClose={() => setShowYah(false)}>
+        <View style={styles.yahOverlay}>
+          <View style={styles.yahModal}>
+            <ImageBackground
+              source={{ uri: (yahImgErr || !(youAreHere && youAreHere.image)) ? YAH_FALLBACK_IMG : youAreHere.image }}
+              style={styles.yahModalImg}
+              imageStyle={styles.yahModalImgRadius}
+              onError={() => setYahImgErr(true)}
+            >
+              <Image source={ICONS.scrimGrad} style={styles.yahScrim} resizeMode="stretch" />
+              <TouchableOpacity style={styles.yahClose} onPress={() => setShowYah(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Text style={styles.yahCloseText}>✕</Text>
+              </TouchableOpacity>
+              <View style={styles.yahModalCap}>
+                <View style={styles.yahPinRow}>
+                  <Image source={ICONS.locWhite} style={styles.yahPin} />
+                  <Text style={styles.yahLabel}>You are here</Text>
+                </View>
+                <Text style={styles.yahCity} numberOfLines={1}>{detectedCity}</Text>
+                {!!(youAreHere && youAreHere.name) && <Text style={styles.yahPlace} numberOfLines={1}>Near {youAreHere.name}</Text>}
+              </View>
+            </ImageBackground>
+            <View style={styles.yahModalBody}>
+              {/* Exact geocoded address — no paragraph, just where you are. */}
+              <Text style={styles.yahAddr} numberOfLines={3}>{fullAddress || detectedCity}</Text>
+              <View style={styles.yahMetaRow}>
+                {!!detectedCity && (
+                  <View style={styles.yahMetaChip}><Text style={styles.yahMetaText}>{detectedCity}</Text></View>
+                )}
+                {!!pincode && (
+                  <View style={styles.yahMetaChip}><Text style={styles.yahMetaText}>PIN {pincode}</Text></View>
+                )}
+              </View>
+              <TouchableOpacity style={styles.yahCta} activeOpacity={0.9} onPress={() => { setShowYah(false); push('experiences', { nearbyMode: true }); }}>
+                <Text style={styles.yahCtaText}>Explore experiences near me</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <RatingModal
         visible={!!pendingReview && !reviewPopupClosed}
         variant="auto"
@@ -450,10 +574,12 @@ function TrendingNearYouCard({ item, onPress }) {
         </TouchableOpacity>
       </View>
       <Text style={styles.tnyTitle} numberOfLines={2}>{item.name}</Text>
-      {!!item.city && (
+      {(item.distanceKm != null || !!item.city) && (
         <View style={styles.tnyLocRow}>
           <Image source={ICONS.locGray} style={styles.tnyLocIcon} />
-          <Text style={styles.tnyLoc} numberOfLines={1}>{item.city}</Text>
+          <Text style={styles.tnyLoc} numberOfLines={1}>
+            {item.distanceKm != null ? `${item.distanceKm} km away` : item.city}
+          </Text>
         </View>
       )}
       <View style={styles.tnyFoot}>
@@ -482,6 +608,36 @@ function TrendingNearYouSection({ data, onSeeAll, onPressItem }) {
         contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 12, paddingTop: 4 }}
         renderItem={({ item }) => <TrendingNearYouCard item={item} onPress={() => onPressItem(item)} />}
       />
+    </>
+  );
+}
+
+// "Near you" — the nearest real experiences to the exact live location, sorted
+// ascending by distance (server-computed via Haversine against each
+// experience's own coordinates — no city matching). Each card shows a
+// "N km away" chip. No distance filter is shown to the user.
+function NearYouSection({
+  data, busy, onSeeAll, onPressItem,
+}) {
+  if (!busy && !(data && data.length)) return null;
+  return (
+    <>
+      <View style={styles.sectionHead}>
+        <SectionTitle icon={ICONS.locMuted} title="Near you" />
+        <TouchableOpacity onPress={onSeeAll}><Text style={styles.seeAll}>See all ›</Text></TouchableOpacity>
+      </View>
+      {busy ? (
+        <ActivityIndicator color={colors.brand} style={{ marginTop: 12, marginBottom: 4 }} />
+      ) : (
+        <FlatList
+          data={data}
+          horizontal
+          keyExtractor={(it, idx) => `near-${it.id || idx}`}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 12, paddingTop: 4 }}
+          renderItem={({ item }) => <TrendingNearYouCard item={item} onPress={() => onPressItem(item)} />}
+        />
+      )}
     </>
   );
 }
@@ -602,12 +758,13 @@ const FOCUS_SNAP = FOCUS_CARD_W + FOCUS_GAP;
 const FOCUS_SIDE = Math.max(16, (SCREEN_W - FOCUS_CARD_W) / 2);
 
 function FocusDealSection({ data, onSeeAll, onPressItem }) {
-  if (!data.length) return null;
   // Start centred on the 2nd card so a card peeks on BOTH sides from the start
   // (otherwise the first card sits flush-left with empty space on the left).
   const initialIdx = data.length > 1 ? 1 : 0;
   const scrollX = useRef(new Animated.Value(initialIdx * FOCUS_SNAP)).current;
   const [active, setActive] = useState(initialIdx);
+  // Hooks must run every render — so the empty-guard sits AFTER them.
+  if (!data.length) return null;
 
   return (
     <>
@@ -740,6 +897,39 @@ const styles = StyleSheet.create({
   geoTitle: { color: colors.ink, fontSize: font.body, fontWeight: '800' },
   geoText: { color: colors.inkMuted, fontSize: font.small, marginTop: 1 },
   geoClose: { color: colors.inkFaint, fontSize: 16, fontWeight: '700', paddingHorizontal: 4 },
+
+  locOffBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FEF3C7', marginHorizontal: H_PAD, marginTop: 14, paddingVertical: 11, paddingHorizontal: 14, borderRadius: radius.lg },
+  locOffIcon: { width: 20, height: 20, tintColor: '#B45309' },
+  locOffTitle: { color: '#92400E', fontSize: font.body, fontWeight: '800' },
+  locOffText: { color: '#B45309', fontSize: font.small, marginTop: 1 },
+  locOffCta: { color: '#fff', fontSize: font.small, fontWeight: '800', backgroundColor: colors.brand, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill, overflow: 'hidden' },
+
+  yahCard: { marginHorizontal: H_PAD, marginTop: 16, borderRadius: radius.lg, overflow: 'hidden', ...shadow.card },
+  yahImg: { width: '100%', height: 140, justifyContent: 'flex-end', backgroundColor: '#DCE0E6' },
+  yahImgRadius: { borderRadius: radius.lg },
+  yahScrim: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, width: '100%', height: '100%' },
+  yahClose: { position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
+  yahCloseText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  yahBody: { padding: 14 },
+  yahPinRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  yahPin: { width: 13, height: 13, tintColor: '#fff' },
+  yahLabel: { color: '#fff', fontSize: font.small, fontWeight: '700', opacity: 0.95, letterSpacing: 0.3 },
+  yahCity: { color: '#fff', fontSize: 22, fontWeight: '900', marginTop: 2 },
+  yahPlace: { color: 'rgba(255,255,255,0.9)', fontSize: font.small, marginTop: 1 },
+
+
+  yahOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  yahModal: { width: '100%', maxWidth: 380, backgroundColor: colors.surface, borderRadius: radius.xl || 22, overflow: 'hidden', ...shadow.card },
+  yahModalImg: { width: '100%', height: 200, justifyContent: 'flex-end', backgroundColor: '#DCE0E6' },
+  yahModalImgRadius: {},
+  yahModalCap: { padding: 16 },
+  yahModalBody: { padding: 16 },
+  yahAddr: { color: colors.ink, fontSize: font.body, fontWeight: '600', lineHeight: 20 },
+  yahMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  yahMetaChip: { backgroundColor: colors.brandSoft, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill },
+  yahMetaText: { color: colors.brandText, fontSize: font.small, fontWeight: '800' },
+  yahCta: { marginTop: 16, backgroundColor: colors.brand, borderRadius: radius.pill, paddingVertical: 13, alignItems: 'center' },
+  yahCtaText: { color: '#fff', fontWeight: '800', fontSize: font.body },
 
   resultsHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: H_PAD, paddingTop: 14, paddingBottom: 8 },
   clearAll: { color: colors.brand, fontWeight: '700' },

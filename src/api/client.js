@@ -1,14 +1,32 @@
 import { API_BASE, API_ORIGIN } from '../config';
 
 /**
+ * Connectivity signalling. Every request reports success/failure to a single
+ * subscriber (the ConnectivityProvider) so the app can show a global "you're
+ * offline" banner and auto-refresh the moment the internet comes back — no
+ * native NetInfo module required (keeps the release build simple).
+ */
+let netStatusHandler = null;
+export function onNetworkStatus(fn) { netStatusHandler = fn; }
+const signalNet = (up) => { try { if (netStatusHandler) netStatusHandler(up); } catch (_) { /* ignore */ } };
+
+/**
  * Tiny fetch wrapper around the backend. Returns the `data` object from the
  * standard { success, message, data } envelope, or throws an Error whose
  * message is the server's `message` so screens can show it directly.
  */
-async function request(path, { method = 'GET', body, token } = {}) {
+async function request(path, { method = 'GET', body, token, timeoutMs } = {}) {
   const headers = { Accept: 'application/json' };
   if (body) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
+
+  // Optional per-request timeout so a hanging socket (e.g. the connectivity
+  // probe on a flaky network) fails fast instead of blocking recovery forever.
+  let ctrl; let timer;
+  if (timeoutMs && typeof AbortController === 'function') {
+    ctrl = new AbortController();
+    timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  }
 
   let res;
   try {
@@ -16,10 +34,21 @@ async function request(path, { method = 'GET', body, token } = {}) {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl ? ctrl.signal : undefined,
     });
   } catch (e) {
-    throw new Error('Network error — check that the backend is running and API_BASE in src/config.js points to it.');
+    // A thrown fetch = no reachable network. Flag it so callers/UI can tell a
+    // connectivity drop apart from a normal server error, and tell the banner.
+    signalNet(false);
+    // User-facing, friendly — never expose backend/config internals.
+    const err = new Error('You’re offline. Please check your internet connection and try again.');
+    err.isNetwork = true;
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
+  // We reached the server → we're online (even a 4xx/5xx means connectivity).
+  signalNet(true);
 
   let json = null;
   try { json = await res.json(); } catch (_) { /* non-JSON */ }
@@ -45,6 +74,9 @@ function qs(params = {}) {
 }
 
 export const api = {
+  // Cheap reachability probe for the offline→online poll. Short timeout so a
+  // stalled socket never blocks fast reconnect detection.
+  ping: () => request('/health', { timeoutMs: 6000 }),
   // ── Public experiences ──────────────────────────────────────────────
   listExperiences: (filters = {}) => request(`/public/experiences${qs(filters)}`),
   getExperience: (idOrSlug) => request(`/public/experiences/${idOrSlug}`),
@@ -58,6 +90,11 @@ export const api = {
   offerBanners: () => request('/public/offer-banners'),
   geoLocate: (lat, lon) => request(`/public/geo/locate${qs({ lat, lon })}`),
   geoNearby: (params = {}) => request(`/public/geo/nearby${qs(params)}`),
+  // Real experiences near a coordinate, sorted ascending by distance (km).
+  nearbyExperiences: (lat, lon, params = {}) => request(`/public/geo/nearby-experiences${qs({ lat, lon, ...params })}`),
+  // A famous place near the user + its real photo, for the "You are here" hero.
+  // Pass `area` so the backend LLM can pick a landmark close to the exact spot.
+  placeImage: (city, place, area) => request(`/public/geo/place-image${qs({ city, place, area })}`),
 
   // ── Auth (OTP) ──────────────────────────────────────────────────────
   requestOtp: (email) => request('/user-auth/request-otp', { method: 'POST', body: { email } }),
@@ -119,6 +156,7 @@ export const api = {
   // endpoints (/api/supplier/*), so Host code never has to change or branch
   // for Supplier to exist. ─────────────────────────────────────────────
   supplierLogin: (email, password) => request('/supplier/auth/login', { method: 'POST', body: { email, password } }),
+  supplierForgotPassword: (email) => request('/supplier/auth/forgot-password', { method: 'POST', body: { email } }),
   supplierMe: (token) => request('/supplier/auth/me', { token }),
   supplierSummary: (token) => request('/supplier/summary', { token }),
   supplierListings: (token) => request('/supplier/listings', { token }),

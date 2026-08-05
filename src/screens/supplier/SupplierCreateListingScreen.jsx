@@ -32,13 +32,15 @@ const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1501785888041-af3ef285
 
 const blank = {
   audiences: [], categoryIds: [], typeIds: [],
-  name: '', location: '', city: '', nearbyLocation: '', durationLabel: '',
+  name: '', location: '', city: '', pincode: '', nearbyLocation: '', durationLabel: '',
   about: '', mode: 'offline',
   // One empty row open by default so the "What's included" / "Nearby" editors
   // read as ready-to-fill boxes (host can delete them to close).
   inclusions: [''], facilities: [], nearbyPlaces: [{ name: '', distance: '', unit: 'km' }], faqs: [],
   termsConditions: '', privacyPolicy: '', refundCancellationPolicy: '',
   priceMethod: 'per_person', adultPrice: '', childrenEnabled: false, childBands: [],
+  b2cPriceMethod: 'per_person', b2cAdultPrice: '', b2cChildrenEnabled: false, b2cChildBands: [],
+  sourceName: '', sourceLink: '',
   capacity: 8, durationHours: 0, durationMinutes: 0,
   schedule: { dates: [] }, // { dates:[{date:'YYYY-MM-DD', slots:[{start,end}]}], slotMode }
   photos: [], videos: [],
@@ -161,6 +163,7 @@ function Step1({ form, patch }) {
       <Field label="Experience Title" value={form.name} onChangeText={(t) => patch({ name: t })} placeholder="e.g. Sunrise Kayaking at Goa Beach" />
       <Field label="Location" value={form.location} onChangeText={(t) => patch({ location: t })} placeholder="City, State, Country" />
       <Field label="City" value={form.city} onChangeText={(t) => patch({ city: t })} placeholder="e.g. Goa" />
+      <Field label="Pincode" value={form.pincode} onChangeText={(t) => patch({ pincode: t.replace(/[^0-9]/g, '').slice(0, 6) })} placeholder="e.g. 403516" keyboardType="number-pad" />
       <DurationField form={form} patch={patch} />
     </View>
   );
@@ -243,39 +246,44 @@ function Step2({ form, patch }) {
 }
 
 /* ───────────────────────── STEP 3 — pricing + availability ───────────── */
-function Step3({ form, patch }) {
+// One pricing block (method + adult + children), bound to a set of form keys,
+// so B2B (working) and B2C (reference) render identically.
+function PriceSection({ form, patch, title, hint, methodKey, priceKey, enabledKey, bandsKey }) {
+  const bands = form[bandsKey] || [];
+  const method = form[methodKey];
+  const perDay = method === 'per_day' || method === 'days';
   const addBand = () => {
-    const last = form.childBands[form.childBands.length - 1];
+    const last = bands[bands.length - 1];
     const start = last ? Math.min(14, Number(last.endAge) + 1) : 0;
-    patch({ childBands: [...form.childBands, { startAge: start, endAge: Math.min(14, start + 4), charge: true, price: '' }] });
+    patch({ [bandsKey]: [...bands, { startAge: start, endAge: Math.min(14, start + 4), charge: true, price: '' }] });
   };
-  const setBand = (i, p) => patch({ childBands: form.childBands.map((b, idx) => (idx === i ? { ...b, ...p } : b)) });
-  const removeBand = (i) => patch({ childBands: form.childBands.filter((_, idx) => idx !== i) });
-
+  const setBand = (i, p) => patch({ [bandsKey]: bands.map((b, idx) => (idx === i ? { ...b, ...p } : b)) });
+  const removeBand = (i) => patch({ [bandsKey]: bands.filter((_, idx) => idx !== i) });
   return (
     <View style={{ gap: 20 }}>
-      <Text style={styles.bigQ}>Set your price</Text>
+      <Text style={styles.bigQ}>{title}</Text>
+      {!!hint && <Text style={styles.hint}>{hint}</Text>}
 
       <View>
         <Label>Price method</Label>
         <Chips>
-          {PRICE_METHODS.map((m) => <Chip key={m.value} active={form.priceMethod === m.value} onPress={() => patch({ priceMethod: m.value })}>{m.label}</Chip>)}
+          {PRICE_METHODS.map((m) => <Chip key={m.value} active={method === m.value} onPress={() => patch({ [methodKey]: m.value })}>{m.label}</Chip>)}
         </Chips>
       </View>
 
-      <MoneyField label="Adult price" value={form.adultPrice} onChangeText={(t) => patch({ adultPrice: t })} suffix={`/ ${form.priceMethod === 'per_day' || form.priceMethod === 'days' ? 'day' : 'person'}`} />
+      <MoneyField label="Adult price" value={form[priceKey]} onChangeText={(t) => patch({ [priceKey]: t })} suffix={`/ ${perDay ? 'day' : 'person'}`} />
 
       {/* Children pricing */}
       <View style={styles.box}>
         <View style={styles.boxHead}>
           <Text style={styles.boxTitle}>Add children pricing</Text>
-          <Switch value={form.childrenEnabled} onValueChange={(v) => patch({ childrenEnabled: v, childBands: v && form.childBands.length === 0 ? [{ startAge: 0, endAge: 5, charge: false, price: '' }] : form.childBands })}
+          <Switch value={form[enabledKey]} onValueChange={(v) => patch({ [enabledKey]: v, [bandsKey]: v && bands.length === 0 ? [{ startAge: 0, endAge: 5, charge: false, price: '' }] : bands })}
             trackColor={{ true: colors.brand, false: '#CBD0D8' }} thumbColor="#fff" />
         </View>
-        {form.childrenEnabled && (
+        {form[enabledKey] && (
           <View style={{ gap: 10, marginTop: 12 }}>
-            <Text style={styles.hint}>Define age bands (years). Turn “Set a price” off to make a band free.</Text>
-            {form.childBands.map((b, i) => (
+            <Text style={styles.hint}>Define age bands (years). Turn a band's "Set a price" off to make it free.</Text>
+            {bands.map((b, i) => (
               <View key={i} style={styles.band}>
                 <View style={styles.bandAges}>
                   <SmallNum label="Min Age" value={b.startAge} onChange={(v) => setBand(i, { startAge: v })} />
@@ -284,7 +292,7 @@ function Step3({ form, patch }) {
                 </View>
                 <View style={styles.bandPrice}>
                   <TouchableOpacity style={styles.checkRow} onPress={() => setBand(i, { charge: !b.charge })}>
-                    <View style={[styles.checkbox, b.charge && styles.checkboxOn]}>{b.charge && <Text style={styles.checkboxTick}>✓</Text>}</View>
+                    <View style={[styles.checkbox, b.charge && styles.checkboxOn]}>{b.charge && <Text style={styles.checkboxTick}>\u2713</Text>}</View>
                     <Text style={styles.checkLabel}>Set a price</Text>
                   </TouchableOpacity>
                   {b.charge ? (
@@ -298,12 +306,33 @@ function Step3({ form, patch }) {
           </View>
         )}
       </View>
+    </View>
+  );
+}
+
+function Step3({ form, patch }) {
+  return (
+    <View style={{ gap: 20 }}>
+      <PriceSection
+        form={form} patch={patch} title="B2B pricing"
+        hint="The working price. Center Ops adds GST/discount/convenience fee on this at go-live — the result is what customers pay in the app."
+        methodKey="priceMethod" priceKey="adultPrice" enabledKey="childrenEnabled" bandsKey="childBands"
+      />
+      <PriceSection
+        form={form} patch={patch} title="B2C pricing"
+        hint="A reference price only — shown to Center Ops at go-live and stored, but not used for booking."
+        methodKey="b2cPriceMethod" priceKey="b2cAdultPrice" enabledKey="b2cChildrenEnabled" bandsKey="b2cChildBands"
+      />
 
       {/* Guests per session */}
       <View style={styles.guestBox}>
         <Text style={styles.guestLabel}>Guests per session</Text>
         <Stepper value={form.capacity} onChange={(v) => patch({ capacity: v })} min={1} max={100} bare />
       </View>
+
+      {/* Source — where this experience was sourced from */}
+      <Field label="Source name" value={form.sourceName} onChangeText={(t) => patch({ sourceName: t })} placeholder="e.g. Airbnb Experiences" />
+      <Field label="Source link" value={form.sourceLink} onChangeText={(t) => patch({ sourceLink: t })} placeholder="https://…" keyboardType="url" />
 
       {/* Availability */}
       <Availability form={form} patch={patch} />
@@ -656,6 +685,21 @@ function DatesCalendar({ selected, initialMode, onSave, onClose }) {
   const cells = [...Array(firstDow).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
   const toggle = (key) => { const n = new Set(sel); n.has(key) ? n.delete(key) : n.add(key); setSel(n); };
 
+  // Bulk select: a whole month, or every future date across all 12 months.
+  const monthKeys = (y, m) => {
+    const dim = new Date(y, m + 1, 0).getDate();
+    const out = [];
+    for (let d = 1; d <= dim; d += 1) { const k = `${y}-${pad(m + 1)}-${pad(d)}`; if (k >= todayKey) out.push(k); }
+    return out;
+  };
+  const selectMonth = (y, m, on) => { const n = new Set(sel); monthKeys(y, m).forEach((k) => (on ? n.add(k) : n.delete(k))); setSel(n); };
+  const selectAll = () => {
+    const n = new Set(sel);
+    for (let o = 0; o < MONTHS_WINDOW; o += 1) { const d = new Date(startY, startM + o, 1); monthKeys(d.getFullYear(), d.getMonth()).forEach((k) => n.add(k)); }
+    setSel(n);
+  };
+  const monthAllOn = (() => { const ks = monthKeys(view.y, view.m); return ks.length > 0 && ks.every((k) => sel.has(k)); })();
+
   const modeRequired = sel.size > 0;
   const canSave = !modeRequired || !!mode;
 
@@ -670,6 +714,16 @@ function DatesCalendar({ selected, initialMode, onSave, onClose }) {
         <Text style={styles.calMonth}>{MONTHS_FULL[view.m]} {view.y}</Text>
         <TouchableOpacity onPress={() => setOffset((o) => Math.min(MONTHS_WINDOW - 1, o + 1))} disabled={offset === MONTHS_WINDOW - 1} style={[styles.calNav, offset === MONTHS_WINDOW - 1 && styles.calNavOff]}><Text style={styles.calNavTxt}>›</Text></TouchableOpacity>
       </View>
+
+      {/* Bulk select — this month, or all dates across every month */}
+      <View style={styles.calBulkRow}>
+        <TouchableOpacity style={styles.calBulkChk} onPress={() => selectMonth(view.y, view.m, !monthAllOn)} activeOpacity={0.8}>
+          <View style={[styles.checkbox, monthAllOn && styles.checkboxOn]}>{monthAllOn && <Text style={styles.checkboxTick}>✓</Text>}</View>
+          <Text style={styles.calBulkTxt}>Select all in {MONTHS_FULL[view.m]}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={selectAll}><Text style={styles.calBulkAll}>Select all dates</Text></TouchableOpacity>
+      </View>
+
       <View style={styles.calDows}>{['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <Text key={i} style={styles.calDow}>{d}</Text>)}</View>
       <View style={styles.calGrid}>
         {cells.map((day, i) => {
@@ -725,12 +779,12 @@ function Chips({ children }) { return <View style={styles.chips}>{children}</Vie
 function Chip({ active, onPress, children }) {
   return <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={[styles.chip, active && styles.chipActive]}><Text style={[styles.chipText, active && styles.chipTextActive]}>{children}</Text></TouchableOpacity>;
 }
-function Field({ label, value, onChangeText, placeholder, multiline, flex }) {
+function Field({ label, value, onChangeText, placeholder, multiline, flex, keyboardType }) {
   return (
     <View style={flex && { flex: 1 }}>
       {!!label && <Label>{label}</Label>}
       <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.inkFaint}
-        multiline={multiline} style={[styles.input, multiline && styles.inputMultiline]} />
+        keyboardType={keyboardType} multiline={multiline} style={[styles.input, multiline && styles.inputMultiline]} />
     </View>
   );
 }
@@ -996,6 +1050,10 @@ const styles = StyleSheet.create({
   calCard: { backgroundColor: colors.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, paddingBottom: 30 },
   calHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   calNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 8 },
+  calBulkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  calBulkChk: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  calBulkTxt: { fontSize: font.small, color: colors.ink, fontWeight: '700' },
+  calBulkAll: { fontSize: font.small, color: colors.brand, fontWeight: '800' },
   calNav: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   calNavTxt: { fontSize: 20, color: colors.ink, marginTop: -2 },
   calMonth: { fontSize: font.body, fontWeight: '800', color: colors.ink },

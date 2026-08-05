@@ -8,17 +8,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space } from '../theme';
 import { api } from '../api/client';
 import { useNav } from '../navigation/NavContext';
+import { useLocation } from '../store/LocationContext';
 import ExperienceCard from '../components/ExperienceCard';
 import FilterSheet, { draftToParams } from './FilterSheet';
+
+// "Near you" screen (opened from the popup CTA / near-you See all) only ever
+// shows experiences within this many km of the user.
+const NEARBY_RADIUS_KM = 20;
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const H_PAD = 16;
 const GAP = 12;
 const COL_W = (SCREEN_W - H_PAD * 2 - GAP) / 2;
 
-export default function ExperiencesScreen({ initialFilters, tagMode = 'category' }) {
+export default function ExperiencesScreen({ initialFilters, tagMode = 'category', nearbyMode = false }) {
   const insets = useSafeAreaInsets();
   const { navigateTab, push, pop, stack } = useNav();
+  const { coords } = useLocation();
   const canGoBack = stack && stack.length > 0;
 
   const [taxonomy, setTaxonomy] = useState(null);
@@ -32,18 +38,28 @@ export default function ExperiencesScreen({ initialFilters, tagMode = 'category'
 
   useEffect(() => { api.taxonomy().then(setTaxonomy).catch(() => {}); }, []);
 
+  const lat = coords && coords.lat != null ? coords.lat : null;
+  const lon = coords && coords.lon != null ? coords.lon : null;
+
   const load = useCallback(async (f) => {
     setLoading(true);
     setError('');
     try {
-      const data = await api.listExperiences(draftToParams(f));
-      setItems(data.items || []);
+      // Near-you screen: ONLY experiences within 20 km of the user, distance-
+      // sorted. Everywhere else: the normal filtered listing.
+      if (nearbyMode && lat != null) {
+        const data = await api.nearbyExperiences(lat, lon, { radius: NEARBY_RADIUS_KM, limit: 60 });
+        setItems(data.experiences || []);
+      } else {
+        const data = await api.listExperiences(draftToParams(f));
+        setItems(data.items || []);
+      }
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [nearbyMode, lat, lon]);
 
   useEffect(() => { load(filters); }, [filters, load]);
 
@@ -79,7 +95,7 @@ export default function ExperiencesScreen({ initialFilters, tagMode = 'category'
               onSubmitEditing={submitSearch}
             />
           ) : (
-            <Text style={styles.title}>{audienceMode ? 'Reconnect' : 'Experiences'}</Text>
+            <Text style={styles.title}>{nearbyMode ? 'Near you' : (audienceMode ? 'Reconnect' : 'Experiences')}</Text>
           )}
           <View style={styles.headerRight}>
             <TouchableOpacity onPress={() => (searching ? submitSearch() : setSearching(true))} style={styles.iconBtn}>
@@ -92,8 +108,14 @@ export default function ExperiencesScreen({ initialFilters, tagMode = 'category'
           </View>
         </View>
 
-        {/* Quick tabs — audiences (All/Family/Friends/Kids…) or broad categories */}
-        {audienceMode ? (
+        {/* Quick tabs — hidden in near-you mode, which just lists everything
+            within 20 km. */}
+        {nearbyMode ? (
+          <View style={styles.nearbyNote}>
+            <Image source={ICONS.locWhite || ICONS.search} style={styles.nearbyNoteIcon} />
+            <Text style={styles.nearbyNoteText}>Showing experiences within {NEARBY_RADIUS_KM} km of you</Text>
+          </View>
+        ) : audienceMode ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
             <Tab label="All" icon={ICONS.globe} active={!filters.audienceId} onPress={() => setFilters((f) => ({ ...f, audienceId: null }))} />
             {auds.map((a) => (
@@ -132,8 +154,10 @@ export default function ExperiencesScreen({ initialFilters, tagMode = 'category'
           )}
           ListEmptyComponent={
             <View style={styles.center}>
-              <Text style={{ fontSize: 40 }}>🔎</Text>
-              <Text style={styles.muted}>No experiences match your filters.</Text>
+              <Text style={{ fontSize: 40 }}>{nearbyMode ? '📍' : '🔎'}</Text>
+              <Text style={styles.muted}>
+                {nearbyMode ? `No experiences within ${NEARBY_RADIUS_KM} km of you yet.` : 'No experiences match your filters.'}
+              </Text>
             </View>
           }
         />
@@ -175,6 +199,9 @@ const styles = StyleSheet.create({
   dot: { position: 'absolute', top: 4, right: 4, backgroundColor: colors.brand, minWidth: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   dotText: { color: '#fff', fontSize: 10, fontWeight: '800' },
   tabs: { paddingHorizontal: H_PAD, gap: 8, paddingTop: 4 },
+  nearbyNote: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: H_PAD, paddingTop: 6 },
+  nearbyNoteIcon: { width: 13, height: 13, tintColor: colors.brand },
+  nearbyNoteText: { color: colors.inkMuted, fontSize: font.small, fontWeight: '600' },
   tab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 34, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
   tabActive: { backgroundColor: colors.brand, borderColor: colors.brand },
   tabIcon: { width: 14, height: 14, tintColor: colors.inkMuted },
