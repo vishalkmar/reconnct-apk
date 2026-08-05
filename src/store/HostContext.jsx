@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../api/client';
 import { useAuth } from './AuthContext';
 
@@ -61,8 +62,13 @@ export function HostProvider({ children }) {
   // In-progress Create-Listing draft — kept in memory so the wizard survives
   // navigating away / device back until the host submits or saves it.
   const [listingDraft, setListingDraft] = useState(null);
-  const saveListingDraft = useCallback((d) => setListingDraft(d), []);
-  const clearListingDraft = useCallback(() => setListingDraft(null), []);
+  // Persist the in-progress create-listing draft so it survives navigating away
+  // AND an app restart (restored on mount, cleared on submit).
+  useEffect(() => {
+    AsyncStorage.getItem('host_listing_draft').then((v) => { if (v) { try { setListingDraft(JSON.parse(v)); } catch (e) { /* ignore */ } } }).catch(() => {});
+  }, []);
+  const saveListingDraft = useCallback((d) => { setListingDraft(d); AsyncStorage.setItem('host_listing_draft', JSON.stringify(d)).catch(() => {}); }, []);
+  const clearListingDraft = useCallback(() => { setListingDraft(null); AsyncStorage.removeItem('host_listing_draft').catch(() => {}); }, []);
 
   // Create a listing from the wizard form. submit=true → "Submit for Review"
   // (stored as pending), otherwise saved as a draft. Returns the new id.

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../api/client';
 import { useSupplierAuth } from './SupplierAuthContext';
 
@@ -60,8 +61,13 @@ export function SupplierProvider({ children }) {
   }, [isSupplierAuthed, reload]);
 
   const [listingDraft, setListingDraft] = useState(null);
-  const saveListingDraft = useCallback((d) => setListingDraft(d), []);
-  const clearListingDraft = useCallback(() => setListingDraft(null), []);
+  // Persist the in-progress create-listing draft so it survives navigating away
+  // AND an app restart (restored on mount, cleared on submit).
+  useEffect(() => {
+    AsyncStorage.getItem('supplier_listing_draft').then((v) => { if (v) { try { setListingDraft(JSON.parse(v)); } catch (e) { /* ignore */ } } }).catch(() => {});
+  }, []);
+  const saveListingDraft = useCallback((d) => { setListingDraft(d); AsyncStorage.setItem('supplier_listing_draft', JSON.stringify(d)).catch(() => {}); }, []);
+  const clearListingDraft = useCallback(() => { setListingDraft(null); AsyncStorage.removeItem('supplier_listing_draft').catch(() => {}); }, []);
 
   const addListing = useCallback(async (form, submit = false) => {
     const d = await api.supplierCreateListing(token, form, submit);

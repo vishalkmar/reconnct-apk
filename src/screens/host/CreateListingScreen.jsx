@@ -14,6 +14,37 @@ import TaxonomyPicker from './TaxonomyPicker';
 // Fixed square photo/video tile — 3 per row (matches Figma's 114px on a 390 screen).
 const TILE = Math.floor((Dimensions.get('window').width - 16 * 2 - 10 * 2) / 3);
 const STEPS = ['Basic info', 'Description', 'Pricing', 'Photos'];
+
+// First missing mandatory field on a given step (null if the step is complete).
+// Video is the ONLY optional field. Mirrors the web validateExperience.
+const rich = (s) => String(s || '').trim();
+const stepError = (st, f) => {
+  if (st === 1) {
+    if (!f.name.trim()) return 'Please add the experience title';
+    if (!f.categoryIds?.length) return 'Please pick at least one broad category';
+    if (!f.typeIds?.length) return 'Please pick at least one type of activity / event';
+    if (!f.location.trim()) return 'Please add the location';
+    if (!f.city.trim()) return 'Please add the city';
+    if (!f.pincode.trim()) return 'Please add the pincode';
+    if (!f.nearbyLocation.trim()) return 'Please add the nearby location';
+  } else if (st === 2) {
+    if (!rich(f.about)) return 'Please add the About description';
+    if (!(f.inclusions || []).some((x) => (x || '').trim())) return 'Please add at least one inclusion';
+    if (!(f.facilities || []).length) return 'Please add at least one facility';
+    if (!(f.nearbyPlaces || []).some((p) => p && p.name && p.name.trim())) return 'Please add at least one nearby place';
+    if (!(f.faqs || []).some((q) => q && (q.question || q.answer))) return 'Please add at least one FAQ';
+    if (!rich(f.termsConditions)) return 'Please add the Terms & Conditions';
+    if (!rich(f.privacyPolicy)) return 'Please add the Privacy Policy';
+    if (!rich(f.refundCancellationPolicy)) return 'Please add the Refund & Cancellation Policy';
+  } else if (st === 3) {
+    if (!(Number(f.adultPrice) > 0)) return 'Please set the B2B adult price';
+    if (!(Number(f.b2cAdultPrice) > 0)) return 'Please set the B2C adult price';
+    if (!f.sourceName.trim()) return 'Please add the Source name';
+    if (!((Number(f.durationHours) || 0) > 0 || (Number(f.durationMinutes) || 0) > 0)) return 'Please set the session duration';
+    if (!(f.schedule && Array.isArray(f.schedule.dates) && f.schedule.dates.length)) return 'Please add availability — pick dates and slots';
+  }
+  return null;
+};
 const DURATIONS = [
   { label: '1 hr', h: 1, m: 0 },
   { label: '2 hrs', h: 2, m: 0 },
@@ -67,17 +98,11 @@ export default function CreateListingScreen() {
     return () => sub.remove();
   }, [step]);
 
-  const canNext = useMemo(() => {
-    if (step === 1) return !!form.name.trim() && !!form.categoryIds?.length && !!form.typeIds?.length;
-    return true;
-  }, [step, form]);
+  const canNext = useMemo(() => !stepError(step, form), [step, form]);
 
   const goNext = () => {
-    if (step === 1 && !canNext) {
-      if (!form.name.trim()) return Alert.alert('Name required', 'Give your experience a name.');
-      if (!form.categoryIds?.length) return Alert.alert('Pick a category', 'Choose at least one broad category.');
-      if (!form.typeIds?.length) return Alert.alert('Pick a type', 'Choose at least one type of activity / event.');
-    }
+    const e = stepError(step, form);
+    if (e) return Alert.alert('Missing info', e);
     setStep((s) => Math.min(4, s + 1));
   };
   const goBack = () => (step > 1 ? setStep((s) => s - 1) : pop());
@@ -85,9 +110,15 @@ export default function CreateListingScreen() {
   const [submitting, setSubmitting] = useState(false);
   const submit = async (isReview) => {
     if (submitting) return;
-    // At least 6 photos are mandatory before submitting for review.
-    if (isReview && form.photos.filter(Boolean).length < 6) {
-      return Alert.alert('Add more photos', `At least 6 photos are required before submitting for review — you have ${form.photos.filter(Boolean).length}.`);
+    if (isReview) {
+      // Every field required (video is the only optional one) — flag the first missing one.
+      const e = stepError(1, form) || stepError(2, form) || stepError(3, form);
+      if (e) return Alert.alert('Missing info', e);
+      if (form.photos.filter(Boolean).length < 6) {
+        return Alert.alert('Add more photos', `At least 6 photos are required before submitting for review — you have ${form.photos.filter(Boolean).length}.`);
+      }
+    } else if (!form.name.trim()) {
+      return Alert.alert('Name required', 'Please add the experience title to save a draft.');
     }
     setSubmitting(true);
     try {
@@ -134,6 +165,7 @@ export default function CreateListingScreen() {
 
       {/* Action bar */}
       <View style={[styles.actionBar, { paddingBottom: insets.bottom + 12 }]}>
+        {step < 4 && !canNext && <Text style={styles.stepErr}>{stepError(step, form)}</Text>}
         {step < 4 ? (
           <TouchableOpacity style={[styles.primary, !canNext && styles.primaryOff]} onPress={goNext} disabled={!canNext} activeOpacity={0.9}>
             <Text style={styles.primaryText}>Next ›</Text>
@@ -160,10 +192,10 @@ function Step1({ form, patch }) {
       <Text style={styles.bigQ}>Let’s start with the basics</Text>
       <TaxonomyPicker value={form} onChange={patch} />
       <Divider />
-      <Field label="Experience Title" value={form.name} onChangeText={(t) => patch({ name: t })} placeholder="e.g. Sunrise Kayaking at Goa Beach" />
-      <Field label="Location" value={form.location} onChangeText={(t) => patch({ location: t })} placeholder="City, State, Country" />
-      <Field label="City" value={form.city} onChangeText={(t) => patch({ city: t })} placeholder="e.g. Goa" />
-      <Field label="Pincode" value={form.pincode} onChangeText={(t) => patch({ pincode: t.replace(/[^0-9]/g, '').slice(0, 6) })} placeholder="e.g. 403516" keyboardType="number-pad" />
+      <Field required label="Experience Title" value={form.name} onChangeText={(t) => patch({ name: t })} placeholder="e.g. Sunrise Kayaking at Goa Beach" />
+      <Field required label="Location" value={form.location} onChangeText={(t) => patch({ location: t })} placeholder="City, State, Country" />
+      <Field required label="City" value={form.city} onChangeText={(t) => patch({ city: t })} placeholder="e.g. Goa" />
+      <Field required label="Pincode" value={form.pincode} onChangeText={(t) => patch({ pincode: t.replace(/[^0-9]/g, '').slice(0, 6) })} placeholder="e.g. 403516" keyboardType="number-pad" />
       <DurationField form={form} patch={patch} />
     </View>
   );
@@ -176,7 +208,7 @@ function DurationField({ form, patch }) {
   const customActive = !!form.durationLabel && !DURATIONS.some((d) => d.label === form.durationLabel);
   return (
     <View>
-      <Label>Duration</Label>
+      <Label>Duration <Text style={{ color: '#DC2626' }}> *</Text></Label>
       <Text style={styles.hint}>Used as the time-slot length in availability.</Text>
       <Chips>
         {DURATIONS.map((d) => (
@@ -204,7 +236,7 @@ function Step2({ form, patch }) {
   return (
     <View style={{ gap: 20 }}>
       <Text style={styles.bigQ}>Describe your experience</Text>
-      <Field label="About this activity / event" value={form.about} onChangeText={(t) => patch({ about: t })}
+      <Field required label="About this activity / event" value={form.about} onChangeText={(t) => patch({ about: t })}
         placeholder="What will guests experience? What makes it unique?" multiline />
 
       <View>
@@ -220,7 +252,7 @@ function Step2({ form, patch }) {
         value={form.inclusions} onChange={(v) => patch({ inclusions: v })} />
 
       <View>
-        <Label>Facilities</Label>
+        <Label>Facilities <Text style={{ color: '#DC2626' }}> *</Text></Label>
         <Text style={styles.hint}>Pick from the list or add your own.</Text>
         <Chips>
           {[...FACILITIES, ...form.facilities.filter((f) => !FACILITIES.includes(f))].map((f) => {
@@ -237,9 +269,9 @@ function Step2({ form, patch }) {
 
       <View style={{ gap: 14 }}>
         <Label>Policies &amp; terms</Label>
-        <Field label="Terms & Conditions" value={form.termsConditions} onChangeText={(t) => patch({ termsConditions: t })} placeholder="e.g. Arrive 15 minutes early…" multiline />
-        <Field label="Privacy Policy" value={form.privacyPolicy} onChangeText={(t) => patch({ privacyPolicy: t })} placeholder="How you handle guest data…" multiline />
-        <Field label="Refund & Cancellation Policy" value={form.refundCancellationPolicy} onChangeText={(t) => patch({ refundCancellationPolicy: t })} placeholder="e.g. Free cancellation up to 24 hrs before…" multiline />
+        <Field required label="Terms & Conditions" value={form.termsConditions} onChangeText={(t) => patch({ termsConditions: t })} placeholder="e.g. Arrive 15 minutes early…" multiline />
+        <Field required label="Privacy Policy" value={form.privacyPolicy} onChangeText={(t) => patch({ privacyPolicy: t })} placeholder="How you handle guest data…" multiline />
+        <Field required label="Refund & Cancellation Policy" value={form.refundCancellationPolicy} onChangeText={(t) => patch({ refundCancellationPolicy: t })} placeholder="e.g. Free cancellation up to 24 hrs before…" multiline />
       </View>
     </View>
   );
@@ -261,7 +293,7 @@ function PriceSection({ form, patch, title, hint, methodKey, priceKey, enabledKe
   const removeBand = (i) => patch({ [bandsKey]: bands.filter((_, idx) => idx !== i) });
   return (
     <View style={{ gap: 20 }}>
-      <Text style={styles.bigQ}>{title}</Text>
+      <Text style={styles.bigQ}>{title} <Text style={{ color: '#DC2626' }}> *</Text></Text>
       {!!hint && <Text style={styles.hint}>{hint}</Text>}
 
       <View>
@@ -331,8 +363,7 @@ function Step3({ form, patch }) {
       </View>
 
       {/* Source — where this experience was sourced from */}
-      <Field label="Source name" value={form.sourceName} onChangeText={(t) => patch({ sourceName: t })} placeholder="e.g. Airbnb Experiences" />
-      <Field label="Source link" value={form.sourceLink} onChangeText={(t) => patch({ sourceLink: t })} placeholder="https://…" keyboardType="url" />
+      <Field required label="Source name" value={form.sourceName} onChangeText={(t) => patch({ sourceName: t })} placeholder="e.g. Airbnb Experiences" />
 
       {/* Availability */}
       <Availability form={form} patch={patch} />
@@ -359,7 +390,7 @@ function Step4({ form, patch, uploadImage }) {
         onRemove={(i) => patch({ photos: form.photos.filter((_, idx) => idx !== i) })}
       />
       <MediaSection
-        title="Videos" kind="video" items={form.videos}
+        title="Videos (optional)" kind="video" items={form.videos}
         onAdd={() => setPicker('video')}
         onRemove={(i) => patch({ videos: form.videos.filter((_, idx) => idx !== i) })}
       />
@@ -542,7 +573,7 @@ function Availability({ form, patch }) {
 
   return (
     <View style={{ gap: 12 }}>
-      <Label>Availability &amp; scheduling</Label>
+      <Label>Availability &amp; scheduling <Text style={{ color: '#DC2626' }}> *</Text></Label>
       <Text style={styles.hint}>Pick dates, then build time slots for each one. Each slot is {Math.floor(dur / 60)}h{dur % 60 ? ` ${dur % 60}m` : ''} long (from your duration).</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <TouchableOpacity style={styles.datesBtn} onPress={() => setCalOpen(true)} activeOpacity={0.9}>
@@ -779,10 +810,10 @@ function Chips({ children }) { return <View style={styles.chips}>{children}</Vie
 function Chip({ active, onPress, children }) {
   return <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={[styles.chip, active && styles.chipActive]}><Text style={[styles.chipText, active && styles.chipTextActive]}>{children}</Text></TouchableOpacity>;
 }
-function Field({ label, value, onChangeText, placeholder, multiline, flex, keyboardType }) {
+function Field({ label, value, onChangeText, placeholder, multiline, flex, keyboardType, required }) {
   return (
     <View style={flex && { flex: 1 }}>
-      {!!label && <Label>{label}</Label>}
+      {!!label && <Label>{label}{required ? <Text style={{ color: '#DC2626' }}> *</Text> : null}</Label>}
       <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.inkFaint}
         keyboardType={keyboardType} multiline={multiline} style={[styles.input, multiline && styles.inputMultiline]} />
     </View>
@@ -854,7 +885,7 @@ function NearbyEditor({ value, onChange }) {
   const labelFor = (u) => (NEARBY_UNITS.find((x) => x.value === u) || NEARBY_UNITS[0]).label;
   return (
     <View>
-      <Label>Nearby places</Label>
+      <Label>Nearby places <Text style={{ color: '#DC2626' }}> *</Text></Label>
       <Text style={styles.hint}>Famous spots near the location and how far they are.</Text>
       {value.map((it, i) => (
         <View key={i} style={[styles.row, { marginBottom: 8 }]}>
@@ -889,7 +920,7 @@ function FaqEditor({ value, onChange }) {
   const update = (i, p) => onChange(value.map((it, idx) => (idx === i ? { ...it, ...p } : it)));
   return (
     <View>
-      <Label>FAQs</Label>
+      <Label>FAQs <Text style={{ color: '#DC2626' }}> *</Text></Label>
       {value.map((it, i) => (
         <View key={i} style={styles.faqCard}>
           <TextInput value={it.question} onChangeText={(t) => update(i, { question: t })} placeholder="Question" placeholderTextColor={colors.inkFaint} style={[styles.input, { fontWeight: '700' }]} />
@@ -1068,6 +1099,7 @@ const styles = StyleSheet.create({
   calDayTxtOff: { color: colors.inkFaint },
 
   actionBar: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.surface, paddingHorizontal: space.lg, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border },
+  stepErr: { color: '#DC2626', fontSize: font.small, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
   finalRow: { flexDirection: 'row', gap: 12 },
   primary: { backgroundColor: colors.brand, height: 52, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   primaryOff: { opacity: 0.45 },
