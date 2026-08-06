@@ -9,6 +9,7 @@ import { useSupplier } from '../../store/SupplierContext';
 import { api } from '../../api/client';
 import { ICONS } from '../../icons';
 import { pickAsset } from '../../utils/imagePicker';
+import { toast } from '../../utils/toast';
 import TaxonomyPicker from '../host/TaxonomyPicker';
 
 // Fixed square photo/video tile — 3 per row (matches Figma's 114px on a 390 screen).
@@ -16,7 +17,9 @@ const TILE = Math.floor((Dimensions.get('window').width - 16 * 2 - 10 * 2) / 3);
 const STEPS = ['Basic info', 'Description', 'Pricing', 'Photos'];
 
 // First missing mandatory field on a given step (null if the step is complete).
-// Video is the ONLY optional field. Mirrors the web validateExperience.
+// Each step only validates the fields it actually renders — so a step never
+// complains about a field that lives on another step. Video is the only
+// optional field.
 const rich = (s) => String(s || '').trim();
 const stepError = (st, f) => {
   if (st === 1) {
@@ -26,7 +29,7 @@ const stepError = (st, f) => {
     if (!f.location.trim()) return 'Please add the location';
     if (!f.city.trim()) return 'Please add the city';
     if (!f.pincode.trim()) return 'Please add the pincode';
-    if (!f.nearbyLocation.trim()) return 'Please add the nearby location';
+    if (!((Number(f.durationHours) || 0) > 0 || (Number(f.durationMinutes) || 0) > 0)) return 'Please set the duration';
   } else if (st === 2) {
     if (!rich(f.about)) return 'Please add the About description';
     if (!(f.inclusions || []).some((x) => (x || '').trim())) return 'Please add at least one inclusion';
@@ -40,7 +43,6 @@ const stepError = (st, f) => {
     if (!(Number(f.adultPrice) > 0)) return 'Please set the B2B adult price';
     if (!(Number(f.b2cAdultPrice) > 0)) return 'Please set the B2C adult price';
     if (!f.sourceName.trim()) return 'Please add the Source name';
-    if (!((Number(f.durationHours) || 0) > 0 || (Number(f.durationMinutes) || 0) > 0)) return 'Please set the session duration';
     if (!(f.schedule && Array.isArray(f.schedule.dates) && f.schedule.dates.length)) return 'Please add availability — pick dates and slots';
   }
   return null;
@@ -98,11 +100,9 @@ export default function SupplierCreateListingScreen() {
     return () => sub.remove();
   }, [step]);
 
-  const canNext = useMemo(() => !stepError(step, form), [step, form]);
-
   const goNext = () => {
     const e = stepError(step, form);
-    if (e) return Alert.alert('Missing info', e);
+    if (e) return toast(e);
     setStep((s) => Math.min(4, s + 1));
   };
   const goBack = () => (step > 1 ? setStep((s) => s - 1) : pop());
@@ -113,12 +113,12 @@ export default function SupplierCreateListingScreen() {
     if (isReview) {
       // Every field required (video is the only optional one) — flag the first missing one.
       const e = stepError(1, form) || stepError(2, form) || stepError(3, form);
-      if (e) return Alert.alert('Missing info', e);
+      if (e) return toast(e);
       if (form.photos.filter(Boolean).length < 6) {
-        return Alert.alert('Add more photos', `At least 6 photos are required before submitting for review — you have ${form.photos.filter(Boolean).length}.`);
+        return toast(`At least 6 photos are required — you have ${form.photos.filter(Boolean).length}.`);
       }
     } else if (!form.name.trim()) {
-      return Alert.alert('Name required', 'Please add the experience title to save a draft.');
+      return toast('Please add the experience title to save a draft.');
     }
     setSubmitting(true);
     try {
@@ -134,7 +134,7 @@ export default function SupplierCreateListingScreen() {
         [{ text: 'OK', onPress: () => { navigateTab('listings'); } }],
       );
     } catch (e) {
-      Alert.alert('Could not save', e.message || 'Please try again.');
+      toast(e.message || 'Could not save. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -165,7 +165,6 @@ export default function SupplierCreateListingScreen() {
 
       {/* Action bar */}
       <View style={[styles.actionBar, { paddingBottom: insets.bottom + 12 }]}>
-        {step < 4 && !canNext && <Text style={styles.stepErr}>{stepError(step, form)}</Text>}
         {step < 4 ? (
           <TouchableOpacity style={styles.primary} onPress={goNext} activeOpacity={0.9}>
             <Text style={styles.primaryText}>Next ›</Text>
