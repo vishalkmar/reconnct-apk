@@ -167,7 +167,7 @@ export default function SupplierCreateListingScreen() {
       <View style={[styles.actionBar, { paddingBottom: insets.bottom + 12 }]}>
         {step < 4 && !canNext && <Text style={styles.stepErr}>{stepError(step, form)}</Text>}
         {step < 4 ? (
-          <TouchableOpacity style={[styles.primary, !canNext && styles.primaryOff]} onPress={goNext} disabled={!canNext} activeOpacity={0.9}>
+          <TouchableOpacity style={styles.primary} onPress={goNext} activeOpacity={0.9}>
             <Text style={styles.primaryText}>Next ›</Text>
           </TouchableOpacity>
         ) : (

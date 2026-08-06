@@ -46,7 +46,15 @@ export default function BookingScreen({ item }) {
   // source the admin/host "Manage dates & slots" screen writes to.
   const slots = useMemo(() => slotsForDate(schedule, dateKey), [schedule, dateKey]);
   const [adults, setAdults] = useState(2);
-  const [children, setChildren] = useState(0);
+  // Children per age band, parallel to the experience's own childBands — set
+  // dynamically from THIS experience (not a hardcoded 0–5 band).
+  const childBands = Array.isArray(item.childBands) ? item.childBands : [];
+  const [childCounts, setChildCounts] = useState([]);
+  const setChildCount = (i, v) => setChildCounts((c) => {
+    const next = childBands.map((_, idx) => Number(c[idx]) || 0);
+    next[i] = v;
+    return next;
+  });
   const [showGuest, setShowGuest] = useState(false);
   const [guest, setGuest] = useState({ firstName: '', lastName: '', country: '', phoneCode: '+91', phone: '', email: '' });
   const [guestTouched, setGuestTouched] = useState({});
@@ -65,8 +73,8 @@ export default function BookingScreen({ item }) {
   // banner say "Payment failed" instead of the softer generic copy.
   const [payFailed, setPayFailed] = useState(false);
 
-  const b = priceBreakdown(item, adults, children);
-  const guests = adults + children;
+  const b = priceBreakdown(item, adults, childCounts);
+  const guests = adults + b.childCount;
   const guestFullName = [guest.firstName, guest.lastName].filter((s) => s && s.trim()).join(' ').trim();
   const guestFullPhone = (guest.phone || '').trim() ? `${guest.phoneCode || ''}${guest.phone.trim()}` : '';
   const primaryName = guestFullName || (user && user.name) || 'You';
@@ -82,7 +90,8 @@ export default function BookingScreen({ item }) {
         itemType: 'experience',
         itemId: item.id,
         scheduledFor: dateKey,
-        guestCount: adults + children,
+        guestCount: guests,
+        childrenBreakdown: b.childLines,
         guestName: primaryName,
         guestEmail: (guest.email || '').trim() || (user && user.email) || '',
         guestPhone: guestFullPhone || (user && user.phone) || '',
@@ -272,9 +281,19 @@ export default function BookingScreen({ item }) {
               <Text style={styles.label}>Guests</Text>
               <View style={styles.guestCard}>
                 <Stepper label="Adults" sub={`${formatMoney(b.adultPrice, item.currency)} each${item.capacity ? ` · up to ${item.capacity}` : ''}`} value={adults} setValue={setAdults} min={1} max={item.capacity || 30} />
-                {b.childBand && (
-                  <Stepper label={`Children (${b.childBand.startAge}–${b.childBand.endAge} yrs)`} sub={`${formatMoney(b.childPrice, item.currency)} each`} value={children} setValue={setChildren} min={0} max={item.capacity || 30} />
-                )}
+                {/* Children by age group — one row per age band this experience
+                    defined. Add as many age groups as needed. */}
+                {childBands.map((band, i) => (
+                  <Stepper
+                    key={`${band.startAge}-${band.endAge}-${i}`}
+                    label={`Children (${band.startAge}–${band.endAge} yrs)`}
+                    sub={band.charge ? `${formatMoney(band.price, item.currency)} each` : 'Free'}
+                    value={Number(childCounts[i]) || 0}
+                    setValue={(v) => setChildCount(i, v)}
+                    min={0}
+                    max={item.capacity || 30}
+                  />
+                ))}
                 <View style={styles.guestPrice}>
                   <Text style={styles.guestPriceTxt}>{formatMoney(b.adultPrice, item.currency)} × {guests} guest{guests > 1 ? 's' : ''}</Text>
                   <Text style={styles.guestPriceVal}>{formatMoney(b.subtotal, item.currency)}</Text>

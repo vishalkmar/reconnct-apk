@@ -3,6 +3,7 @@ import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { colors, radius, font, shadow } from '../theme';
 import { resolveImage, DUMMY_IMAGE } from '../api/client';
 import { formatMoney } from '../utils/format';
+import { finalFromPrice } from '../utils/booking';
 import { useWishlist } from '../store/WishlistContext';
 import { useNav } from '../navigation/NavContext';
 import { ICONS } from '../icons';
@@ -65,7 +66,7 @@ export default function ExperienceCard({ item, onPress, variant = 'grid', style 
             {item.reviewsCount ? <Text style={styles.muted}> ({item.reviewsCount})</Text> : null}
           </View>
           <Text style={styles.price}>
-            {item.fromPrice ? formatMoney(item.fromPrice, item.currency) : 'Contact'}
+            {item.fromPrice ? formatMoney(finalFromPrice(item), item.currency) : 'Contact'}
           </Text>
         </View>
 

@@ -36,11 +36,24 @@ export function slotsForDate(schedule = {}, dateKey) {
 }
 
 // Full price breakdown for the chosen guests.
-export function priceBreakdown(item, adults, children) {
+// `childCounts` is an array parallel to item.childBands — the number of children
+// booked in each age band (so different age groups price independently).
+export function priceBreakdown(item, adults, childCounts = []) {
   const adultPrice = item.fromPrice || 0;
-  const band = (item.childBands || []).find((b) => b.charge && b.price > 0);
-  const childPrice = band ? band.price : 0;
-  const subtotal = adults * adultPrice + children * childPrice;
+  const bands = Array.isArray(item.childBands) ? item.childBands : [];
+
+  let childCount = 0;
+  let childSubtotal = 0;
+  const childLines = [];
+  bands.forEach((band, i) => {
+    const n = Number((childCounts || [])[i]) || 0;
+    if (!n) return;
+    const price = band.charge ? (Number(band.price) || 0) : 0;
+    childCount += n;
+    childSubtotal += n * price;
+    childLines.push({ startAge: band.startAge, endAge: band.endAge, count: n, price });
+  });
+  const subtotal = adults * adultPrice + childSubtotal;
 
   const disc = item.discount || null;
   let discountAmt = 0;
@@ -57,5 +70,14 @@ export function priceBreakdown(item, adults, children) {
     convAmt = cf.type === 'percentage' ? (afterGst * Number(cf.value)) / 100 : Number(cf.value) || 0;
   }
   const total = Math.round(afterGst + convAmt);
-  return { adultPrice, childPrice, subtotal, discountAmt, gstAmt, convAmt, total, childBand: band };
+  return {
+    adultPrice, subtotal, discountAmt, gstAmt, convAmt, total, childCount, childLines, bands,
+  };
+}
+
+// Per-adult "from" price WITH the go-live extras (GST + convenience, less any
+// %-discount) applied — what the card / detail "from ₹X" should show once live.
+export function finalFromPrice(item) {
+  const b = priceBreakdown(item, 1, []);
+  return b.total || (item.fromPrice || 0);
 }

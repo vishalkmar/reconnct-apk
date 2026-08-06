@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../theme';
 import { api, resolveImage, DUMMY_IMAGE } from '../api/client';
 import { formatMoney, initials } from '../utils/format';
+import { finalFromPrice } from '../utils/booking';
 import { useNav } from '../navigation/NavContext';
 import { useWishlist } from '../store/WishlistContext';
 import { shareExperience } from '../utils/share';
@@ -193,7 +194,8 @@ export default function DetailScreen({ idOrSlug }) {
         <View>
           <Text style={styles.fromLabel}>from</Text>
           <Text style={styles.fromPrice}>
-            {item.fromPrice ? formatMoney(item.fromPrice, item.currency) : 'Contact'}
+            {/* Final price the customer pays = B2B + GST/convenience (less %-discount). */}
+            {item.fromPrice ? formatMoney(finalFromPrice(item), item.currency) : 'Contact'}
             {item.fromPrice ? <Text style={styles.fromUnit}>/{item.priceUnit}</Text> : null}
           </Text>
         </View>
