@@ -75,6 +75,12 @@ export default function BookingScreen({ item }) {
 
   const b = priceBreakdown(item, adults, childCounts);
   const guests = adults + b.childCount;
+  // Per-band price lines so the breakdown reads "₹1,000 × 1 / ₹500 × 1 / …"
+  // instead of a misleading single "adult price × total guests" line.
+  const priceLines = [
+    ...(adults > 0 ? [{ label: 'Adults', qty: adults, price: b.adultPrice }] : []),
+    ...b.childLines.map((c) => ({ label: `Children (${c.startAge}–${c.endAge} yrs)`, qty: c.count, price: c.price })),
+  ];
   const guestFullName = [guest.firstName, guest.lastName].filter((s) => s && s.trim()).join(' ').trim();
   const guestFullPhone = (guest.phone || '').trim() ? `${guest.phoneCode || ''}${guest.phone.trim()}` : '';
   const primaryName = guestFullName || (user && user.name) || 'You';
@@ -280,7 +286,7 @@ export default function BookingScreen({ item }) {
             <>
               <Text style={styles.label}>Guests</Text>
               <View style={styles.guestCard}>
-                <Stepper label="Adults" sub={`${formatMoney(b.adultPrice, item.currency)} each${item.capacity ? ` · up to ${item.capacity}` : ''}`} value={adults} setValue={setAdults} min={1} max={item.capacity || 30} />
+                <Stepper label="Adults" sub={`${formatMoney(b.adultPrice, item.currency)} each${item.capacity ? ` · up to ${item.capacity}` : ''}`} value={adults} setValue={setAdults} min={0} max={item.capacity || 30} />
                 {/* Children by age group — one row per age band this experience
                     defined. Add as many age groups as needed. */}
                 {childBands.map((band, i) => (
@@ -294,9 +300,17 @@ export default function BookingScreen({ item }) {
                     max={item.capacity || 30}
                   />
                 ))}
-                <View style={styles.guestPrice}>
-                  <Text style={styles.guestPriceTxt}>{formatMoney(b.adultPrice, item.currency)} × {guests} guest{guests > 1 ? 's' : ''}</Text>
-                  <Text style={styles.guestPriceVal}>{formatMoney(b.subtotal, item.currency)}</Text>
+                <View style={styles.guestPriceBox}>
+                  {priceLines.map((ln, i) => (
+                    <View key={i} style={styles.guestPriceRow}>
+                      <Text style={styles.guestPriceTxt}>{formatMoney(ln.price, item.currency)} × {ln.qty}</Text>
+                      <Text style={styles.guestPriceVal}>{ln.price ? formatMoney(ln.price * ln.qty, item.currency) : 'Free'}</Text>
+                    </View>
+                  ))}
+                  <View style={[styles.guestPriceRow, styles.guestSubtotalRow]}>
+                    <Text style={styles.guestSubtotalTxt}>Subtotal</Text>
+                    <Text style={styles.guestSubtotalTxt}>{formatMoney(b.subtotal, item.currency)}</Text>
+                  </View>
                 </View>
               </View>
 
@@ -335,7 +349,10 @@ export default function BookingScreen({ item }) {
           </Section>
 
           <Section title="Price details">
-            <KV k={`${formatMoney(b.adultPrice, item.currency)} × ${guests} guest${guests > 1 ? 's' : ''}`} v={formatMoney(b.subtotal, item.currency)} />
+            {priceLines.map((ln, i) => (
+              <KV key={i} k={`${formatMoney(ln.price, item.currency)} × ${ln.qty}`} v={ln.price ? formatMoney(ln.price * ln.qty, item.currency) : 'Free'} />
+            ))}
+            <KV k="Subtotal" v={formatMoney(b.subtotal, item.currency)} />
             {b.discountAmt > 0 && <KV k="Discount" v={`− ${formatMoney(b.discountAmt, item.currency)}`} green />}
             {b.gstAmt > 0 && <KV k={`GST (${item.gstRate}%)`} v={formatMoney(b.gstAmt, item.currency)} />}
             {b.convAmt > 0 && <KV k="reconnct service fee" v={formatMoney(b.convAmt, item.currency)} />}
@@ -461,7 +478,7 @@ export default function BookingScreen({ item }) {
       {/* Sticky action bar (steps 1–3) */}
       {step < 4 && (
         <View style={[styles.actionBar, { paddingBottom: insets.bottom + 12 }]}>
-          {step === 1 && <Action label="Choose guests & continue" onPress={next1} enabled={!!dateKey && (!slots.length || !!slot)} />}
+          {step === 1 && <Action label="Choose guests & continue" onPress={next1} enabled={!!dateKey && (!slots.length || !!slot) && guests > 0} />}
           {step === 2 && <Action label={`Continue to payment  ${formatMoney(b.total, item.currency)}`} onPress={startPayment} enabled />}
           {step === 3 && (
             <View style={styles.waitRow}>
@@ -652,8 +669,12 @@ const styles = StyleSheet.create({
   stepSign: { fontSize: 18, color: colors.brand, fontWeight: '800' },
   stepVal: { fontSize: font.h3, fontWeight: '800', color: colors.ink, minWidth: 22, textAlign: 'center' },
   guestPrice: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  guestPriceBox: { paddingHorizontal: 10, paddingTop: 6, paddingBottom: 8, borderTopWidth: 1, borderTopColor: colors.border },
+  guestPriceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
   guestPriceTxt: { fontSize: font.small, color: colors.inkMuted },
-  guestPriceVal: { fontSize: font.body, fontWeight: '800', color: colors.ink },
+  guestPriceVal: { fontSize: font.body, fontWeight: '700', color: colors.ink },
+  guestSubtotalRow: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 4, paddingTop: 8 },
+  guestSubtotalTxt: { fontSize: font.body, fontWeight: '800', color: colors.ink },
 
   guestToggle: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderRadius: radius.md, padding: 14, marginTop: 12, borderWidth: 1, borderColor: colors.border },
   guestToggleIcon: { width: 18, height: 18, tintColor: colors.brand },

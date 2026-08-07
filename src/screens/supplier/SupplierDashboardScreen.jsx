@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, font, space, shadow } from '../../theme';
 import { useNav } from '../../navigation/NavContext';
 import { useSupplier } from '../../store/SupplierContext';
-import { useSupplierAuth } from '../../store/SupplierAuthContext';
 import { initials, formatMoney } from '../../utils/format';
 import { ICONS } from '../../icons';
 import NotificationBell from '../../components/NotificationBell';
@@ -23,7 +22,6 @@ export default function SupplierDashboardScreen() {
   const insets = useSafeAreaInsets();
   const { push, navigateTab } = useNav();
   const { token, stats, profile, reload, canAddListing } = useSupplier();
-  const { signOut } = useSupplierAuth();
   const [kamOpen, setKamOpen] = useState(false);
   // Stats/bookings are fetched once at login otherwise, so a listing that went
   // live (or a new booking) never showed up until a reinstall.
@@ -42,9 +40,10 @@ export default function SupplierDashboardScreen() {
           <Image source={ICONS.logoWhite} style={styles.logo} resizeMode="contain" />
           <View style={styles.headerActions}>
             <NotificationBell mode="supplier" token={token} />
-          <TouchableOpacity style={styles.modePill} onPress={signOut} activeOpacity={0.85}>
-            <Text style={styles.modePillText}>Supplier</Text>
-            </TouchableOpacity>
+            {/* Showcase-only role badge — not interactive (sign-out lives in Profile). */}
+            <View style={styles.modePill}>
+              <Text style={styles.modePillText}>Supplier</Text>
+            </View>
           </View>
         </View>
         <View style={styles.idRow}>

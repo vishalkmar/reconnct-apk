@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Dimensions,
 } from 'react-native';
 import { colors, radius, font, space } from '../../theme';
+
+// Fixed square photo tile — 3 per row. A computed pixel size (not a "%" width +
+// aspectRatio, which collapses to 0 height inside this nested flex grid and
+// leaves the Photos section looking empty).
+const PHOTO_TILE = Math.floor((Dimensions.get('window').width - space.lg * 2 - 8 * 2) / 3);
 import { useSupplierAuth } from '../../store/SupplierAuthContext';
 import { useAuth } from '../../store/AuthContext';
 import { useNav } from '../../navigation/NavContext';
@@ -106,9 +111,11 @@ export default function SupplierListingDetailScreen({ id, listing: passed, mode 
   // Real, resolvable photos only — the gallery can carry empty strings/nulls
   // that otherwise render as blank grey tiles (or an empty "Photos" section).
   // Include the cover image and de-dupe so it isn't shown twice.
+  // Pull from every place a photo can live — the form's gallery, the row's
+  // gallery, and the cover — so the section fills even when one source is empty.
   const photos = [...new Set(
-    [(listing && listing.image), ...(f.photos || [])]
-      .map((p) => resolveImage(p))
+    [(listing && listing.image), ...(f.photos || []), ...((listing && listing.gallery) || [])]
+      .map((p) => resolveImage(typeof p === 'string' ? p : (p && (p.url || p.image))))
       .filter(Boolean),
   )];
   const inclusions = (f.inclusions || []).map((x) => stripHtml(typeof x === 'string' ? x : (x.title || x.text || ''))).filter(Boolean);
@@ -384,7 +391,7 @@ const styles = StyleSheet.create({
   kvValue: { fontSize: font.small, color: colors.ink, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
   para: { fontSize: font.body, color: colors.ink, lineHeight: 21 },
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  photo: { width: '31.5%', aspectRatio: 1, borderRadius: radius.md, backgroundColor: '#DCE0E6' },
+  photo: { width: PHOTO_TILE, height: PHOTO_TILE, borderRadius: radius.md, backgroundColor: '#DCE0E6' },
   bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 5 },
   bulletIcon: { width: 15, height: 15, tintColor: colors.brand, marginTop: 2 },
   bulletText: { flex: 1, fontSize: font.body, color: colors.ink, lineHeight: 20 },
