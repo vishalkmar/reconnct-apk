@@ -11,7 +11,7 @@ import {
 } from '../utils/booking';
 import { useAuth } from '../store/AuthContext';
 import { useNav } from '../navigation/NavContext';
-import { shareExperience, shareVoucher } from '../utils/share';
+import { shareExperience, shareVoucher, shareVoucherPdf } from '../utils/share';
 import { createDirectPaymentLink } from '../utils/cashfree';
 import PaymentWebView from '../components/PaymentWebView';
 import { ICONS } from '../icons';
@@ -468,16 +468,24 @@ export default function BookingScreen({ item }) {
             <TouchableOpacity style={styles.doneBtnPrimary} onPress={() => { navigateTab('profile'); push('bookings'); }}>
               <Text style={styles.doneBtnPrimaryTxt}>View trips</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.doneBtnGhost} onPress={() => shareVoucher({
-              code: bookingCode,
-              name: item.name,
-              city: item.city || item.location,
-              date: fmtDate(dateKey),
-              slot: slot?.label,
-              guests: `${guests} guest${guests > 1 ? 's' : ''}`,
-              total: formatMoney(payTotal, item.currency),
-              url: `https://reconnct.app/experiences/${item.slug || item.id}`,
-            })}>
+            <TouchableOpacity style={styles.doneBtnGhost} onPress={async () => {
+              // Share the actual PDF voucher; fall back to a text voucher if the
+              // file can't be fetched/shared.
+              try {
+                await shareVoucherPdf({ code: bookingCode, token });
+              } catch (_) {
+                shareVoucher({
+                  code: bookingCode,
+                  name: item.name,
+                  city: item.city || item.location,
+                  date: fmtDate(dateKey),
+                  slot: slot?.label,
+                  guests: `${guests} guest${guests > 1 ? 's' : ''}`,
+                  total: formatMoney(payTotal, item.currency),
+                  url: `https://reconnct.app/experiences/${item.slug || item.id}`,
+                });
+              }
+            }}>
               <Image source={ICONS.share} style={{ width: 16, height: 16, tintColor: colors.ink }} />
               <Text style={styles.doneBtnGhostTxt}>Share voucher</Text>
             </TouchableOpacity>
