@@ -71,8 +71,8 @@ const blank = {
   // read as ready-to-fill boxes (host can delete them to close).
   inclusions: [''], facilities: [], nearbyPlaces: [{ name: '', distance: '', unit: 'km' }], faqs: [],
   termsConditions: '', privacyPolicy: '', refundCancellationPolicy: '',
-  priceMethod: 'per_person', adultPrice: '', childrenEnabled: false, childBands: [],
-  b2cPriceMethod: 'per_person', b2cAdultPrice: '', b2cChildrenEnabled: false, b2cChildBands: [],
+  priceMethod: 'per_person', adultPrice: '', childrenEnabled: false, childBands: [], childMode: 'age',
+  b2cPriceMethod: 'per_person', b2cAdultPrice: '', b2cChildrenEnabled: false, b2cChildBands: [], b2cChildMode: 'age',
   sourceName: '', sourceLink: '',
   capacity: 8, durationHours: 0, durationMinutes: 0,
   schedule: { dates: [] }, // { dates:[{date:'YYYY-MM-DD', slots:[{start,end}]}], slotMode }
@@ -279,17 +279,28 @@ function Step2({ form, patch }) {
 /* ───────────────────────── STEP 3 — pricing + availability ───────────── */
 // One pricing block (method + adult + children), bound to a set of form keys,
 // so B2B (working) and B2C (reference) render identically.
-function PriceSection({ form, patch, title, hint, methodKey, priceKey, enabledKey, bandsKey }) {
+function PriceSection({ form, patch, title, hint, methodKey, priceKey, enabledKey, bandsKey, modeKey }) {
   const bands = form[bandsKey] || [];
   const method = form[methodKey];
   const perDay = method === 'per_day' || method === 'days';
+  const mode = (modeKey && form[modeKey]) || 'age'; // 'age' (default) | 'height'
   const addBand = () => {
     const last = bands[bands.length - 1];
-    const start = last ? Math.min(14, Number(last.endAge) + 1) : 0;
-    patch({ [bandsKey]: [...bands, { startAge: start, endAge: Math.min(14, start + 4), charge: true, price: '' }] });
+    if (mode === 'height') {
+      const start = last ? (Number(last.endHeight) || 0) + 1 : 80;
+      patch({ [bandsKey]: [...bands, { startHeight: start, endHeight: start + 20, charge: true, price: '' }] });
+    } else {
+      const start = last ? Math.min(14, Number(last.endAge) + 1) : 0;
+      patch({ [bandsKey]: [...bands, { startAge: start, endAge: Math.min(14, start + 4), charge: true, price: '' }] });
+    }
   };
   const setBand = (i, p) => patch({ [bandsKey]: bands.map((b, idx) => (idx === i ? { ...b, ...p } : b)) });
   const removeBand = (i) => patch({ [bandsKey]: bands.filter((_, idx) => idx !== i) });
+  const setMode = (m) => {
+    if (mode === m || !modeKey) return;
+    const seed = m === 'height' ? { startHeight: 80, endHeight: 120, charge: false, price: '' } : { startAge: 0, endAge: 5, charge: false, price: '' };
+    patch({ [modeKey]: m, [bandsKey]: [seed] });
+  };
   return (
     <View style={{ gap: 20 }}>
       <Text style={styles.bigQ}>{title} <Text style={{ color: '#DC2626' }}> *</Text></Text>
@@ -313,13 +324,34 @@ function PriceSection({ form, patch, title, hint, methodKey, priceKey, enabledKe
         </View>
         {form[enabledKey] && (
           <View style={{ gap: 10, marginTop: 12 }}>
-            <Text style={styles.hint}>Define age bands (years). Turn a band's "Set a price" off to make it free.</Text>
+            {/* Basis: age (default) or height */}
+            <View style={{ flexDirection: 'row', gap: 18 }}>
+              <TouchableOpacity style={styles.checkRow} onPress={() => setMode('age')}>
+                <View style={[styles.checkbox, mode === 'age' && styles.checkboxOn]}>{mode === 'age' && <Text style={styles.checkboxTick}>{'✓'}</Text>}</View>
+                <Text style={styles.checkLabel}>Based on age</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.checkRow} onPress={() => setMode('height')}>
+                <View style={[styles.checkbox, mode === 'height' && styles.checkboxOn]}>{mode === 'height' && <Text style={styles.checkboxTick}>{'✓'}</Text>}</View>
+                <Text style={styles.checkLabel}>Based on height</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.hint}>{mode === 'height' ? 'Define height ranges (cm). Turn a band\'s "Set a price" off to make it free.' : 'Define age bands (years). Turn a band\'s "Set a price" off to make it free.'}</Text>
             {bands.map((b, i) => (
               <View key={i} style={styles.band}>
                 <View style={styles.bandAges}>
-                  <SmallNum label="Min Age" value={b.startAge} onChange={(v) => setBand(i, { startAge: v })} />
-                  <Text style={styles.toText}>to</Text>
-                  <SmallNum label="Max Age" value={b.endAge} onChange={(v) => setBand(i, { endAge: v })} />
+                  {mode === 'height' ? (
+                    <>
+                      <SmallNum label="Min (cm)" value={b.startHeight} onChange={(v) => setBand(i, { startHeight: v })} />
+                      <Text style={styles.toText}>to</Text>
+                      <SmallNum label="Max (cm)" value={b.endHeight} onChange={(v) => setBand(i, { endHeight: v })} />
+                    </>
+                  ) : (
+                    <>
+                      <SmallNum label="Min Age" value={b.startAge} onChange={(v) => setBand(i, { startAge: v })} />
+                      <Text style={styles.toText}>to</Text>
+                      <SmallNum label="Max Age" value={b.endAge} onChange={(v) => setBand(i, { endAge: v })} />
+                    </>
+                  )}
                 </View>
                 <View style={styles.bandPrice}>
                   <TouchableOpacity style={styles.checkRow} onPress={() => setBand(i, { charge: !b.charge })}>
@@ -333,7 +365,7 @@ function PriceSection({ form, patch, title, hint, methodKey, priceKey, enabledKe
                 </View>
               </View>
             ))}
-            <TouchableOpacity onPress={addBand}><Text style={styles.addLink}>＋ Add age band</Text></TouchableOpacity>
+            <TouchableOpacity onPress={addBand}><Text style={styles.addLink}>＋ {mode === 'height' ? 'Add height band' : 'Add age band'}</Text></TouchableOpacity>
           </View>
         )}
       </View>
@@ -347,12 +379,11 @@ function Step3({ form, patch }) {
       <PriceSection
         form={form} patch={patch} title="B2B pricing"
         hint="The working price. Center Ops adds GST/discount/convenience fee on this at go-live — the result is what customers pay in the app."
-        methodKey="priceMethod" priceKey="adultPrice" enabledKey="childrenEnabled" bandsKey="childBands"
+        methodKey="priceMethod" priceKey="adultPrice" enabledKey="childrenEnabled" bandsKey="childBands" modeKey="childMode"
       />
       <PriceSection
         form={form} patch={patch} title="B2C pricing"
-       
-        methodKey="b2cPriceMethod" priceKey="b2cAdultPrice" enabledKey="b2cChildrenEnabled" bandsKey="b2cChildBands"
+        methodKey="b2cPriceMethod" priceKey="b2cAdultPrice" enabledKey="b2cChildrenEnabled" bandsKey="b2cChildBands" modeKey="b2cChildMode"
       />
 
       {/* Guests per session */}

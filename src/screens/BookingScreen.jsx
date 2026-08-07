@@ -11,7 +11,7 @@ import {
 } from '../utils/booking';
 import { useAuth } from '../store/AuthContext';
 import { useNav } from '../navigation/NavContext';
-import { shareExperience } from '../utils/share';
+import { shareExperience, shareVoucher } from '../utils/share';
 import { createDirectPaymentLink } from '../utils/cashfree';
 import PaymentWebView from '../components/PaymentWebView';
 import { ICONS } from '../icons';
@@ -291,8 +291,10 @@ export default function BookingScreen({ item }) {
                     defined. Add as many age groups as needed. */}
                 {childBands.map((band, i) => (
                   <Stepper
-                    key={`${band.startAge}-${band.endAge}-${i}`}
-                    label={`Children (${band.startAge}–${band.endAge} yrs)`}
+                    key={`band-${i}`}
+                    label={band.unit === 'cm'
+                      ? `Children (${band.startHeight}–${band.endHeight} cm)`
+                      : `Children (${band.startAge}–${band.endAge} yrs)`}
                     sub={band.charge ? `${formatMoney(band.price, item.currency)} each` : 'Free'}
                     value={Number(childCounts[i]) || 0}
                     setValue={(v) => setChildCount(i, v)}
@@ -466,9 +468,18 @@ export default function BookingScreen({ item }) {
             <TouchableOpacity style={styles.doneBtnPrimary} onPress={() => { navigateTab('profile'); push('bookings'); }}>
               <Text style={styles.doneBtnPrimaryTxt}>View trips</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.doneBtnGhost} onPress={() => shareExperience(item)}>
+            <TouchableOpacity style={styles.doneBtnGhost} onPress={() => shareVoucher({
+              code: bookingCode,
+              name: item.name,
+              city: item.city || item.location,
+              date: fmtDate(dateKey),
+              slot: slot?.label,
+              guests: `${guests} guest${guests > 1 ? 's' : ''}`,
+              total: formatMoney(payTotal, item.currency),
+              url: `https://reconnct.app/experiences/${item.slug || item.id}`,
+            })}>
               <Image source={ICONS.share} style={{ width: 16, height: 16, tintColor: colors.ink }} />
-              <Text style={styles.doneBtnGhostTxt}>Share</Text>
+              <Text style={styles.doneBtnGhostTxt}>Share voucher</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity onPress={() => navigateTab('home')}><Text style={styles.backExplore}>Back to explore</Text></TouchableOpacity>

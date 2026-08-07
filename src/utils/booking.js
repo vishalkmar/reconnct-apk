@@ -13,25 +13,42 @@ export const to12h = (hhmm) => {
   return `${h12}:${String(m).padStart(2, '0')} ${ap}`;
 };
 
+const slotMinutes = (hhmm) => { const [h, m] = String(hhmm).split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+const nowMinutes = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+
 // Set of bookable date-keys (YYYY-MM-DD): exactly the dates the host picked in
-// "Manage dates & slots" on the admin/host side — schedule.dates[].date —
-// so the app never shows availability that isn't actually configured.
+// "Manage dates & slots" on the admin/host side — schedule.dates[].date. For
+// TODAY, the date is only bookable if it still has a time slot in the future
+// (movie-ticket style) — once today's last slot start has passed, the day is
+// no longer selectable.
 export function bookableDateSet(schedule = {}) {
   const dates = Array.isArray(schedule.dates) ? schedule.dates : [];
   const todayKey = ymd(new Date());
+  const now = nowMinutes();
   const set = new Set();
   for (const d of dates) {
-    if (d && d.date && d.date >= todayKey) set.add(d.date);
+    if (!d || !d.date || d.date < todayKey) continue;
+    if (d.date === todayKey) {
+      const slots = Array.isArray(d.slots) ? d.slots : [];
+      // Has configured slots but none still upcoming today → not bookable.
+      if (slots.length > 0 && !slots.some((s) => slotMinutes(s.start) > now)) continue;
+    }
+    set.add(d.date);
   }
   return set;
 }
 
 // The real slots configured for one specific date (schedule.dates[].slots),
-// formatted for display. Empty if the host hasn't added slots for that date.
+// formatted for display. For TODAY, slots whose start time has already passed
+// are dropped, so a user can never pick an expired time.
 export function slotsForDate(schedule = {}, dateKey) {
   const dates = Array.isArray(schedule.dates) ? schedule.dates : [];
   const row = dateKey ? dates.find((d) => d.date === dateKey) : null;
-  const slots = (row && row.slots) || [];
+  let slots = (row && row.slots) || [];
+  if (dateKey === ymd(new Date())) {
+    const now = nowMinutes();
+    slots = slots.filter((s) => slotMinutes(s.start) > now);
+  }
   return slots.map((s) => ({ ...s, label: `${to12h(s.start)} – ${to12h(s.end)}` }));
 }
 
@@ -53,7 +70,15 @@ export function priceBreakdown(item, adults, childCounts = []) {
     childSubtotal += n * price;
     childLines.push({ startAge: band.startAge, endAge: band.endAge, count: n, price });
   });
-  const subtotal = adults * adultPrice + childSubtotal;
+  const baseSubtotal = adults * adultPrice + childSubtotal;
+
+  // Markup — a margin added on the B2B base, applied BEFORE discount.
+  const mk = item.markup || null;
+  let markupAmt = 0;
+  if (mk && mk.value && baseSubtotal > 0) {
+    markupAmt = mk.type === 'fixed' ? (Number(mk.value) || 0) : (baseSubtotal * (Number(mk.value) || 0)) / 100;
+  }
+  const subtotal = baseSubtotal + markupAmt;
 
   const disc = item.discount || null;
   let discountAmt = 0;
